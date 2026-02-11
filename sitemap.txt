@@ -1,3 +1,6 @@
+http://example.com/css/vaporwave/index.css
+http://example.com/css/vaporwave.css
+http://example.com/Gallery/index.html
 http://example.com/tags/index.html
 http://example.com/categories/index.html
 http://example.com/2025/03/30/hello-world/
