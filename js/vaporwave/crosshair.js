@@ -26,7 +26,6 @@
 
   var STATE_LERP = 0.08;
 
-  // Hide system cursor (only on pages that run the comet effect)
   function hideSystemCursor() {
     var s = document.createElement('style');
     s.id = 'comet-cursor-hide';
@@ -111,12 +110,11 @@
   function start() {
     if (document.documentElement.getAttribute('data-crosshair') === 'false') return;
 
-    // On article pages, disable comet cursor entirely — use system cursor
+    // On article pages, use system cursor — skip entirely
     var bodyWrap = document.getElementById('body-wrap');
     if (bodyWrap && bodyWrap.classList.contains('post')) return;
 
     hideSystemCursor();
-
     canvas = document.createElement('canvas');
     canvas.id = 'comet-canvas';
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:99999;';
