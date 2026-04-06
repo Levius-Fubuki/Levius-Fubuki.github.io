@@ -283,6 +283,13 @@ body.body-article-page::-webkit-scrollbar-thumb:hover {
   outline: 2px solid #0ff !important;
   outline-offset: 2px !important;
 }
+.katex {
+  display: inline !important;
+}
+.katex-display .katex-show,
+.katex-display {
+  display: block !important;
+}
 body {
   position: relative;
 }
