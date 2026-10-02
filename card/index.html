@@ -9,8 +9,8 @@
     <script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('is-embedded');</script>
     <link rel="stylesheet" href="./style.css" />
     <link rel="stylesheet" href="./preview.css" />
-    <link rel="stylesheet" href="./embed.css?v=88aedbfde224" />
-    <script type="module" src="./app.bundle.js?v=d96e20b2dbb4"></script>
+    <link rel="stylesheet" href="./embed.css?v=66782d1b71ac" />
+      <script type="module" src="./app.bundle.js?v=f6155a097969" onerror="document.querySelector('[data-card-status]').textContent='互动卡片未载入，请点击重新加载'"></script>
   </head>
   <body>
     <header class="masthead">
@@ -52,7 +52,8 @@
           aria-label="可旋转的全息卡片"
         >
           <div id="loading" class="loading" role="status">
-            <span class="loading-line"></span><span>正在装裱作品</span>
+            <img class="card-loading-preview" src="./assets/card-preview.webp" alt="Sun Yunfei 与 Levius-Fubuki 的身份卡预览" width="600" height="550" fetchpriority="high" />
+            <div class="card-loading-status"><span class="loading-line"></span><span data-card-status>正在加载互动卡片…</span><button data-card-retry type="button" onclick="location.reload()">重新加载</button></div>
           </div>
         </div>
         <div class="preview-controls"><button id="auto" type="button" aria-label="暂停旋转" title="暂停旋转"><i data-lucide="pause"></i></button><button id="reset-card" type="button">复位</button></div>
@@ -191,6 +192,5 @@
       </dl>
     </dialog>
     <div id="notice" role="status" class="notice" hidden></div>
-    <script type="module" src="./app.bundle.js?v=d96e20b2dbb4"></script>
   </body>
 </html>
