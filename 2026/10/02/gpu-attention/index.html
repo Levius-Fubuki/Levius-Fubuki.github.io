@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="保留 FlashAttention-4 的在线 Softmax 推导、七张技术图与前后向流水线分析，明确论文实验范围。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/gpu-attention/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="保留 FlashAttention-4 的在线 Softmax 推导、七张技术图与前后向流水线分析，明确论文实验范围。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/gpu-attention.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/gpu-attention.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/gpu-attention/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="AI Infra" property="article:tag"/><meta content="Attention" property="article:tag"/><meta content="算子优化" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/AI-Infra/">AI Infra</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="gpu-attention">FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</h1>
+<p>本文由既有深读笔记整理入博客，并核对了对应 Codex 学习工作区。内容区分论文事实、教学推导与实验边界；论文中的性能与规模数据属于作者报告，不是我在本地复现的成绩。原笔记的公式、示例和推导在此保留。</p>
+<div class="study-note">
+<section class="article-section" id="summary">
+<p class="section-kicker">01 / Executive summary</p>
+<h2 id="一页读懂-论文主张与结论">一页读懂：论文主张与结论</h2>
+<p class="section-intent">结论：FA4 的核心不是让 Tensor Core 单独跑得更快，而是让 softmax、片上存储和调度跟上 Blackwell 已翻倍的矩阵吞吐。</p>
+<p><span class="evidence">论文事实</span>Blackwell 的矩阵乘加（MMA）能力增长快于特殊函数和共享内存能力，FA4 因而同时重构前向流水线、指数计算、反向 CTA 协作与任务调度。主文在 B200 上报告 BF16 attention 最高 1613 TFLOP/s，约为峰值的 71%；相对 cuDNN 9.13 为 1.1–1.3×，相对 Triton 为 2.1–2.7×。总体主张见论文 §1，设计见 §3，编译方法见 §4，评测见 §5。</p>
+<div class="callout"><strong>阅读主线。</strong>把 attention 看成多个资源同时推进的生产线：MMA 是主装配线，MUFU 负责指数，SMEM/TMA 负责周转，warpgroup 与 CTA 调度决定谁等待谁。优化目标是缩短最长的那一段，而非只提高某一条指令的峰值。</div>
+<p><span class="evidence inference">工程推断</span>最可迁移的思想是“关联式摘要（associative summary）+ 有结构的调度”：先把分块结果压成可合并状态，再按硬件依赖安排执行；这不等价于一个能表达所有算子的通用 runtime semiring。</p>
+<p><span class="evidence limit">局限</span>论文未给出端到端训练收敛、能耗、p95/p99 延迟或广泛形状覆盖，因此这些吞吐结果不能直接外推为所有模型、部署和后续软件版本上的普遍优势。</p>
+</section>
+<section class="article-section" id="attention-map">
+<p class="section-kicker">02 / Computation map</p>
+<h2 id="attention-计算与数据流地图">Attention 计算与数据流地图</h2>
+<p class="section-intent">结论：标准 attention 是“相似度 → 概率 → 加权汇总”；FlashAttention 的分块算法在精确算术中与标准公式等价，但浮点舍入和快速指数近似会带来数值差异。</p>
+<h3 id="一句话定义与公式">一句话定义与公式</h3>
+<p><span class="evidence">论文事实</span><code>QKᵀ</code> 计算每个 query 与每个 key 的相似度分数；softmax 把一行分数变为和为 1 的归一化权重；<code>PV</code> 再用这些权重汇总 value。缩放 attention 为：</p>
+<div class="equation">S = QKᵀ / √d<br/>P = softmax(S)<br/>O = PV</div>
+<figure class="technical-figure attention-flow-diagram" id="attention-flow-diagram">
+<svg aria-label="Attention 前向三阶段与反向五次矩阵乘的依赖有向无环图" role="img" viewbox="0 0 720 340">
+<title>Attention 前向流与反向五次 MMA 依赖图</title>
+<desc>dS derives from P + dP; dV branches from P; dQ and dK branch from dS.</desc>
+<rect class="strong" height="52" rx="3" width="155" x="20" y="28"></rect>
+<rect class="strong" height="52" rx="3" width="155" x="282" y="28"></rect>
+<rect class="strong" height="52" rx="3" width="155" x="544" y="28"></rect>
+<text class="label" text-anchor="middle" x="97" y="51">QKᵀ</text>
+<text class="small" text-anchor="middle" x="97" y="70">相似度 S</text>
+<text class="label" text-anchor="middle" x="359" y="51">softmax</text>
+<text class="small" text-anchor="middle" x="359" y="70">概率 P</text>
+<text class="label" text-anchor="middle" x="621" y="51">PV</text>
+<text class="small" text-anchor="middle" x="621" y="70">输出 O</text>
+<path class="accent-wire" d="M175 54H282 M437 54H544"></path>
+<text text-anchor="middle" x="226" y="47">→</text>
+<text text-anchor="middle" x="488" y="47">→</text>
+<text class="label" x="20" y="116">Backward · 5 MMA · dependency DAG</text>
+<rect class="strong" height="52" rx="3" width="130" x="20" y="132"></rect>
+<text class="label" text-anchor="middle" x="85" y="154">① QKᵀ</text>
+<text class="small" text-anchor="middle" x="85" y="174">重算 S</text>
+<rect class="box" height="52" rx="3" width="130" x="180" y="132"></rect>
+<text class="label" text-anchor="middle" x="245" y="154">P</text>
+<text class="small" text-anchor="middle" x="245" y="174">由 S softmax 得到</text>
+<rect class="strong" height="52" rx="3" width="140" x="560" y="132"></rect>
+<text class="label" text-anchor="middle" x="630" y="154">③ Pᵀ dO</text>
+<text class="small" text-anchor="middle" x="630" y="174">dV 分支</text>
+<rect class="strong" height="52" rx="3" width="130" x="20" y="252"></rect>
+<text class="label" text-anchor="middle" x="85" y="274">② dO Vᵀ</text>
+<text class="small" text-anchor="middle" x="85" y="294">矩阵乘</text>
+<rect class="box" height="52" rx="3" width="130" x="180" y="252"></rect>
+<text class="label" text-anchor="middle" x="245" y="274">dP</text>
+<text class="small" text-anchor="middle" x="245" y="294">由 MMA ② 得到</text>
+<rect class="accent-fill" height="52" rx="3" width="140" x="360" y="192"></rect>
+<text class="label" text-anchor="middle" x="430" y="214">dS</text>
+<text class="small" text-anchor="middle" x="430" y="234">由 P 与 dP 求导</text>
+<rect class="strong" height="48" rx="3" width="150" x="550" y="210"></rect>
+<text class="label" text-anchor="middle" x="625" y="232">④ dS K → dQ</text>
+<rect class="strong" height="48" rx="3" width="150" x="550" y="276"></rect>
+<text class="label" text-anchor="middle" x="625" y="298">⑤ dSᵀ Q → dK</text>
+<path class="accent-wire" d="M150 158H180"></path>
+<path class="wire" d="M310 158H560"></path>
+<text class="small" text-anchor="middle" x="435" y="151">P 与 dO</text>
+<path class="accent-wire" d="M150 278H180"></path>
+<path class="wire" d="M245 184V210H360"></path>
+<path class="wire" d="M310 278H334V226H360"></path>
+<path class="accent-wire" d="M500 218H550"></path>
+<path class="accent-wire" d="M430 244V300H550"></path>
+</svg>
+<figcaption>前向依旧是 QKᵀ → softmax → PV。反向不是五个 MMA 串行：重算 S 后得到 P；P 一路与 dO 计算 dV，另一路与 dP 共同产生 dS；dS 再分叉计算 dQ 与 dK。mask、缩放与 softmax 导数细节仍以正文为准。</figcaption>
+</figure>
+<h3 id="直觉类比-随后是精确定义">直觉类比，随后是精确定义</h3>
+<p>像顾客先给仓库中的每件商品打相关度分数，再把分数换成预算占比，最后按占比装货。准确地说：每行 <code>S</code> 属于一个 query，softmax 沿 key 维归一化，输出向量是同一行概率对 <code>V</code> 各行的线性组合。</p>
+<div class="example compact">
+<h3 id="小数值例子">小数值例子</h3>
+<p>若一个 query 对两个 key 的分数为 <code>[0, ln 3]</code>，softmax 权重为 <code>[1/4, 3/4]</code>；对应 value 为 <code>[8, 20]</code> 时，输出是 <code>1/4×8 + 3/4×20 = 17</code>。</p>
+</div>
+<h3 id="反向为何有-5-次-mma">反向为何有 5 次 MMA</h3>
+<p><span class="evidence">论文事实</span>反向不保存完整分数矩阵，而是重算并依次完成五个矩阵乘：重算 <code>S=QKᵀ</code>；<code>dP=dO Vᵀ</code>；<code>dV=Pᵀ dO</code>；经 softmax 导数得到 <code>dS</code> 后，<code>dQ=dS K</code>、<code>dK=dSᵀ Q</code>。这解释了反向比前向更重，也解释了 TMEM 不可能同时容纳五块累加器。</p>
+<p><span class="evidence limit">局限</span>这里省略 mask、dropout、缩放常数和数值格式细节，目的是建立数据依赖；具体 kernel 仍需按 causal/varlen 等模式处理边界。attention 背景见论文 §2.1，反向见 §3.2。</p>
+</section>
+<section class="article-section" id="gpu-glossary">
+<p class="section-kicker">03 / Hardware glossary</p>
+<h2 id="blackwell-gpu-术语速查">Blackwell GPU 术语速查</h2>
+<p class="section-intent">结论：理解 FA4 的最低硬件门槛，是分清计算单元、存储层级、搬运引擎与协作线程组织。</p>
+<p><span class="evidence">论文事实</span>把 GPU 想成多层仓库与车间很有帮助，但类比后必须落回硬件定义：</p>
+<figure class="technical-figure gpu-hierarchy-diagram" id="gpu-hierarchy-diagram">
+<svg aria-label="GPU 数据路径、CTA 到线程的逻辑层级，以及 CTA 在 SM 上驻留和 cluster 协作关系" role="img" viewbox="0 0 720 365">
+<title>GPU 数据路径与执行组织</title>
+<desc>SM resources are not a storage tier. A CTA cluster is a coordination domain of CTAs, while each CTA is scheduled / resident on an SM; CTA to warp to thread is the logical hierarchy.</desc>
+<text class="label" x="20" y="25">Memory / data path · SM 不作为存储层级</text>
+<rect class="box" height="58" rx="3" width="110" x="20" y="52"></rect>
+<text class="label" text-anchor="middle" x="75" y="77">HBM</text>
+<text class="small" text-anchor="middle" x="75" y="99">大容量显存</text>
+<rect class="box" height="58" rx="3" width="110" x="160" y="52"></rect>
+<text class="label" text-anchor="middle" x="215" y="77">L2</text>
+<text class="small" text-anchor="middle" x="215" y="99">跨 SM 缓存</text>
+<rect class="strong" height="126" rx="3" width="390" x="310" y="38"></rect>
+<text class="label" text-anchor="middle" x="505" y="62">SM resources · 并列的片上用途</text>
+<rect class="box" height="54" rx="3" width="105" x="330" y="78"></rect>
+<rect class="box" height="54" rx="3" width="105" x="452" y="78"></rect>
+<rect class="accent-fill" height="54" rx="3" width="105" x="574" y="78"></rect>
+<text class="label" text-anchor="middle" x="382" y="101">SMEM</text>
+<text class="small" text-anchor="middle" x="382" y="122">CTA 管理</text>
+<text class="label" text-anchor="middle" x="504" y="101">TMEM</text>
+<text class="small" text-anchor="middle" x="504" y="122">张量路径</text>
+<text class="label" text-anchor="middle" x="626" y="101">RMEM</text>
+<text class="small" text-anchor="middle" x="626" y="122">线程寄存器</text>
+<text class="small" text-anchor="middle" x="505" y="153">三者不是统一缓存的逐级关系</text>
+<path class="accent-wire" d="M130 81H160 M270 81H310"></path>
+<text class="label" x="20" y="207">Logical hierarchy</text>
+<rect class="strong" height="108" rx="3" width="320" x="20" y="226"></rect>
+<text class="label" x="40" y="251">CTA</text>
+<rect class="box" height="48" rx="3" width="250" x="54" y="265"></rect>
+<text class="label" x="76" y="294">warp</text>
+<rect class="accent-fill" height="26" rx="3" width="143" x="140" y="276"></rect>
+<text class="small" text-anchor="middle" x="211" y="294">32 × thread</text>
+<text class="label" x="380" y="207">Placement &amp; coordination</text>
+<rect class="box" height="108" rx="3" width="140" x="380" y="226"></rect>
+<text class="label" text-anchor="middle" x="450" y="251">SM</text>
+<rect class="strong" height="42" rx="3" width="102" x="399" y="266"></rect>
+<text class="small" text-anchor="middle" x="450" y="283">resident CTA(s)</text>
+<text class="small" text-anchor="middle" x="450" y="300">受资源约束</text>
+<rect class="accent-fill" height="108" rx="3" width="152" x="548" y="226"></rect>
+<text class="label" text-anchor="middle" x="624" y="251">CTA cluster</text>
+<rect class="box" height="32" rx="3" width="52" x="566" y="268"></rect>
+<rect class="box" height="32" rx="3" width="52" x="630" y="268"></rect>
+<text class="small" text-anchor="middle" x="592" y="289">CTA 0</text>
+<text class="small" text-anchor="middle" x="656" y="289">CTA 1</text>
+<path class="accent-wire dash" d="M618 284H630"></path>
+<text class="small" text-anchor="middle" x="624" y="320">协作 / DSMEM</text>
+<path class="wire dash" d="M340 280H380"></path>
+<text class="small" text-anchor="middle" x="360" y="353">每个 CTA 被调度并驻留到某个 SM；cluster 直接组织 CTA，而不是包含 SM。</text>
+</svg>
+<figcaption>上半部只表达数据路径：HBM 经 L2 到达 SM 内的不同资源；SMEM、TMEM、RMEM 服务不同作用域，并非严格的三级缓存。下半部拆开两种关系：逻辑上 CTA 包含 warp、warp 包含 32 个 thread；放置上每个 CTA 被调度并驻留到一个 SM，SM 可在资源允许时同时驻留多个 CTA；CTA cluster 则是多个 CTA 的协作域，可通过 DSMEM 交换。</figcaption>
+</figure>
+<table>
+<caption>术语的类比与准确含义</caption>
+<thead>
+<tr>
+<th scope="col">术语</th>
+<th scope="col">直觉类比</th>
+<th scope="col">准确硬件定义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>thread</td>
+<td>一名工人的执行档案</td>
+<td>一个 lane 的执行上下文，拥有私有寄存器状态；线程被组成 warp 执行。</td>
+</tr>
+<tr>
+<td>SM</td>
+<td>容纳多个班组的车间</td>
+<td>Streaming Multiprocessor，调度驻留的 warp/CTA，并包含 register file、SMEM、Tensor Core 等执行与存储资源。</td>
+</tr>
+<tr>
+<td>warp</td>
+<td>32 人同步班组</td>
+<td>32 个以 lockstep 方式执行同一指令的线程，是 SIMT 调度基本单位。</td>
+</tr>
+<tr>
+<td>CTA / thread block</td>
+<td>共享一间车间的班组集合</td>
+<td>可共享 SMEM、在同一个 SM 上驻留并协作同步的线程块。</td>
+</tr>
+<tr>
+<td>warpgroup</td>
+<td>四个相邻班组组成的专职工段</td>
+<td>4 个相邻 warp（128 线程）的组合，可为 TMA、MMA 或 softmax 等工作专职化。</td>
+</tr>
+<tr>
+<td>HBM / L2</td>
+<td>厂外大仓 / 厂区缓存</td>
+<td>HBM 是高容量高延迟显存；L2 是跨 SM 共享的片上缓存。</td>
+</tr>
+<tr>
+<td>SMEM</td>
+<td>车间周转区</td>
+<td>CTA 显式管理的片上 shared memory，容量有限但延迟低。</td>
+</tr>
+<tr>
+<td>register / RMEM</td>
+<td>工人手边托盘</td>
+<td>线程寄存器及论文中的 register-memory 路径，用于标量和局部状态，受容量与 occupancy 约束。</td>
+</tr>
+<tr>
+<td>TMEM</td>
+<td>张量装配线旁的专用工位</td>
+<td>Blackwell tensor memory；异步 MMA 可把累加器写入其中，从而开放新的合法依赖与消费顺序，不只是“多一块存储”。</td>
+</tr>
+<tr>
+<td>DSMEM</td>
+<td>相邻车间的共享传送口</td>
+<td>CTA cluster 内可跨 CTA 访问的 distributed shared memory。</td>
+</tr>
+<tr>
+<td>TMA</td>
+<td>自动叉车</td>
+<td>Tensor Memory Accelerator，异步搬运多维张量，减少线程参与的数据移动。</td>
+</tr>
+<tr>
+<td>MMA / MUFU</td>
+<td>矩阵装配机 / 特殊函数机</td>
+<td>MMA 执行矩阵乘加；MUFU 执行 <code>exp2</code> 等特殊函数，吞吐资源独立。</td>
+</tr>
+<tr>
+<td>CTA cluster</td>
+<td>可互通的车间组</td>
+<td>一组可进行 cluster 级同步并通过 DSMEM 交换数据的 CTA。</td>
+</tr>
+</tbody>
+</table>
+<p><span class="evidence inference">工程推断</span>FA4 中的“快”来自这些资源的生命周期相互咬合：TMA 预取下一块、MMA 生产 TMEM 累加器、softmax warpgroup 消费当前块。单独数 FLOP 无法预测流水线是否堵塞。</p>
+<p><span class="evidence limit">局限</span>这些术语是面向本文的数据流解释，不替代 Blackwell ISA 与编程指南。见论文 §2.2。</p>
+</section>
+<section class="article-section" id="bottleneck-shift">
+<p class="section-kicker">04 / Roofline shift</p>
+<h2 id="硬件非对称扩展与瓶颈迁移">硬件非对称扩展与瓶颈迁移</h2>
+<p class="section-intent">结论：在 128×128 tile 上，前向的 MMA 与指数都需 1024 周期；MMA 再快也会被 MUFU 或 SMEM 封顶。</p>
+<p><span class="evidence">论文事实</span>论文用简化的多资源 roofline 比较每个 tile 的理想周期。取 <code>M=N=d=128</code>：</p>
+<details class="derivation" open="">
+<summary>展开 / 收起完整推导</summary>
+<div class="derivation-body">
+<div class="equation">Forward MMA:<br/>T_MMA = 4MNd / 8192<br/>= 4×128×128×128 / 8192<br/>= 1024 cycles<br/><br/>Forward EXP:<br/>T_EXP = MN / 16<br/>= 128×128 / 16<br/>= 1024 cycles<br/><br/>Forward SMEM:<br/>T_SMEM = 6MN / 128<br/>= 6×128×128 / 128<br/>= 768 cycles</div>
+<p>SMEM 的 <code>6MN</code> 是论文的简化流量计数：把相关 tile 阶段折算为每个元素共 6 byte 的片上读写，再除以假定的 128 byte/cycle；它不是对真实 bank conflict、指令发射或所有临时量的逐条仿真。</p>
+<div class="equation">Backward MMA (5 MMAs, multiply-add counted as 2 FLOPs):<br/>T_MMA = 10MNd / 8192<br/>= 10×128×128×128 / 8192<br/>= 2560 cycles<br/><br/>Backward SMEM, 1-CTA:<br/>T_SMEM = 26×128 = 3328 cycles<br/><br/>Backward SMEM, 2-CTA:<br/>T_SMEM = 21×128 = 2688 cycles<br/><br/>Backward EXP:<br/>T_EXP = MN / 16 = 128×128 / 16 = 1024 cycles</div>
+</div>
+</details>
+<figure class="technical-figure resource-cycle-chart" id="resource-cycle-chart">
+<svg aria-label="前向与反向每 tile 的简化资源周期对比条形图" role="img" viewbox="0 0 720 305">
+<title>前向 1024、768、1024 周期与反向 2560、3328、2688、1024 周期对比</title>
+<text class="label" x="20" y="24">Forward · cycles / tile</text>
+<text x="20" y="58">MMA</text><rect class="strong" height="22" width="185" x="110" y="42"></rect><text x="306" y="58">1024</text>
+<text x="20" y="91">SMEM</text><rect class="box" height="22" width="139" x="110" y="75"></rect><text x="260" y="91">768</text>
+<text x="20" y="124">EXP</text><rect class="accent-fill" height="22" width="185" x="110" y="108"></rect><text x="306" y="124">1024</text>
+<text class="label" x="20" y="171">Backward · cycles / tile</text>
+<text x="20" y="205">MMA</text><rect class="strong" height="22" width="277" x="110" y="189"></rect><text x="398" y="205">2560</text>
+<text x="20" y="238">SMEM 1-CTA</text><rect class="accent-fill" height="22" width="360" x="110" y="222"></rect><text x="481" y="238">3328</text>
+<text x="20" y="271">SMEM 2-CTA</text><rect class="box" height="22" width="291" x="110" y="255"></rect><text x="412" y="271">2688</text>
+<text x="505" y="205">EXP</text><rect class="accent-fill" height="22" width="111" x="548" y="189"></rect><text x="670" y="205">1024</text>
+<text class="small" x="20" y="299">条长按各组最大值归一化；数字才是跨组比较依据。</text>
+</svg>
+<figcaption>前向中 MMA 与 EXP 同为 1024 周期，说明只加速矩阵乘不会缩短关键路径；反向 1-CTA 的 SMEM 估算 3328 周期高于 MMA，2-CTA 将其压至 2688 周期。该图对应正文的简化 roofline，不是实测时序。</figcaption>
+</figure>
+<p>后两条 <code>26×128</code> 与 <code>21×128</code> 是论文按 tile 数据流汇总后的简化 SMEM 项；2-CTA 通过各自只 staging 半个 B 操作数等设计，减少了每 CTA 的 SMEM 周期。</p>
+<div class="callout warning"><span class="evidence limit">局限</span>这是简化的多资源 roofline，未纳入寄存器/RMEM 压力、L2 命中、调度空洞、同步与依赖延迟。它能定位候选瓶颈，不能当成实测运行时间。</div>
+<p><span class="evidence inference">工程推断</span>Blackwell 把 MMA 吞吐约翻倍，而 MUFU/SMEM 没有同比扩展，所以 non-MMA work 从配角变为关键路径。见论文 §2.2、表 1。</p>
+</section>
+<section class="article-section" id="forward-pipeline">
+<p class="section-kicker">05 / Forward pipeline</p>
+<h2 id="前向流水线的阶段重构">前向流水线的阶段重构</h2>
+<p class="section-intent">结论：前向用 128×128 tile、TMEM 与 ping-pong 阶段把矩阵计算、softmax 修正和搬运重叠起来。</p>
+<p><span class="evidence">论文事实</span>Blackwell 的异步 MMA 将累加器写入 TMEM。对一个 128×128 score tile，MMA warpgroup 生产 <code>QKᵀ</code>，softmax warpgroup 归约观测到的行最大值与指数和；只有维护的 softmax 锚点被实际推进时，correction warpgroup 才修正旧输出——通常是新旧最大值之差换算到 base-2 域后超过阈值，而不是每次观测到更大行最大值都修正。TMA 同时预取后续 K/V；两套缓冲 ping-pong，当前块被消费时下一块已在路上。见论文 §3.1.2；conditional rescale 见 §3.1.4。</p>
+<figure class="technical-figure forward-pipeline-diagram" id="forward-pipeline-diagram">
+<svg aria-label="FA3 与 FA4 前向数据依赖对照，以及 FA4 双缓冲和条件修正流水线" role="img" viewbox="0 0 720 420">
+<title>FA3/Hopper 与 FA4/Blackwell 前向流水线对照</title>
+<desc>FA3 uses 64 by 128 tiles and register accumulators while retaining some overlap. FA4 uses 128 by 128 tiles, TMEM, fully asynchronous MMA, and a dedicated correction warpgroup.</desc>
+<rect class="box" height="116" rx="3" width="330" x="20" y="32"></rect>
+<text class="label" x="40" y="58">FA3 / Hopper</text>
+<text class="small" x="40" y="84">64×128 tile · 寄存器累加器</text>
+<text class="small" x="40" y="108">能做 producer / consumer 重叠</text>
+<text class="small" x="40" y="132">但累加器依赖限制重叠深度</text>
+<rect class="strong" height="116" rx="3" width="330" x="370" y="32"></rect>
+<text class="label" x="390" y="58">FA4 / Blackwell</text>
+<text class="small" x="390" y="84">128×128 tile · TMEM 累加器</text>
+<text class="small" x="390" y="108">全异步 MMA 解耦生产 / 消费</text>
+<text class="small" x="390" y="132">独立 correction warpgroup</text>
+<text class="label" x="20" y="177">FA4 ping-pong timeline · 时间 →</text>
+<text x="20" y="212">TMA</text>
+<rect class="strong" height="34" width="170" x="105" y="190"></rect>
+<rect class="box" height="34" width="170" x="282" y="190"></rect>
+<rect class="strong" height="34" width="170" x="459" y="190"></rect>
+<text text-anchor="middle" x="190" y="212">预取 B · tile 1</text>
+<text text-anchor="middle" x="367" y="212">预取 A · tile 2</text>
+<text text-anchor="middle" x="544" y="212">预取 B · tile 3</text>
+<text x="20" y="261">MMA WG</text>
+<rect class="box" height="34" width="170" x="105" y="239"></rect>
+<rect class="strong" height="34" width="170" x="282" y="239"></rect>
+<rect class="box" height="34" width="170" x="459" y="239"></rect>
+<text text-anchor="middle" x="190" y="261">消费 A · tile 0</text>
+<text text-anchor="middle" x="367" y="261">消费 B · tile 1</text>
+<text text-anchor="middle" x="544" y="261">消费 A · tile 2</text>
+<text x="20" y="310">Softmax WG</text>
+<path class="wire" d="M190 273V288H367V273 M367 273V288H544V273"></path>
+<text class="small" text-anchor="middle" x="367" y="307">TMEM 结果被后级归约；两套 tile 缓冲交替复用</text>
+<rect class="box" height="58" width="205" x="20" y="338"></rect>
+<rect class="box" height="58" width="205" x="258" y="338"></rect>
+<rect class="accent-fill" height="58" width="204" x="496" y="338"></rect>
+<text text-anchor="middle" x="122" y="361">观测 max 上升</text>
+<text class="small" text-anchor="middle" x="122" y="382">但未跨阈值</text>
+<text text-anchor="middle" x="360" y="361">锚点维持</text>
+<text class="small" text-anchor="middle" x="360" y="382">不做 correction</text>
+<text text-anchor="middle" x="598" y="361">锚点实际推进</text>
+<text class="small" text-anchor="middle" x="598" y="382">correction WG 修正 ℓ 与 u</text>
+<path class="accent-wire" d="M225 367H258 M463 367H496"></path>
+</svg>
+<figcaption>FA3 也能进行阶段重叠，但 64×128 tile 与寄存器累加器使依赖更紧、可隐藏的 non-MMA 瓶颈更有限；FA4 借 128×128 tile、TMEM 和全异步 MMA 放宽生产—消费依赖，并让独立 correction warpgroup 只在维护锚点实际推进时修正旧状态，而不是每次观测最大值上升都修正。</figcaption>
+</figure>
+<div class="example compact">
+<h3 id="小例子-两块交替">小例子：两块交替</h3>
+<p>阶段 A 对 K/V block 0 做 MMA 时，阶段 B 预取 block 1；A 的结果进入 TMEM 后，softmax 组读取它，MMA 组转而处理 block 1。若 block 1 只把观测最大值小幅提高但未跨阈值，旧锚点继续使用，不触发 correction；只有累计的 base-2-scaled increase 超过阈值并推进锚点时，correction 组才对旧累加输出乘统一修正因子。</p>
+</div>
+<p><span class="evidence inference">工程推断</span>TMEM 的真正价值是提供新的合法依赖图：MMA 不必把完整累加器留在线程寄存器里，消费者可在明确同步后从 TMEM 取数，生产与归约更易重叠。把它概括为“容量更大”会漏掉这一点。</p>
+<p><span class="evidence limit">局限</span>阶段数增加会带来 barrier、容量和 occupancy 取舍；若 tile 形状或序列太小，填充/排空成本可能抵消重叠收益。</p>
+</section>
+<section class="article-section" id="online-softmax">
+<p class="section-kicker">06 / Numerical state</p>
+<h2 id="online-softmax-的状态更新">Online Softmax 的状态更新</h2>
+<p class="section-intent">结论：online softmax 保存运行最大值 m、指数质量 ℓ 与加权载荷 u；只要三者使用同一锚点缩放，精确算术中的 u/ℓ 不变。</p>
+<p><span class="evidence">论文事实</span>标准 online softmax 对到目前为止的分数 <code>sᵢ</code> 与 payload <code>vᵢ</code>，维护 <code>m=max sᵢ</code>、<code>ℓ=Σexp(sᵢ−m)</code>、<code>u=Σexp(sᵢ−m)vᵢ</code>，最终 <code>O=u/ℓ</code>。FA4 的 conditional rescale 另外允许维护锚点暂时落后于观测最大值；只有锚点实际推进时，旧的 ℓ 与 u 才乘同一个修正因子。</p>
+<figure class="technical-figure online-softmax-state-diagram" id="online-softmax-state-diagram">
+<svg aria-label="Online softmax 的块摘要、状态合并与锚点选择" role="img" viewbox="0 0 720 245">
+<title>Online softmax 状态 m、ell、u 的合并</title>
+<rect class="box" height="92" width="175" x="20" y="42"></rect><rect class="box" height="72" width="175" x="20" y="150"></rect>
+<text class="label" text-anchor="middle" x="107" y="66">Block A summary</text><text text-anchor="middle" x="107" y="91">mₐ · ℓₐ · uₐ</text><text class="small" text-anchor="middle" x="107" y="114">局部最大 / 质量 / 载荷</text><text class="label" text-anchor="middle" x="107" y="176">Block B summary</text><text text-anchor="middle" x="107" y="201">mᵦ · ℓᵦ · uᵦ</text>
+<path class="accent-wire" d="M195 88H270 M195 186H270"></path>
+<rect class="strong" height="112" width="205" x="270" y="72"></rect>
+<text class="label" text-anchor="middle" x="372" y="98">选择共同锚点 m*</text><text class="small" text-anchor="middle" x="372" y="121">缩放两块的 ℓ 与 u</text><text text-anchor="middle" x="372" y="147">ℓ = rₐℓₐ + rᵦℓᵦ</text><text text-anchor="middle" x="372" y="170">u = rₐuₐ + rᵦuᵦ</text>
+<path class="accent-wire" d="M475 128H535"></path>
+<rect class="accent-fill" height="80" width="165" x="535" y="88"></rect><text class="label" text-anchor="middle" x="617" y="118">merged state</text><text text-anchor="middle" x="617" y="143">(m*, ℓ, u) → u/ℓ</text>
+<text class="small" text-anchor="end" x="700" y="214">若维护锚点暂不推进，m* 可落后于观测 max；关键是 ℓ、u 始终共用同一缩放。</text>
+</svg>
+<figcaption>每个 block 压缩为三元状态，再以共同锚点合并。锚点可以按条件延迟推进，但质量 ℓ 与加权载荷 u 必须使用相同因子，最终输出才保持为 u/ℓ。</figcaption>
+</figure>
+<details class="derivation" open="">
+<summary>展开 / 收起完整推导</summary>
+<div class="derivation-body">
+<div class="example">
+<h3 id="完整数值例子">完整数值例子</h3>
+<p>Block A：scores <code>[2,4]</code>、payload <code>[10,20]</code>；Block B：scores <code>[5,3]</code>、payload <code>[30,40]</code>。</p>
+<p>以最终最大值 <code>m=5</code> 为标准锚点：</p>
+<div class="equation">ℓ = exp(-3)+exp(-1)+1+exp(-2) ≈ 1.5530<br/>u = 10exp(-3)+20exp(-1)+30+40exp(-2) ≈ 43.2688<br/>O = u/ℓ ≈ 27.86</div>
+<p>若暂时沿用旧锚点 <code>m=4</code>：</p>
+<div class="equation">old-anchor mass = exp(-2)+1+exp(1)+exp(-1) ≈ 4.2215<br/>old-anchor payload = 10exp(-2)+20+30exp(1)+40exp(-1) ≈ 117.61<br/>output = payload/mass ≈ 27.86</div>
+<p>两套质量和载荷相差共同因子 <code>e</code>，所以精确算术中比值不变；这个例子说明“旧锚点仍可保持比值”，不代表每次最大值从 4 变到 5 都要推进锚点。若分数已是自然指数域，增量 1 换成 base-2 域约为 <code>log₂(e)=1.443</code>，低于典型阈值 8，因而不会触发这次 correction。浮点舍入、溢出与下溢仍会使实现结果不同，不能宣称“浮点中没有近似”。</p>
+</div>
+</div>
+</details>
+<p><span class="evidence">论文事实</span>论文 §3.1.4 对 BF16 取 base-2 阈值 <code>τ=8</code>，意味着延迟修正期间临时比例最多可到 <code>2⁸=256</code>。</p>
+<p><span class="evidence code">代码事实</span>论文公式写 <code>eˣ</code>，实现机制使用 <code>exp2</code>，先乘 <code>scale_log2</code> 把自然指数域换到以 2 为底的域；阈值单位必须与所在域一致。可对照 <a href="https://raw.githubusercontent.com/Dao-AILab/flash-attention/main/flash_attn/cute/softmax.py">softmax.py</a>。</p>
+<p><span class="evidence limit">局限</span>阈值是实现的性能—数值折中，不是任意输入范围下的误差证明。见论文 §3.1.4。</p>
+</section>
+<section class="article-section" id="exp-emulation">
+<p class="section-kicker">07 / Exp emulation</p>
+<h2 id="指数函数的软件模拟">指数函数的软件模拟</h2>
+<p class="section-intent">结论：FA4 只把约 10–25% 的 exp2 转移到 FMA 多项式路径，以缓解 MUFU 拥堵，同时保留硬件 exp2 作为主体。</p>
+<p><span class="evidence">论文事实</span>软件路径将输入拆为整数部分 <code>n</code> 与小数部分 <code>f</code>；数学分解是 <code>2ˣ = 2ⁿ · 2ᶠ</code>，即两部分在数学上相乘。小数部分用 Horner 形式的多项式在 FMA 上近似；论文的具体实现并非必须发射一次普通浮点乘，而是通过移位构造 exponent bits，并把多项式结果的 mantissa bits 组合进 FP32 表示。调度器只让约 10–25% 元素走这条路，其余仍用 <code>MUFU.EX2</code>，把工作分摊到不同执行资源。见论文 §3.1.3。</p>
+<table>
+<caption>在 [0,1) 内随机采样的 400 万个输入，以 FP64 为 reference 的最大相对误差</caption>
+<thead>
+<tr>
+<th scope="col">实现/格式</th>
+<th scope="col">最大相对误差</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>degree-3，FP32</td><td>8.77e-5</td></tr>
+<tr><td>degree-3，BF16</td><td>3.90e-3</td></tr>
+<tr><td>hardware exp2，BF16</td><td>3.89e-3</td></tr>
+<tr><td>degree-5，FP32</td><td>1.44e-7</td></tr>
+</tbody>
+</table>
+<div class="example compact">
+<h3 id="小例子">小例子</h3>
+<p>对 <code>x=3.25</code>，先写成整数 3 与小数 0.25；数学上是 <code>2³ · 2^0.25</code>，具体实现则沿用上述 exponent/mantissa bits 组合，而不要求一次普通浮点乘。Horner 形式减少多项式求值的中间乘法并利用 FMA 吞吐。</p>
+</div>
+<p><span class="evidence limit">局限</span>这些误差来自在 [0,1) 内随机采样的 400 万个输入、以 FP64 为 reference 的局部比较，不是完整 attention 误差界，更不是端到端训练收敛证明；混合比例也依赖资源与形状。</p>
+</section>
+<section class="article-section" id="backward-2cta">
+<p class="section-kicker">08 / Backward design</p>
+<h2 id="反向-2-cta-协作设计">反向 2-CTA 协作设计</h2>
+<p class="section-intent">结论：2-CTA 反向用 cluster 内协作换取更少的单 CTA SMEM 流量，但同步、DSMEM 与原子归约让它高度 Blackwell 特化。</p>
+<p><span class="evidence">论文事实</span>反向包含前述 5 次 MMA；TMEM 区域按生命周期复用，因为无法同时容纳五个 accumulator tile。反向流水线见论文 §3.2.2。2-CTA 配置取 <code>M=256,N=K=128</code>，两个 CTA 各 staging 操作数 B 的一半，并通过 DSMEM 交换半块 <code>dS</code>。</p>
+<div class="equation">per-CTA dQ:<br/>(M/2, 2N) × (2N, d) → (M/2, d)<br/>代入 M=256, N=d=128:<br/>(128, 256) × (256, 128) → (128, 128)</div>
+<figure class="technical-figure two-cta-diagram" id="two-cta-diagram">
+<svg aria-label="两个 CTA staging 半个 B 并通过 DSMEM 交换 dS 半块，分别计算 dQ 的两半" role="img" viewbox="0 0 720 285">
+<title>2-CTA 反向协作与 DSMEM 数据交换</title>
+<rect class="strong" height="195" width="290" x="20" y="36"></rect><rect class="strong" height="195" width="290" x="410" y="36"></rect>
+<text class="label" text-anchor="middle" x="165" y="63">CTA 0</text><text class="label" text-anchor="middle" x="555" y="63">CTA 1</text>
+<rect class="box" height="43" width="234" x="48" y="82"></rect><rect class="box" height="43" width="234" x="438" y="82"></rect><text text-anchor="middle" x="165" y="108">staging B 的前半</text><text text-anchor="middle" x="555" y="108">staging B 的后半</text>
+<rect class="accent-fill" height="54" width="234" x="48" y="146"></rect><rect class="accent-fill" height="54" width="234" x="438" y="146"></rect><text text-anchor="middle" x="165" y="168">dS₀ + 来自 CTA 1 的 dS₁</text><text class="small" text-anchor="middle" x="165" y="188">覆盖 2N</text><text text-anchor="middle" x="555" y="168">dS₁ + 来自 CTA 0 的 dS₀</text><text class="small" text-anchor="middle" x="555" y="188">覆盖 2N</text>
+<path class="accent-wire dash" d="M282 162H438 M438 188H282"></path><text class="label" text-anchor="middle" x="360" y="144">DSMEM exchange</text>
+<path class="wire" d="M165 231V257 M555 231V257"></path><text class="label" text-anchor="middle" x="165" y="278">dQ 上半 · (M/2,d)</text><text class="label" text-anchor="middle" x="555" y="278">dQ 下半 · (M/2,d)</text>
+</svg>
+<figcaption>两个 CTA 各自只 staging 半个 B 操作数，通过 cluster 内 DSMEM 互换 dS 半块，使每个 CTA 都能执行 (M/2,2N)×(2N,d)→(M/2,d)，最终分别形成 dQ 的上下两半。</figcaption>
+</figure>
+<p>每个 CTA 的 dQ 工作扩大 N 方向覆盖，最终全局 dQ atomic add 次数减半。可以把两个 CTA 类比为相邻车间：各自存半套原料，通过内部传送口交换半成品；精确定义是 cluster 内 DSMEM 通信与同步，不是 CPU 式共享地址空间。</p>
+<p><span class="evidence inference">工程推断</span>TMEM aliasing 的原则是按“最后一次读取”回收区域，而非按变量名永久占位；这是 pipeline resource planning 的典型实例。</p>
+<p><span class="evidence limit">局限</span>2-CTA 方案依赖 Blackwell 的 TMEM、DSMEM 与 cluster 能力，不能无改动移植到旧架构。见论文 §3.2.3。</p>
+</section>
+<section class="article-section" id="scheduling">
+<p class="section-kicker">09 / Scheduling</p>
+<h2 id="warp-专职化与任务调度">Warp 专职化与任务调度</h2>
+<p class="section-intent">结论：内核内用 warpgroup 专职化隐藏资源延迟，内核间用确定性归约与长任务优先减少尾部空转。</p>
+<h3 id="确定性归约">确定性归约</h3>
+<p><span class="evidence">论文事实</span>atomic add 的到达顺序不固定，浮点非结合性使结果 nondeterministic。semaphore 可固定归约顺序，但会增加 fence 与 stall。论文对 causal 情形用排序/最短处理时间（SPT）思路安排顺序，使第一笔 dQ 写入不必等待前序；确定性实现速度最高约为 <em>NONDETERMINISTIC 1-CTA backward</em> 的 75%，不能误读为达到最快 2-CTA 实现的 75%。见论文 §3.2.4。</p>
+<h3 id="跨任务-lpt">跨任务 LPT</h3>
+<div class="example compact">
+<h3 id="小例子-任务-8-7-3-2">小例子：任务 [8,7,3,2]</h3>
+<p>两台等速“工位”采用 short-first 升序列表调度时，按 2、3、7、8 依次分配给当前负载较小的工位：负载从 2/3 变为 9/3，最后成为 9/11，makespan 为 11。Longest Processing Time first（LPT）则先派 8 和 7，再把 3、2 放到当前负载更小的工位，负载成为 10 与 10，makespan 为 10。LPT 让最长任务更早启动，把本例中最后完成的尾部从 11 缩到 10；该例解释原则，不声称所有原顺序都更差。</p>
+</div>
+<figure class="technical-figure scheduling-timeline" id="scheduling-timeline">
+<svg aria-label="任务 8、7、3、2 的 LPT 双工位时间线与确定性 semaphore 顺序" role="img" viewbox="0 0 720 265">
+<title>LPT 尾部直觉和确定性 semaphore 顺序</title>
+<text class="label" x="20" y="27">LPT · tasks [8, 7, 3, 2]</text><text x="20" y="73">工位 A</text><rect class="strong" height="38" width="400" x="100" y="50"></rect><rect class="box" height="38" width="100" x="500" y="50"></rect><text text-anchor="middle" x="300" y="75">8</text><text text-anchor="middle" x="550" y="75">2</text>
+<text x="20" y="125">工位 B</text><rect class="strong" height="38" width="350" x="100" y="102"></rect><rect class="box" height="38" width="150" x="450" y="102"></rect><text text-anchor="middle" x="275" y="127">7</text><text text-anchor="middle" x="525" y="127">3</text>
+<path class="accent-wire dash" d="M600 42V148"></path><text class="small" x="610" y="158">makespan 10</text>
+<text class="label" x="20" y="192">确定性归约（独立约束）</text>
+<rect class="accent-fill" height="38" width="150" x="20" y="210"></rect><rect class="box" height="38" width="150" x="220" y="210"></rect><rect class="box" height="38" width="150" x="420" y="210"></rect><text text-anchor="middle" x="95" y="234">producer 0</text><text text-anchor="middle" x="295" y="234">producer 1</text><text text-anchor="middle" x="495" y="234">producer 2</text><path class="accent-wire" d="M170 229H220 M370 229H420"></path><text class="small" text-anchor="end" x="700" y="234">semaphore 固定到达顺序</text>
+</svg>
+<figcaption>LPT 先放 8 和 7，再补 2 与 3，使两工位都在时间 10 结束，减少“长任务最后启动”的尾部风险。下方 semaphore 链表达另一个目标：以固定 producer 顺序换确定性，代价是 fence 与等待。</figcaption>
+</figure>
+<p><span class="evidence">论文事实</span>真实 attention scheduler 不是盲目全局排序：它保留 batch 外层顺序，配合 head swizzle 维护 L2 locality；variable-length 场景可预处理并排序 metadata。H200 上 LPT 对 MHA 提升 4–8%，对 MQA8 提升 7–14%。见论文 §3.3。</p>
+<h3 id="cute-dsl-编译">CuTe-DSL 编译</h3>
+<p><span class="evidence">论文事实</span>CuTe-DSL 是 Python embedded DSL，lower 到 PTX 再生成 SASS。单个 kernel 的编译对比中，FA3 为 55s/45s，FA4 为 2.5s/1.4s，即 22×/32×；这是单 kernel 编译，不是整个工程构建时间。见论文 §4；代码入口见 <a href="https://github.com/Dao-AILab/flash-attention/tree/main/flash_attn/cute">FlashAttention CuTe 目录</a>。</p>
+<p><span class="evidence limit">局限</span>调度收益取决于任务长度分布、cache 行为和 launch 组织；均匀工作负载下可优化空间更小。调度见论文 §3.3，编译方法见 §4。</p>
+</section>
+<section class="article-section" id="evaluation">
+<p class="section-kicker">10 / Evaluation</p>
+<h2 id="实验结果与性能边界">实验结果与性能边界</h2>
+<p class="section-intent">结论：FA4 在论文所测 B200 BF16 区间表现强，但版本、形状与测量口径限定了结论外推范围。</p>
+<p><span class="evidence">论文事实</span>主文实验采用 BF16，序列长度 1K–32K，总 token 固定为 32K；head dimension 测 64、128，以及 QK/V 维为 (192,128) 的组合。主文与图中设备写 B200。结果为 1.1–1.3× cuDNN 9.13、2.1–2.7× Triton，峰值 1613 TFLOP/s，约 71% theoretical peak。见论文 §5、Figures 4–7；局限与后续讨论见 §6。</p>
+<div class="callout"><span class="evidence">论文事实</span>论文也注明更新的 cuDNN 已吸收相关技术并达到相似性能，因此“最高 1.3×”不能被宣传为对当前所有 cuDNN 版本的普遍领先。</div>
+<table>
+<caption>该证据能与不能回答什么</caption>
+<thead>
+<tr>
+<th scope="col">能回答</th>
+<th scope="col">不能回答</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>所列 BF16 shapes 上相对指定基线的吞吐</td><td>端到端训练收敛与模型质量</td></tr>
+<tr><td>固定 32K tokens 下不同序列长度的表现</td><td>能耗、成本、p95/p99 latency</td></tr>
+<tr><td>单设备主流 head dims 的 kernel 效率</td><td>更广设备、格式、稀疏/分布式工作负载</td></tr>
+</tbody>
+</table>
+<p><span class="evidence limit">局限</span>附录只做 5 次 warmup、10 次平均；per-technique ablation 有限；exp 误差仅为局部随机输入。主文/图写 B200，而附录写 B100 180GB；论文 v1 日期为 2026 年 3 月，附录却称“截至写作时最新版本”为 2025 年 3 月。二者均应标为论文内部不一致，不能据此推断哪一处才是真实配置或日期。</p>
+</section>
+<section class="article-section" id="reusable-operators">
+<p class="section-kicker">11 / Reusable patterns</p>
+<h2 id="可迁移的算子设计模式">可迁移的算子设计模式</h2>
+<p class="section-intent">结论：FA4 可抽象为四类可复用设计对象；以下均是本文工程归纳，不是作者提出的正式 API。</p>
+<div class="pattern-grid">
+<div class="pattern-card">
+<h3 id="stableweightedreduce">StableWeightedReduce</h3>
+<p><span class="evidence inference">工程推断</span><strong>非作者 API。</strong>状态为 running max、mass 与 weighted payload，提供可结合的 block merge；可用于 dense、sparse、ragged、split-K 和 distributed merge。</p>
+</div>
+<div class="pattern-card">
+<h3 id="nonmmabalancepolicy">NonMmaBalancePolicy</h3>
+<p><span class="evidence inference">工程推断</span><strong>非作者 API。</strong>根据 MUFU/FMA 压力、误差预算和数据格式，决定 hardware exp 与 polynomial/FMA 路径的比例。</p>
+</div>
+<div class="pattern-card">
+<h3 id="pipelineresourceplan">PipelineResourcePlan</h3>
+<p><span class="evidence inference">工程推断</span><strong>非作者 API。</strong>显式描述 RMEM、SMEM、TMEM 的生命周期、aliasing、producer/consumer barrier 与 pipeline stages。</p>
+</div>
+<div class="pattern-card">
+<h3 id="reductionschedule">ReductionSchedule</h3>
+<p><span class="evidence inference">工程推断</span><strong>非作者 API。</strong>在 atomic 与 deterministic reduction、LPT/SPT 次序、CTA-pair/cluster 协作之间选择。</p>
+</div>
+</div>
+<div class="example compact">
+<h3 id="组合例子">组合例子</h3>
+<p>一个 ragged split-K attention 可先用 <code>StableWeightedReduce</code> 合并分片摘要，再由 <code>ReductionSchedule</code> 决定固定顺序或原子累加；同时用 <code>PipelineResourcePlan</code> 验证中间状态是否能安全复用。</p>
+</div>
+<p><span class="evidence inference">工程推断</span>这也回应侧栏的核心想法：可复用 kernel 往往来自“关联式摘要 + 结构化调度”，而不是强行把任意算子塞进一个 universal runtime semiring。</p>
+<p><span class="evidence limit">局限</span>四个名称是教学抽象，尚无类型系统、代价模型或跨架构验证，不能当作已实现框架。</p>
+</section>
+<section class="article-section" id="references">
+<p class="section-kicker">12 / References</p>
+<h2 id="论文定位与延伸阅读">论文定位与延伸阅读</h2>
+<p class="section-intent">结论：本文只使用论文与官方代码仓库的一手材料，并把事实主张限制在这些来源实际覆盖的范围内。</p>
+<ol>
+<li><span class="evidence">论文事实</span><a href="https://arxiv.org/html/2603.05451v1">FlashAttention-4: Algorithm and Kernel Pipelining Co-Design for Asymmetric Hardware Scaling</a> — 背景与硬件见 §2.1–§2.2，算法与 kernel pipeline 见 §3，CuTe-DSL 见 §4，评测见 §5，讨论见 §6。</li>
+<li><span class="evidence code">代码事实</span><a href="https://github.com/Dao-AILab/flash-attention/tree/main/flash_attn/cute">Dao-AILab/flash-attention：flash_attn/cute</a> — CuTe-DSL kernel 源码树。</li>
+<li><span class="evidence code">代码事实</span><a href="https://raw.githubusercontent.com/Dao-AILab/flash-attention/main/flash_attn/cute/softmax.py">softmax.py（raw）</a> — online softmax、<code>exp2</code> 与缩放实现的直接代码入口。</li>
+</ol>
+<p class="source-note"><span class="evidence limit">局限</span>链接指向会演进的 main 分支；复现实验时应记录具体 commit。页面可离线阅读，但点击引用需要联网。</p>
+</section>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/gpu-attention/">https://leviusspace.top/2026/10/02/gpu-attention/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/AI%20Infra/">AI Infra</a><a class="post-meta__tags" href="/tags/Attention/">Attention</a><a class="post-meta__tags" href="/tags/%E7%AE%97%E5%AD%90%E4%BC%98%E5%8C%96/">算子优化</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/amd-architecture/" title="AMD GPU 架构笔记：从 Wavefront 到大模型性能分析"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</div></div></div></a><a class="pagination-related" href="/2026/10/02/kimi-architecture/" title="Kimi K3 架构笔记：KDA、深度残差与稀疏专家"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">Kimi K3 架构笔记：KDA、深度残差与稀疏专家</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="infra">
+<img alt="《FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/gpu-attention.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>✣ AI Infra</span><span>VOL. IV</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>FlashAttention</span><span>流水线设计</span></span><span class="book-cover-english">THE ASYMMETRIC ENGINE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/AI-Infra/">✣ AI Infra ↗</a><span>第 IV 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#一页读懂-论文主张与结论"><span class="toc-text">一页读懂：论文主张与结论</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#attention-计算与数据流地图"><span class="toc-text">Attention 计算与数据流地图</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#一句话定义与公式"><span class="toc-text">一句话定义与公式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#直觉类比-随后是精确定义"><span class="toc-text">直觉类比，随后是精确定义</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#小数值例子"><span class="toc-text">小数值例子</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#反向为何有-5-次-mma"><span class="toc-text">反向为何有 5 次 MMA</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#blackwell-gpu-术语速查"><span class="toc-text">Blackwell GPU 术语速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#硬件非对称扩展与瓶颈迁移"><span class="toc-text">硬件非对称扩展与瓶颈迁移</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#前向流水线的阶段重构"><span class="toc-text">前向流水线的阶段重构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#小例子-两块交替"><span class="toc-text">小例子：两块交替</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#online-softmax-的状态更新"><span class="toc-text">Online Softmax 的状态更新</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#完整数值例子"><span class="toc-text">完整数值例子</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#指数函数的软件模拟"><span class="toc-text">指数函数的软件模拟</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#小例子"><span class="toc-text">小例子</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#反向-2-cta-协作设计"><span class="toc-text">反向 2-CTA 协作设计</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#warp-专职化与任务调度"><span class="toc-text">Warp 专职化与任务调度</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#确定性归约"><span class="toc-text">确定性归约</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#跨任务-lpt"><span class="toc-text">跨任务 LPT</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#小例子-任务-8-7-3-2"><span class="toc-text">小例子：任务 [8,7,3,2]</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#cute-dsl-编译"><span class="toc-text">CuTe-DSL 编译</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#实验结果与性能边界"><span class="toc-text">实验结果与性能边界</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#可迁移的算子设计模式"><span class="toc-text">可迁移的算子设计模式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#stableweightedreduce"><span class="toc-text">StableWeightedReduce</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#nonmmabalancepolicy"><span class="toc-text">NonMmaBalancePolicy</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#pipelineresourceplan"><span class="toc-text">PipelineResourcePlan</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#reductionschedule"><span class="toc-text">ReductionSchedule</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#组合例子"><span class="toc-text">组合例子</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#论文定位与延伸阅读"><span class="toc-text">论文定位与延伸阅读</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

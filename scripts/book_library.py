@@ -85,11 +85,15 @@ def enhance_list(content):
 
 def collections_page():
     blocks = []
-    for series_id in ['llm', 'rl']:
+    for series_id, collection in COLLECTIONS.items():
+        if not collection['href'].startswith('/categories/'):
+            continue
         collection = COLLECTIONS[series_id]
         books = [book for book in BOOKS if book['collection'] == series_id]
         stack = ''.join(f'<span class="collection-volume">{cover(book, decorative=True)}</span>' for book in books[:3][::-1])
         branch = collection.get('branch')
-        branch_html = f'''<a class="collection-branch" href="{esc(branch['href'])}"><span class="branch-symbol" aria-hidden="true">└</span><span><b>{esc(branch['title'])}</b><small>{esc(branch['description'])}</small></span><span class="branch-count">01 卷 ↗</span></a>''' if branch else '<p class="collection-sequence">基础概念 → 价值 → 策略 → Actor-Critic → 树搜索</p>'
+        branch_count = sum(book.get('branch') == branch['title'] for book in books) if branch else 0
+        sequence = collection.get('sequence', '基础概念 → 价值 → 策略 → Actor-Critic → 树搜索' if series_id == 'rl' else '')
+        branch_html = f'''<a class="collection-branch" href="{esc(branch['href'])}"><span class="branch-symbol" aria-hidden="true">└</span><span><b>{esc(branch['title'])}</b><small>{esc(branch['description'])}</small></span><span class="branch-count">{branch_count:02d} 卷 ↗</span></a>''' if branch else f'<p class="collection-sequence">{esc(sequence)}</p>'
         blocks.append(f'''<section class="collection-set" data-collection="{series_id}"><a class="collection-art" href="{esc(collection['href'])}" aria-label="浏览{esc(collection['title'])}合集">{stack}</a><div class="collection-info"><p class="book-series">{collection['mark']} {esc(collection['english'])}</p><h2><a href="{esc(collection['href'])}">{esc(collection['title'])}<span>{len(books):02d} 卷</span></a></h2><p class="collection-subtitle">{esc(collection['subtitle'])}</p><p class="collection-description">{esc(collection['description'])}</p>{branch_html}<a class="collection-open" href="{esc(collection['href'])}">浏览合集 ↗</a></div></section>''')
     return '<div id="page" class="collection-library">' + ''.join(blocks) + '</div>'

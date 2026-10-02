@@ -1,13 +1,15 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>大模型算法工程师 — 从零开始学习路线图 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="大模型算法工程师 — 从零开始学习路线图  目标：准备大模型算法工程师暑期实习面试 起点：已有 ML 基础（CNN、Self-Attention、GAN、BN 等）+ RL 基础（Value/Policy-Based、Actor-Critic）    阶段一：深度学习与基础补齐（3-4 周）  1.1 深度学习基础 ✅  [X] 神经网络基本结构：感知机 → 多层网络 → 深层网络 [X] 前向" name="description"/>
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>大模型算法工程师 — 从零开始学习路线图 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="保留基础课程路线，补充从推理基线、算子分析到服务测量、CUDA Graph 与开源贡献的实践路径。" name="description"/>
 <meta content="article" property="og:type"/>
 <meta content="大模型算法工程师 — 从零开始学习路线图" property="og:title"/>
 <meta content="https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/index.html" property="og:url"/>
 <meta content="L_F's Blog" property="og:site_name"/>
-<meta content="大模型算法工程师 — 从零开始学习路线图  目标：准备大模型算法工程师暑期实习面试 起点：已有 ML 基础（CNN、Self-Attention、GAN、BN 等）+ RL 基础（Value/Policy-Based、Actor-Critic）    阶段一：深度学习与基础补齐（3-4 周）  1.1 深度学习基础 ✅  [X] 神经网络基本结构：感知机 → 多层网络 → 深层网络 [X] 前向" property="og:description"/>
+<meta content="保留基础课程路线，补充从推理基线、算子分析到服务测量、CUDA Graph 与开源贡献的实践路径。" property="og:description"/>
 <meta content="zh_CN" property="og:locale"/>
 <meta content="https://leviusspace.top/img/books/llm-roadmap-color.webp" property="og:image"/>
 <meta content="2026-04-07T02:00:00.000Z" property="article:published_time"/>
-<meta content="2026-04-07T08:20:49.896Z" property="article:modified_time"/>
+<meta content="2026-10-02T05:46:47Z" property="article:modified_time"/>
 <meta content="Levius" property="article:author"/>
 <meta content="学习路线" property="article:tag"/>
 <meta content="大模型" property="article:tag"/>
@@ -26,7 +28,135 @@
 <button class="search-open" hidden="">搜索</button>
 </nav>
 <a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
-</header><main id="main-content"><nav class="breadcrumbs" aria-label="当前位置"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode>大模型算法工程师 — 从零开始学习路线图</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-07T02:00:00.000Z" title="发表于 2026-04-07 10:00:00">2026-04-07</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-07T08:20:49.896Z" title="更新于 2026-04-07 16:20:49">2026-04-07</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a></span></div></div><div class="reading-tools"><button class="reading-width" type="button" aria-pressed="false">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="大模型算法工程师-从零开始学习路线图"><a class="markdownIt-Anchor" href="#大模型算法工程师-从零开始学习路线图"></a> 大模型算法工程师 — 从零开始学习路线图</h1>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">大模型算法工程师 — 从零开始学习路线图</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-07T02:00:00.000Z" title="发表于 2026-04-07 10:00:00">2026-04-07</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T05:46:47Z" title="更新于 2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="大模型算法工程师-从零开始学习路线图"><a class="markdownIt-Anchor" href="#大模型算法工程师-从零开始学习路线图"></a> 大模型算法工程师 — 从零开始学习路线图</h1><h2 id="practice-2026-10-01">2026 年 10 月补记：从学习清单走到 AI Infra 实践</h2>
+<p>4 月写这份路线图时，我把目标拆成了 Transformer、微调、推理、RAG 和 Agent 等课程主题。这个清单适合查漏补缺，但做项目以后，另一类问题占用了更多时间：算子测试通过，为什么模型结果变了？单请求更快，为什么并发吞吐反而下降？服务返回了 HTTP 200，为什么生成任务仍然失败？</p>
+<p>这次补记把学习单位改成能够检查的工程产出。基础知识仍然要补，后面的课程清单也继续保留；它的勾选状态是 4 月的历史记录，不代表当前能力评定，也不能根据几个 PR 就把整门课标成“已掌握”。以下路线面向会写 Python、理解反向传播和基本 Attention，希望进一步做推理系统与性能优化的读者。</p>
+<p>文中公开贡献状态核验于 2026-10-02。案例只使用已经公开的实现和验证说明；旧实验的硬件、版本与测量范围都不自动适用于今天的任意环境。</p>
+<h3 id="practice-2026-10-02">1. 先建立一个自己能解释的推理基线</h3>
+<p>第一份产出可以很小：固定一个模型、一份输入和一条生成路径，让一次请求完整经过分词、模型执行、采样和结果返回。除了回答内容，还要记下 checkpoint 修订、tokenizer、计算精度、软件版本、输入输出长度以及停止条件。这样下一次修改有了可以比较的起点。</p>
+<p>模型名称相同并不足以保证比较公平。一个请求用了聊天模板，另一个直接输入裸文本，实际 token 序列就可能不同；一边允许 EOS 提前结束，另一边强制生成固定长度，完成时间也不能直接拿来算优化收益。先比较输入 token IDs、采样参数和实际输出长度，往往比先调整并发数更有用。</p>
+<p>建议把配置文件、输入数据和结果文件一起保存。配置说明“准备怎么跑”，结果中的实际参数说明“最终怎么跑”。出现默认值覆盖、配置没有传到后端、回退分支被选中时，两者可能不同。把关键实际参数随结果输出，才能定位差异发生在哪一层。</p>
+<p>这一阶段的验收问题很具体：隔一段时间重新打开项目，你能否说清结果由哪一版代码、哪一份权重和哪些请求产生？若答案需要依赖回忆，先补记录，再进入优化。</p>
+<h3 id="practice-2026-10-03">2. 把算子练习变成数据流分析</h3>
+<p>向量加法、归约、Softmax 和矩阵乘法都适合练习，但学习目标应当包含寻址和数据流。写一个 kernel 前，先列出张量 shape、dtype、stride、输入输出关系，以及是否允许原地写回。连续矩阵上的正确结果，不足以说明转置视图和切片也能工作。</p>
+<p>例如按行计算 Softmax 时，传入行 stride 只解决了行起点的问题。若访问仍然写成 <code>row * stride_row + col</code>，就同时假定列 stride 为 1。要么在入口明确拒绝不支持的布局，要么把列 stride 也纳入寻址。不能因为参数里出现了一个 stride，就把函数描述成“支持所有非连续张量”。</p>
+<p>随后估算数据搬运。一个 FP32 向量加法 <code>z = x + y</code>，每个元素至少读取两个 4 字节输入、写出一个 4 字节结果；忽略缓存和其他开销时，有用流量是 <code>12N</code> 字节。可用这个数除以耗时估算有效带宽，但它不是显存控制器的真实流量计数。缓存命中、重复读取和写回方式都可能让两者不同。</p>
+<p>Softmax 的训练价值在于，它把数值稳定性、归约和融合放到了一起。先减每行最大值，再做指数与归一化；mask 掉的列若仍然参加归约，填充值就必须与归约语义配合。对有限有效输入，常见实现用负无穷填充无效位置，使它们既不抬高最大值，也不贡献指数和。全 mask、NaN 或无穷输入仍须单独约定行为。</p>
+<p>融合可以减少中间张量的读写，但也可能增加寄存器压力、限制并行度，或在多个 tile 中重复计算。读 <a href="https://triton-lang.org/main/getting-started/tutorials/02-fused-softmax.html">Triton 的 Fused Softmax 教程</a> 时，可以同时写出“中间结果在哪里”和“哪一项流量被省掉”，再用实际 profile 检查。演示实现的 shape 与片上资源约束也要一起读。</p>
+<p>完成这个阶段后，最好留下一个参考实现、边界输入集合、一张数据流草图和一份带 shape 的结果表。单独一个“比某函数快几倍”的标题，很难帮助下一位读者判断适用范围。</p>
+<h3 id="practice-2026-10-04">3. 从算子耗时走到请求耗时</h3>
+<p>算子变化进入推理引擎之后，还会受到预处理、调度、缓存、通信和结果序列化的影响。一个局部 kernel 的加速比不能直接写成模型加速比。可以先用 Amdahl 定律作粗略判断：若目标部分占原始耗时比例为 <code>f</code>，局部加速为 <code>s</code>，在其他部分完全不变的理想条件下，总加速比为 <code>1 / ((1-f) + f/s)</code>。</p>
+<p>举个纯计算示例：某部分占总时间 10%，把它加速两倍，整体理想加速只有约 1.053 倍。这个估算不包含排队与重叠变化，但足以提醒我们先寻找占比较高、机制明确的瓶颈。profile 中父算子和子 kernel 的时间可能重叠，也不能把它们全部相加作为请求耗时。</p>
+<p>测量范围应当写在数字旁边。<code>engine.predict</code> 的计时可能不包含网络、JSON 解析和排队；完整 HTTP 请求通常包含更多工作。进程冷启动、首次编译、首次 capture 与稳定复用阶段，也回答不同的问题。对交互应用而言，用户碰到的首次请求可能很重要，不能只留下热缓存下最好看的数字。</p>
+<p>改变优化层级时，验证也应当跟着扩大：先在算子层比较结果，再在模型层检查真实输入，最后经过正常服务入口查看请求行为。每一层都保留前一层的证据，同时补充新引入的边界。这样出现退化时，可以缩小排查范围。</p>
+<h3 id="practice-2026-10-05">4. 用请求记录理解 TTFT、TPOT 与吞吐</h3>
+<p>客户端的 TTFT 通常从发送请求计到首次收到流式输出，它可能包含排队、网络与 prefill；因此不能直接把 TTFT 当作某个 GPU 阶段的纯计算时间。TPOT 则按单请求计算，在输出 token 数大于 1 时，用首个输出之后的剩余时间除以剩余 token 数。具体实现应以工具的测量点为准。<a href="https://docs.vllm.ai/en/latest/benchmarking/cli/#understanding-the-latency-metrics">vLLM 的指标定义</a> 给出了相应公式，也解释了流式块和 token 的差异。</p>
+<p>下面的辅助函数只处理已经对齐到同一时钟的请求时间戳，不负责网络请求。失败请求保留记录，指标留空；只有一个输出 token 时，没有可计算的逐后续 token 平均延迟。</p>
+<pre><code class="language-python">def request_latencies(start_s, first_s, end_s, output_tokens, success):
+    if not success:
+        return {"success": False, "ttft_ms": None, "tpot_ms": None}
+    if first_s is None or not start_s &lt;= first_s &lt;= end_s:
+        raise ValueError("invalid request timestamps")
+    if output_tokens &lt; 1:
+        raise ValueError("successful generation must contain a token")
+    return {
+        "success": True,
+        "ttft_ms": 1000 * (first_s - start_s),
+        "tpot_ms": (1000 * (end_s - first_s) / (output_tokens - 1)
+                    if output_tokens &gt; 1 else None),
+    }
+</code></pre>
+<p>流式响应可能一块返回多个 token，特别是在投机解码中。不能把收到一次网络 chunk 当成生成一个 token，也不能直接用相邻 chunk 的平均间隔代替 TPOT。服务端的 token 计数、客户端的分块方式和统计公式需要明确对应。</p>
+<p>吞吐量是整个测量窗口内完成工作的速率。并发、排队、输入长度和输出长度都会影响它，因此不能把单请求 TPOT 的倒数当作整套服务的吞吐。报告至少应同时列出成功/失败请求数、输出 token 总量、测量窗口，以及相关延迟分位数。</p>
+<p>我会把低并发交互和多请求吞吐分成不同实验。前者更关心等待时间，后者更关心给定负载下的容量与尾延迟。一个配置只在其中一种场景占优，是完全合理的结果；应按使用场景选择，不必强行找一个覆盖所有负载的“最佳参数”。</p>
+<h3 id="practice-2026-10-06">5. 先检查测量器怎样认定成功</h3>
+<p>参与 vLLM-Omni 的基准客户端修复时，一个容易遗漏的情况是：HTTP 状态已经返回 200，流中也出现了一部分文本，随后却收到服务端 <code>error</code> 事件。若客户端只看 HTTP 状态，就会把这次失败计入成功请求。</p>
+<p>对应的 <a href="https://github.com/vllm-project/vllm-omni/pull/8000">PR #8000</a> 已合并。修复在每次尝试中记录错误事件，并在流结束时据此判定成功与否；后续 <a href="https://github.com/vllm-project/vllm-omni/pull/8015">PR #8015</a> 将相同问题补到图像编辑基准路径。二者修正的是测量结果的可信度，没有据此宣称模型变快。</p>
+<p>从这个问题出发，一个很适合入门的项目是给测量器建立协议测试：正常完成、部分输出后报错、读取中断、非成功状态、空输出，以及重试前后的状态清理。每个案例先写预期结果，再构造可控响应；涉及真实协议时，还应经过实际客户端路径，避免只测试一个脱离网络解析的判断函数。</p>
+<p>处理重试时，逻辑请求与尝试次数也要分开。一条请求尝试三次才成功，它消耗的时间和资源不能只剩下最后一次的记录。你可以分别报告最终成功率和重试成本，但必须保留失败尝试。否则“成功请求的平均延迟”可能随着失败率上升而变得更好看。</p>
+<p>这类改动通常不需要先租一台昂贵 GPU。协议回放能验证客户端如何处理错误；真实模型测试则补充正常生成路径是否受影响。两类证据各自有用，不能把协议测试写成模型质量或性能实验。</p>
+<h3 id="practice-2026-10-07">6. 给 CUDA Graph 同时计算复用收益与构建成本</h3>
+<p>CUDA Graph 将一组有依赖关系的操作预先组织起来，再重复执行，能够减少反复提交短 kernel 的主机侧开销。它的适用性仍取决于执行路径和复用机会，相关机制可查 <a href="https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html">CUDA Programming Guide</a>。学习时可以先实现固定 shape 的正确 replay，再研究动态请求。</p>
+<p>动态场景中的关键问题是：这个形状会被再次使用几次，缓存能留住它多久？把一次构建与验证成本记作 <code>C</code>，每次成功复用相对原路径节省的时间记作 <code>d</code>，忽略其他开销时，至少需要大于 <code>C/d</code> 次复用才可能收回成本。若图不断被淘汰，理论上的单次 replay 优势就很难积累起来。</p>
+<p>这不是纯粹的理论担忧。在已合并的 <a href="https://github.com/ThinkFlowLab/system1-omni/pull/22">System1-Omni PR #22</a> 的公开测试记录里，正确计入常驻资源并限制为 1 GiB 后，八个不同问题触发反复淘汰和 capture；该场景 Graph 的 p50 为 4.57–4.65 秒，eager 为 0.84–0.85 秒。记录同时说明其他四个测量场景有改善。它限定于一张 RTX 4090、固定实现、串行合成输入和两轮测量，不能外推成普遍的线上延迟结论。</p>
+<p>因此，Graph 练习应包含“变化输入后仍然正确”“淘汰后资源能释放”“资源不足时回退”等案例。只检查同一输入重复一百次，可能漏掉静态缓冲区内容没有更新、缓存键不完整和资源归属错误。</p>
+<p>进一步可以为 capture 设置准入条件，限制一次请求允许尝试的次数，并为反复失败或低复用形状设置冷却。相关探索在 <a href="https://github.com/ThinkFlowLab/system1-omni/pull/33">PR #33</a> 中仍处于评审状态；截至核验日，不能把它写成主分支已经具备的能力。其常驻缓存预算也不等于整个进程的显存硬上限，同步 capture 的时间限制不一定能中途抢占执行。</p>
+<h3 id="practice-2026-10-08">7. 在改采样路径前写清楚输出应当保持什么</h3>
+<p>数值优化要先约定正确性的层级：逐位相同、数值误差在容差内、greedy token 一致、随机采样分布等价，还是下游任务质量满足阈值。这些是不同合同。浮点运算顺序改变可能让数值略有不同，而两个接近的 logits 交换次序，又可能改变后续整段生成。</p>
+<p>TopK 是一个适合检查思维漏洞的小题。把词表任意切成若干桶，然后凭启发式丢弃某些桶，并不保证剩余集合包含全局 TopK。若要精确裁剪，需要能证明被丢弃元素不会进入结果。一个简单可证明的方案是：每个分片先保留本片前 K 个，再从这些候选中取全局 K 个；并列分数还需要一致的次序规则。</p>
+<p>证明也很直接：某个元素若在自己的分片里排在 K 名之后，已有至少 K 个本片元素排在它前面，它就不可能进入按同一全序定义的全局前 K 名。这个性质能帮助分布式实现减少汇集的候选量，但每个分片仍需检查其输入；不能把通信量减少直接写成总计算量相同比例下降。</p>
+<p>Top-p 改变的是采样候选集合的定义，并不是对任意 TopK 调用都等价的加速替换。投机解码也有自己的接受与纠正机制。对标准概率式方案，拒绝草稿 token 后，要从归一化的正残差分布 <code>max(p-q, 0)</code> 采样，不能简单改成“再从原目标分布 p 抽一次”；详见 <a href="https://arxiv.org/abs/2211.17192">Leviathan 等人的原始论文</a>。greedy 验证与随机分布等价验证应分别设计。</p>
+<p>如果暂时没有完整质量评测，结论就写到已经验证的层级为止。例如“固定输入下的 logits 最大误差低于某阈值”，比没有范围的“精度无损”更有信息。有限样本通过也不等于对所有输入作了证明。</p>
+<h3 id="practice-2026-10-09">8. 用一次运行时迁移练习接口与回归</h3>
+<p>推理系统的工作不全是降低延迟。把一个模型迁移到共享运行时，同样需要逐项保持请求身份、参数优先级、条件张量、输出格式和错误行为。错误经常发生在模块边界：尺寸在入口被读取，却没有传到真正执行的后端；用户传入的 seed 被部署默认值覆盖；图像张量范围变了，保存时却沿用旧处理方式。</p>
+<p>我在 <a href="https://github.com/vllm-project/vllm-omni/pull/7134">vLLM-Omni PR #7134</a> 中参与了 MammothModa2 的 DiT 运行时迁移，该 PR 已于 9 月合并。它明确限制为单请求 request mode，AR 到 DiT 传递 hidden states 与 token 元数据，不传递 AR KV cache；请求 batching 和 step execution 不属于这次交付范围。公开记录中的小幅耗时差异被作为回归证据，没有宣传成性能优化。</p>
+<p>可以仿照这种规模练习贡献：选一个边界明确的问题，写清输入、输出与失败方式，保留原路径的对照案例，然后做最小修改。评审者能够从差异、测试和说明中恢复你的判断，比一次同时改架构、后端和默认配置更容易审核。</p>
+<p>提交之后还要跟踪变更：重设基线、解决冲突、修改参数或清理提交，都可能影响原有证据的适用性。记录“GPU 测量发生在提交 A，提交 B 只调整了某些文件，本次是否复跑”，比笼统写“测试通过”更准确。若无法证明运行路径未变，就不能自动沿用旧性能结论。</p>
+<h3 id="practice-2026-10-10">9. 把后续学习安排成四份可检查的交付</h3>
+<p>这条实践路线可以与原课程清单并行推进，不要求把所有论文读完才开始写代码，也不把一次项目经历视为基础学习的替代。</p>
+<table>
+<thead>
+<tr>
+<th>交付</th>
+<th>应当留下什么</th>
+<th>什么时候可以继续</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>推理基线</td>
+<td>固定版本、输入、配置和完整输出记录</td>
+<td>能解释测量范围，重复运行差异有记录</td>
+</tr>
+<tr>
+<td>单个算子实验</td>
+<td>参考实现、布局与边界测试、数据流估算、profile</td>
+<td>正确性与性能分别核验，支持范围明确</td>
+</tr>
+<tr>
+<td>服务测量闭环</td>
+<td>客户端成功语义、错误回放、并发与延迟数据</td>
+<td>失败请求和重试没有被统计过程隐藏</td>
+</tr>
+<tr>
+<td>小范围开源贡献</td>
+<td>最小差异、可复现测试、证据版本和限制</td>
+<td>实现与声称的结果一致，评审问题得到回答</td>
+</tr>
+</tbody></table>
+<p>每完成一份交付，就回头找知识缺口：不懂带宽估算时补体系结构，不懂 logits 差异时补数值计算，不懂 rollout 与训练衔接时补策略梯度。这样基础学习有了具体问题作为牵引，项目也不会因为缺少理论解释而只剩一组开关。</p>
+<p>记录负面结果同样值得投入时间。一个候选因为质量、容量或并发行为不满足要求而被拒绝，可以说明边界在哪里，并为下一轮减少重复工作。只有在工作负载、正确性标准与计时口径一致时，性能比较才有可解释性；没有成熟证据时，继续保留问题比急着写出优化结论更合适。</p>
+<h3 id="practice-2026-10-11">10. 本次核验的公开案例与阅读顺序</h3>
+<table>
+<thead>
+<tr>
+<th>案例</th>
+<th>2026-10-02 状态</th>
+<th>适合学习的内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/vllm-project/vllm-omni/pull/8000">Omni #8000</a>、<a href="https://github.com/vllm-project/vllm-omni/pull/8015">#8015</a></td>
+<td>已合并</td>
+<td>流式错误处理与测量器回归测试</td>
+</tr>
+<tr>
+<td><a href="https://github.com/vllm-project/vllm-omni/pull/7134">Omni #7134</a></td>
+<td>已合并</td>
+<td>跨阶段接口、参数传递与迁移验证</td>
+</tr>
+<tr>
+<td><a href="https://github.com/ThinkFlowLab/system1-omni/pull/22">System1-Omni #22</a></td>
+<td>已合并</td>
+<td>Graph 资源归属、回退与负面性能结果</td>
+</tr>
+<tr>
+<td><a href="https://github.com/ThinkFlowLab/system1-omni/pull/33">System1-Omni #33</a></td>
+<td>尚在评审</td>
+<td>capture 准入、冷却和预算边界</td>
+</tr>
+</tbody></table>
+<p>阅读时先看问题和验证范围，再看代码差异，最后回到结果。不要仅凭 PR 已合并就假定所有负载都会受益，也不要把多个独立实验的百分比相加。源码与协议会继续变化，上表保存的是这次学习记录对应的核验状态。</p>
+<p>下面保留原有课程路线，便于按主题回查基础知识与尚待整理的篇目。</p>
 <blockquote>
 <p>目标：准备大模型算法工程师暑期实习面试<br/>
 起点：已有 ML 基础（CNN、Self-Attention、GAN、BN 等）+ RL 基础（Value/Policy-Based、Actor-Critic）</p>
@@ -310,15 +440,15 @@
 </tr>
 </tbody>
 </table>
-</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/">https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF/">学习路线</a><a class="post-meta__tags" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/04/06/01-%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/" title="深度学习基础"><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">深度学习基础</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section class="article-book" aria-label="本篇封面">
-      <span class="book-cover" data-collection="llm">
-      <img class="book-art" src="/img/books/llm-roadmap-color.webp" alt="《大模型算法工程师 — 从零开始学习路线图》暗黑中世纪插画封面" width="640" height="960" loading="lazy" decoding="async" />
-      <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✧ 大模型</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>大模型</span><span>学习路线图</span></span><span class="book-cover-english">THE ASCENT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
-    </span>
-      <div class="article-book-caption"><a href="/categories/大模型/">✧ 大模型 ↗</a><span>第 I 卷</span></div>
-    </section><details class="contents-panel" open><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E5%A4%A7%E6%A8%A1%E5%9E%8B%E7%AE%97%E6%B3%95%E5%B7%A5%E7%A8%8B%E5%B8%88-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE"><span class="toc-number">1.</span> <span class="toc-text"> 大模型算法工程师 — 从零开始学习路线图</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%B6%E6%AE%B5%E4%B8%80%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E4%B8%8E%E5%9F%BA%E7%A1%80%E8%A1%A5%E9%BD%903-4-%E5%91%A8"><span class="toc-number">1.1.</span> <span class="toc-text"> 阶段一：深度学习与基础补齐（3-4 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#11-%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80"><span class="toc-number">1.1.1.</span> <span class="toc-text"> 1.1 深度学习基础 ✅</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-transformer-%E5%85%A8%E8%A7%A3"><span class="toc-number">1.1.2.</span> <span class="toc-text"> 1.2 Transformer 全解 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-%E8%AF%AD%E8%A8%80%E6%A8%A1%E5%9E%8B%E5%9F%BA%E7%A1%80"><span class="toc-number">1.1.3.</span> <span class="toc-text"> 1.3 语言模型基础 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%B6%E6%AE%B5%E4%BA%8C%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%A0%B8%E5%BF%83%E6%8A%80%E6%9C%AF3-4-%E5%91%A8"><span class="toc-number">1.2.</span> <span class="toc-text"> 阶段二：大模型核心技术（3-4 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#21-%E4%B8%BB%E6%B5%81%E5%A4%A7%E6%A8%A1%E5%9E%8B%E6%9E%B6%E6%9E%84"><span class="toc-number">1.2.1.</span> <span class="toc-text"> 2.1 主流大模型架构 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#22-%E9%A2%84%E8%AE%AD%E7%BB%83"><span class="toc-number">1.2.2.</span> <span class="toc-text"> 2.2 预训练 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#23-%E5%BE%AE%E8%B0%83fine-tuning"><span class="toc-number">1.2.3.</span> <span class="toc-text"> 2.3 微调（Fine-tuning）⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#24-%E5%AF%B9%E9%BD%90alignment"><span class="toc-number">1.2.4.</span> <span class="toc-text"> 2.4 对齐（Alignment）⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%B6%E6%AE%B5%E4%B8%89%E6%8E%A8%E7%90%86%E4%B8%8E%E9%83%A8%E7%BD%B22-%E5%91%A8"><span class="toc-number">1.3.</span> <span class="toc-text"> 阶段三：推理与部署（2 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#31-%E6%8E%A8%E7%90%86%E4%BC%98%E5%8C%96"><span class="toc-number">1.3.1.</span> <span class="toc-text"> 3.1 推理优化 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#32-%E6%8E%A8%E7%90%86%E6%A1%86%E6%9E%B6%E5%AE%9E%E8%B7%B5"><span class="toc-number">1.3.2.</span> <span class="toc-text"> 3.2 推理框架实践 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%B6%E6%AE%B5%E5%9B%9B%E5%BA%94%E7%94%A8%E4%B8%8E%E5%89%8D%E6%B2%BF2-3-%E5%91%A8"><span class="toc-number">1.4.</span> <span class="toc-text"> 阶段四：应用与前沿（2-3 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#41-prompt-engineering"><span class="toc-number">1.4.1.</span> <span class="toc-text"> 4.1 Prompt Engineering ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#42-rag%E6%A3%80%E7%B4%A2%E5%A2%9E%E5%BC%BA%E7%94%9F%E6%88%90"><span class="toc-number">1.4.2.</span> <span class="toc-text"> 4.2 RAG（检索增强生成）⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#43-agent"><span class="toc-number">1.4.3.</span> <span class="toc-text"> 4.3 Agent ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#44-%E9%95%BF%E4%B8%8A%E4%B8%8B%E6%96%87%E4%B8%8E%E5%A4%9A%E6%A8%A1%E6%80%81"><span class="toc-number">1.4.4.</span> <span class="toc-text"> 4.4 长上下文与多模态 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%B6%E6%AE%B5%E4%BA%94%E9%9D%A2%E8%AF%95%E5%86%B2%E5%88%BA%E6%8C%81%E7%BB%AD"><span class="toc-number">1.5.</span> <span class="toc-text"> 阶段五：面试冲刺（持续）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#51-%E6%89%8B%E6%92%95%E4%BB%A3%E7%A0%81"><span class="toc-number">1.5.1.</span> <span class="toc-text"> 5.1 手撕代码 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#52-%E9%9D%A2%E8%AF%95%E9%AB%98%E9%A2%91%E9%A2%98"><span class="toc-number">1.5.2.</span> <span class="toc-text"> 5.2 面试高频题 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%BA%90"><span class="toc-number">1.6.</span> <span class="toc-text"> 学习资源</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%9B%E5%BA%A6%E8%BF%BD%E8%B8%AA"><span class="toc-number">1.7.</span> <span class="toc-text"> 进度追踪</span></a></li></ol></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/">https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF/">学习路线</a><a class="post-meta__tags" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/kimi-systems/" title="Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存</div></div></div></a><a class="pagination-related" href="/2026/04/06/01-深度学习基础/" title="深度学习基础"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">深度学习基础</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="llm">
+<img alt="《大模型算法工程师 — 从零开始学习路线图》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/llm-roadmap-color.webp" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>✧ 大模型</span><span>VOL. I</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>大模型</span><span>学习路线图</span></span><span class="book-cover-english">THE ASCENT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/大模型/">✧ 大模型 ↗</a><span>第 I 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#大模型算法工程师-从零开始学习路线图"><span class="toc-text">大模型算法工程师 — 从零开始学习路线图</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#practice-2026-10-01"><span class="toc-text">2026 年 10 月补记：从学习清单走到 AI Infra 实践</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-02"><span class="toc-text">1. 先建立一个自己能解释的推理基线</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-03"><span class="toc-text">2. 把算子练习变成数据流分析</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-04"><span class="toc-text">3. 从算子耗时走到请求耗时</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-05"><span class="toc-text">4. 用请求记录理解 TTFT、TPOT 与吞吐</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-06"><span class="toc-text">5. 先检查测量器怎样认定成功</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-07"><span class="toc-text">6. 给 CUDA Graph 同时计算复用收益与构建成本</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-08"><span class="toc-text">7. 在改采样路径前写清楚输出应当保持什么</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-09"><span class="toc-text">8. 用一次运行时迁移练习接口与回归</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-10"><span class="toc-text">9. 把后续学习安排成四份可检查的交付</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#practice-2026-10-11"><span class="toc-text">10. 本次核验的公开案例与阅读顺序</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#阶段一深度学习与基础补齐3-4-周"><span class="toc-text">阶段一：深度学习与基础补齐（3-4 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#11-深度学习基础"><span class="toc-text">1.1 深度学习基础 ✅</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-transformer-全解"><span class="toc-text">1.2 Transformer 全解 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-语言模型基础"><span class="toc-text">1.3 语言模型基础 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#阶段二大模型核心技术3-4-周"><span class="toc-text">阶段二：大模型核心技术（3-4 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#21-主流大模型架构"><span class="toc-text">2.1 主流大模型架构 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#22-预训练"><span class="toc-text">2.2 预训练 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#23-微调fine-tuning"><span class="toc-text">2.3 微调（Fine-tuning）⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#24-对齐alignment"><span class="toc-text">2.4 对齐（Alignment）⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#阶段三推理与部署2-周"><span class="toc-text">阶段三：推理与部署（2 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#31-推理优化"><span class="toc-text">3.1 推理优化 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#32-推理框架实践"><span class="toc-text">3.2 推理框架实践 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#阶段四应用与前沿2-3-周"><span class="toc-text">阶段四：应用与前沿（2-3 周）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#41-prompt-engineering"><span class="toc-text">4.1 Prompt Engineering ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#42-rag检索增强生成"><span class="toc-text">4.2 RAG（检索增强生成）⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#43-agent"><span class="toc-text">4.3 Agent ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#44-长上下文与多模态"><span class="toc-text">4.4 长上下文与多模态 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#阶段五面试冲刺持续"><span class="toc-text">阶段五：面试冲刺（持续）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#51-手撕代码"><span class="toc-text">5.1 手撕代码 ⬜</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#52-面试高频题"><span class="toc-text">5.2 面试高频题 ⬜</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#学习资源"><span class="toc-text">学习资源</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#进度追踪"><span class="toc-text">进度追踪</span></a></li></ol></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
 <p>
 <a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
         </p>
@@ -340,4 +470,4 @@
 <div class="search-footer">
 <span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
 </div>
-</dialog><button class="back-top" type="button" aria-label="回到顶部" hidden>↑</button><p class="sr-only" id="inner-status" role="status"></p><div class="reading-progress" aria-hidden="true"></div></body></html>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

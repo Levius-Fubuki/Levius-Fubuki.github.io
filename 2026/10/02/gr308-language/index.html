@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="覆盖 Qwen、DeepSeek 等模型的并行拓扑、MTP、Graph 与量化分支，保留正式测试、短测及失败边界。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/gr308-language/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="覆盖 Qwen、DeepSeek 等模型的并行拓扑、MTP、Graph 与量化分支，保留正式测试、短测及失败边界。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/gr308-language.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/gr308-language.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/gr308-language/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="GR308" property="article:tag"/><meta content="大模型" property="article:tag"/><meta content="性能测量" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/工程实践/">工程实践</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="gr308-language">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</h1>
+<p>同样是把模型放到 GR308 上，9B 模型适合把两个逻辑芯片拆成独立副本，30B MoE 在测试中关闭专家并行反而更快，80B 模型则需要四路张量并行。27B 的一次大幅加速，后来又被冷启动对照修正了归因。调优最有价值的部分，正是这些选择怎样被实验逐步筛出来。</p>
+<p>本文整理 2026 年 9 月的本地报告、指标 CSV 与对应 Codex 工作区记录。10 月 2 日进行的是证据整理，没有重新运行设备实验。型号沿用各报告的模型标识；不同 checkpoint、驱动、容器与请求长度各自成组，不把它们拼成硬件排行榜。多模态分支另见 <a href="/2026/10/02/gr308-image/">Qwen Image 实现复盘</a> 和 <a href="/2026/10/02/gr308-video/">Wan / H3 报告</a>。</p>
+<h2 id="先定义一张卡-一个副本与一个成绩">先定义一张卡、一个副本与一个成绩</h2>
+<p>这些实验中的 GR308 物理卡包含两个逻辑设备。TP2 表示一个模型被切到两个逻辑设备，并不自动表示用了两张物理卡；具体放置还要看实验记录。DP2 则是两份独立模型副本，各自接受请求。9B 的 TP1+DP2 和 30B 的 TP2 都可以占用一张双芯物理卡，但通信行为完全不同。</p>
+<p>TP 会切分一层的权重或中间表示，再通过集合通信汇总结果；副本并行直接分发不同请求，在副本之间通常不需要逐层汇总。选择的第一步是看模型能否单芯装下，其次才是单请求延迟、总吞吐和显存余量。不能因为 MoE 有很多专家，就默认增加 EP 一定有效：专家派发引入的数据搬运、负载不均与实现开销也会进入关键路径。</p>
+<p>表中的 aggregate output tok/s 是整个测试窗口内的输出吞吐；Decode tok/s 是报告按平均 TPOT 换算的单请求解码速度。两者分母不同。TTFT 包括首个输出前的等待与计算，不能只当 prefill kernel 耗时。并发增加以后，总吞吐上升而每个用户的输出速度下降，可以同时发生。</p>
+<p>9 月 17 日四模型报告主要使用 vLLM 0.18.0、vllm_fant 1.1.0.20 与 BF16。9B、30B、35B 请求为 3072→1024 tokens；80B 为 1024→1024。下表没有混入报告中的外部参考成绩。</p>
+<table>
+<thead>
+<tr>
+<th>模型与选中路径</th>
+<th align="right">C1 总输出 tok/s</th>
+<th align="right">C16 总输出 tok/s</th>
+<th>C16 TTFT / 平均 TPOT</th>
+<th>证据范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Qwen3.5-9B，TP1+DP2，MTP4</td>
+<td align="right">48.62</td>
+<td align="right">247.16</td>
+<td>3501.62 / 52.90 ms</td>
+<td>C1、C16 各 64 请求，均零失败，正式测试</td>
+</tr>
+<tr>
+<td>Qwen3-30B-A3B，TP2，无 EP / MTP</td>
+<td align="right">25.76</td>
+<td align="right">225.67</td>
+<td>4225.69 / 65.69 ms</td>
+<td>C1、C16 各 64 请求，均零失败，正式测试</td>
+</tr>
+<tr>
+<td>Qwen3.6-35B-A3B，TP2，MTP4</td>
+<td align="right">47.21</td>
+<td align="right">180.64</td>
+<td>3321.47 / 71.76 ms</td>
+<td>C1 16、C16 32 请求，短测候选</td>
+</tr>
+<tr>
+<td>Qwen3-Next-80B-A3B-Instruct，TP4，MTP3</td>
+<td align="right">47.13</td>
+<td align="right">255.93</td>
+<td>3535.56 / 50.74 ms</td>
+<td>C1 16、C16 32 请求，短测候选；两张物理卡</td>
+</tr>
+</tbody></table>
+<p>30B 的 C32 为 320.90 tok/s，35B 的 C32 为 208.08 tok/s，各 64 请求，但原始 CSV 仍标记为 short。请求数相同也不能自动升级为多轮正式验收：实验类别、重复次数和工作负载覆盖还需要一起看。</p>
+<h2 id="9b-先改变部署单位-再调整草稿长度">9B：先改变部署单位，再调整草稿长度</h2>
+<p>9B 的主要收益来自把 TP2 改为同一物理卡上的两个 TP1 副本。短测中，C16 总吞吐从 157.67 升到 247.87 tok/s，约增加 57%。单芯能够容纳模型后，去掉逐层跨芯通信，比先写一个更复杂的算子更有效。最终正式值是 247.16，文章保留正式值，不把短测最高点当最终交付。</p>
+<p>随后才调整 MTP。它让模型先提出若干候选 token，再由主路径验证，以增加一次验证后可提交的 token 数。MTP1→MTP3 的某组 C16 对照从 205.71 升到 231.81；最终候选采用 MTP4。这里不能把每个局部增益相乘，因为它们的其他参数与基线可能已经不同。</p>
+<p>调度预算也有影响。<code>max_num_batched_tokens</code> 从 2048 增到 4096 后，相关对照从约 215.8 升至 237–239 tok/s。更大预算减少了部分工作被切碎的机会，却可能提高临时内存和首 token 等待，因此后续仍需检查 TTFT。最终采用 Graph 捕获尺寸 [4,8,16,32]、block size 800、自动 KV 预算和同步调度。扩大 Graph 到 64 没有形成稳定收益，自动 KV 的局部容量收益也只有约 0.9%。</p>
+<p>这个项目实际采用了三个层次的技术：部署副本消除不必要的通信，MTP 减少逐 token 验证开销，调度和 Graph 控制发射粒度。收益主次要按实验排列，不能把最后留下的所有开关都写成同等重要。</p>
+<h2 id="30b-moe-专家并行不等于默认更快">30B MoE：专家并行不等于默认更快</h2>
+<p>30B 的选中配置是 TP2、不启用 EP、MoE 后端 auto、Graph [4,8,16,32]、batch token 4096、block size 800、固定 8 GiB KV，并启用异步调度。模型名字里的 A3B 说明每 token 激活参数较少，但全部专家权重仍要被存储、分片和访问。</p>
+<p>EP2 在 C16 / C32 的结果分别为 185.86 / 230.52 tok/s，低于最后保留的无 EP 路径。减少一部分本地专家工作不一定抵消 token 派发和汇总成本。能够证明的是这组拓扑和实现没有赢，尚不足以断定硬件上的所有专家并行都无效。</p>
+<p>一次 grouped Triton 候选得到 321.35，对照为 320.90，只差约 0.14%。如此小的差值不足以支撑额外维护一条默认路径。把 batch token 提到 6144，也只换来约 0.8% / 0.2% 的吞吐变化，却让 TTFT 增加约 30%–47%。如果只按最终 tokens/s 排名，这种候选容易被误选。</p>
+<p>自动 KV 在 C16 略好、C32 反而变差，最终仍保留固定预算。该分支说明，调度参数要对服务目标负责：有的参数改善短时吞吐，有的扩大可容纳请求数，还有的只是改变排队位置。它们并不都意味着模型计算更快。</p>
+<h2 id="35b-与-80b-mtp-有效-但不能跨模型照搬">35B 与 80B：MTP 有效，但不能跨模型照搬</h2>
+<p>35B 的最终短测路径是 TP2、MTP4、Graph [4,8,16,32,64]、batch token 4096、block size 1088、自动 KV、同步调度。在 batch token 2048 时，MTP3→4 让 C16 从 164.38 升到 175.57；随后把预算改到 4096，得到 180.64，同时 TTFT 从 5593.57 降到 3321.47 ms。</p>
+<p>继续加参数并没有持续进步。Graph128 只有约 0.5% 的变化；batch6144 的吞吐变化在负 0.5% 到正 0.48% 附近，且 TTFT 变差。Triton fused 路径 C16 / C32 为 167.69 / 188.63；EP2 linear 为 167.81 / 185.50，都没有超过选中路径。一个 round-robin 配置实际静默回退到了 linear，这不是合法的策略 A/B。C64 还遇到 SSM state indices 非连续的问题，因此不提供稳定 C64 成绩。</p>
+<p>80B 使用 TP4，分布在两张物理卡。无 MTP、MTP1、MTP2、MTP3 的 C16 结果依次是 177.71、231.30、251.49、255.93 tok/s。MTP3 相对 MTP2 的总吞吐提升不大，但 C1 从 36.75 升到 47.13，因此最终选 MTP3。这里同时观察了吞吐与低并发体验。</p>
+<p>其余参数是 Graph [4,8,16,32,64]、batch token 2048、block size 1088、固定 8 GiB KV 和同步调度。EP4 只得到 233.93，TTFT 还增加约 21.2%。TP2+DP2+EP 的尝试先碰到设备类型被写为 CUDA 的兼容问题，修过 CPU 设备处理后又遇到固件 semaphore/profile 失败，不能列为可用方案。</p>
+<p>80B 的 255.93 是整条 TP4 路径总吞吐。除以两张物理卡可得到 127.97 tok/s/卡的折算指标，但它不是在单卡上独立运行得到的成绩。类似换算只适合成本记账，不能替代另一种拓扑的实验。</p>
+<h2 id="27b-一次冷启动复测改变了结论">27B：一次冷启动复测改变了结论</h2>
+<p>27B 材料必须按时间阅读。9 月 11 日报告中的 BF16 基线是四张物理卡、八个逻辑设备、四个 TP2 副本，每副本 C16，合计 C64，3072→1024 tokens。KV block 从 144 调到 152 后，总吞吐 46.455→72.781 tok/s，抢占次数 144→0。这个变化确实说明旧配置存在容量问题。</p>
+<p>当时 BF16 每副本约 18.195–18.267，FP16 单副本两次为 19.0828、19.0729，平均 19.0779，约快 4.5%。但四副本 76.312 只是据此计算的投影，没完成对应整机实测；FP16 的材料也不足以声明业务质量验收通过。slab8 在短 decode 看起来增加约 18.9%，长请求却只有 17.9539，说明局部计时会改变候选排序。</p>
+<p>9 月 14 日的受控对照使用同一 TP2、BF16、C16、64 请求、3072→1024。厂商配置的无投机基线已经是 53.574 tok/s；把 KV 设为 152 得到 53.587，只差 0.023%。因此，后来约 18→53 的差距不能继续归因于 KV block。移除厂商配置还会在启动时申请 512 MiB 失败，尽管监控显示仍有较多空闲显存；该事实证明环境相关，不足以独自定位分配器根因。</p>
+<p>MTP1 的历史成功也要保留前置状态：51.52→67.75 tok/s 的那次 C16 测试，发生在同进程先完成 C1×64、运行约 3596.9 秒之后。新进程直接做 MTP1+Graph32 的冷 C16，两次都在完成边界卡住，接受率从约 90%–96% 降到零，仍有 16 个 running 请求，并出现共享内存广播超时。</p>
+<table>
+<thead>
+<tr>
+<th>27B 观察</th>
+<th>可以得出的结论</th>
+<th>尚不能得出的结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>无投机受控基线约 53.6 tok/s</td>
+<td>旧低基线不再适合作为当前 MTP 对照</td>
+<td>所有差值都来自某一个开关</td>
+</tr>
+<tr>
+<td>暖进程 MTP1 51.52→67.75</td>
+<td>该运行状态下曾获得约 31.5% 吞吐收益</td>
+<td>冷启动 C16 稳定可部署</td>
+</tr>
+<tr>
+<td>C1 6.14→18.22，TPOT 173.8→49.28 ms</td>
+<td>投机在低并发有较大潜力</td>
+<td>C16/C64 同比例受益</td>
+</tr>
+<tr>
+<td>C16 TTFT 14.61→18.49 s</td>
+<td>收益同时带来首 token 代价</td>
+<td>单个吞吐数字覆盖全部体验</td>
+</tr>
+<tr>
+<td>MTP3 C16 35.44，平均接受长度 1.038</td>
+<td>草稿加长的验证成本未被接受收益抵消</td>
+<td>MTP 深度越大越快</td>
+</tr>
+</tbody></table>
+<p>这一分支最终应写成“获得候选收益并发现冷启动稳定性问题”。把 67.75 直接乘四写成已交付整机吞吐，会同时忽略副本互扰与冷启动失败。工作区里的后续对照，比早期汇报中醒目的最高值更重要。</p>
+<h2 id="deepseek-gptq-和尚未完成的模型分支">DeepSeek、GPTQ 和尚未完成的模型分支</h2>
+<p>DeepSeek-R1-Distill-Qwen-7B 的第三方报告复核位于 H3 工作树中，主目录索引不显眼。条件是 FP16、TP1、一个逻辑芯片，1024→1024、C8、8 个请求、忽略 EOS、temperature 0。第三方 PDF 的 205.11 tok/s 缺少三份原始 CSV，不能当作本次复现成功。</p>
+<p>旧 1.1.0.17 镜像在当时 1.1.0.19 驱动下卡在 KV 初始化。改用 1.1.0.20 后，eager 得到 33.68，Graph8 得到 33.89 tok/s；各完成 8/8。Graph 的增幅约 0.62%，TTFT 3.221→2.562 秒，平均 TPOT 234.64→233.55 ms。每种模式只有一次正式运行，这是一份兼容性与复现差异记录，还不能宣布设备性能上限。</p>
+<p>9 月 7 日交接中的 Qwen3.8-27B GPTQ 也必须区分存储、计算与质量。INT4 权重由 INT32 容器打包，实际激活/矩阵路径要求 FP16，部分内部状态仍是 FP32；TP 通信随激活走 FP16。接口可以接收请求，不代表量化实现合格。早期 200 题中，BF16 为 127/200，GPTQ 为 0/200，输出退化为重复符号；真实 packed 层还出现大幅数值偏差。较晚的精度调查确认 HTTP 请求能完成，但没有补出替代这份质量失败的完整验收，因此不能把“最低可启动精度”写成“最低合格部署精度”。</p>
+<p>为避免只留下成功模型，其他分支也列出截至已核材料的状态：</p>
+<table>
+<thead>
+<tr>
+<th>分支</th>
+<th>已取得证据</th>
+<th>保留的缺口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DeepSeek-V4-Flash GPTQ</td>
+<td>真实专家 FP16/BF16 部分 FFN 对照通过；q_a_proj FP16 6/6</td>
+<td>BF16 q_a_proj 0/6 且 NaN；clamp、loader/repack 未完成整链；旧下载最终记录不完整</td>
+</tr>
+<tr>
+<td>GLM-5.3 BF16 / INT4 转换</td>
+<td>有容量、下载和转换探索</td>
+<td>无完整真权重 E2E；tiny dummy 不算完成部署</td>
+</tr>
+<tr>
+<td>Qwen3.5-4B</td>
+<td>下载方案与固定 revision</td>
+<td>缺下载最终记录和 GR308 E2E</td>
+</tr>
+<tr>
+<td>Qwen3.8-Flash-Next</td>
+<td>后续工作区有量化与 PLE 卸载容量调查</td>
+<td>本轮未核得实际部署或吞吐成绩；运行时支持仍是独立前提</td>
+</tr>
+<tr>
+<td>LFM2.5、Gemma4 E2B、Z-Image-Turbo</td>
+<td>仅历史候选</td>
+<td>没有可供成稿的该平台调优结果</td>
+</tr>
+</tbody></table>
+<p>这些状态都不是对模型一般能力的评价。它们只回答这个工程分支当时走到哪里。特别是下载成功、dummy 前向、HTTP 200、数值门通过和长时服务可用，是五件不同的事。</p>
+<h2 id="最后交付的应当是可解释的配置">最后交付的应当是可解释的配置</h2>
+<p>这批实验的实现过程有一条清楚的顺序：先核对逻辑设备和物理拓扑，再建立固定请求基线，接着比较 TP/DP/EP，最后才调 MTP、Graph、KV 与 token budget。每轮把启动、实际分发后端、完成数、错误、TTFT、TPOT 和总吞吐一起保存，才能发现“配置写了但没有生效”以及“短测成功但冷启动卡住”。</p>
+<p>明确保留的成果包括 9B、30B 的正式 C1/C16 配置，35B、80B 的短测最优候选，以及 27B 的基线修正和稳定性边界。失败分支同样减少了后续搜索空间：EP 并不默认更优，草稿长度不能无限增加，单算子或短 decode 的收益也不能替代真实服务请求。</p>
+<p>本文的本地证据包括《风华 GR308 Qwen 系列调优结果总结》（2026-09-17）及 <code>final_metrics.csv</code>、《Qwen3.6-27B vLLM 调优总结》（09-11）、《Qwen36 C16 Controlled A/B》（09-14）、《GR308 测试交接文档》（09-07）、H3 工作树中的第三方报告复核（09-10），以及对应工作区后续记录。数值是历史实验结果，本轮没有重新认证当前服务器状态。通用的实验设计方法另见 <a href="/2026/10/02/inference-evidence/">推理优化怎样形成可信结论</a>。</p>
+<h2 id="复核配置时-保留失败路径的作用">复核配置时，保留失败路径的作用</h2>
+<p>这次整理没有把最后一份报告覆盖掉前面的所有记录。对同一个模型，旧结果仍然解释了为什么会尝试某个方向：早期抢占推动了 KV 容量调整，短 decode 的正结果推动了更长请求的复测，暖进程成功又推动了冷启动对照。后续证据改变的是当前结论，不应抹去实验的因果顺序。</p>
+<p>例如，模型名称本身并不能解释哪一步在等待；这里真正有解释力的是相同请求下的抢占计数、接受长度、已完成请求数和错误位置。一个候选若只在稳态有效，启动过程就应成为单独验收项；一个候选若在高并发卡住，低并发成功也不能替它签署容量承诺。</p>
+<p>更具体地说，MTP 的成本至少包含提出候选、验证候选以及维护状态。接受率高可能减少主模型重复轮次，但如果一次验证扩大了工作量、增加缓冲区或引入额外同步，最终吞吐仍可能下降。材料中 MTP3 的低平均接受长度与退化相互呼应；它提供的是该配置不值得保留的证据，而不是对全部投机解码的否定。</p>
+<p>Graph 也必须检查实际捕获与命中。不同 batch bucket 占用额外内存，不能只在命令里添加更大的尺寸就认为所有请求都会更快。状态索引不连续、后端静默回退或启动申请失败，会让一个表面相同的配置走到不同执行路径。文章保留这些失败，是为了让后来读者知道应该在哪里确认真实行为。</p>
+<p>最终，配置记录应与模型修订、软件栈、请求长度和测量窗口共同保存。只留下启动参数，无法解释某个开关为何被选中；只留下最高吞吐，无法知道付出了多少首 token 延迟或稳定性代价。本文的表格与失败矩阵正是同一份结果的两面，后续新增实验也应沿这些条件更新。</p>
+<p>相关 GRServe 工作区另有“可移植核心与 Fant 首个后端”的设计规格，讨论 Backend ABI、能力协商、执行计划、兼容与原生两条路径。这一部分目前属于设计证据，不能把计划中的 KV、TP、Graph 或跨厂商性能目标算进上述已经取得的模型结果。后续若形成真实实现和同口径验收，应以独立工程文章记录，而不是借用现有 vLLM 基线替它证明完成。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/gr308-language/">https://leviusspace.top/2026/10/02/gr308-language/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/GR308/">GR308</a><a class="post-meta__tags" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="post-meta__tags" href="/tags/%E6%80%A7%E8%83%BD%E6%B5%8B%E9%87%8F/">性能测量</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/dual-mac-inference/" title="两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</div></div></div></a><a class="pagination-related" href="/2026/10/02/gr308-image/" title="Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="engineering">
+<img alt="《GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/gr308-language.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>⚙ 工程实践</span><span>VOL. II</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>语言模型</span></span><span class="book-cover-english">THE CALIBRATION</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/工程实践/">⚙ 工程实践 ↗</a><span>第 II 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#先定义一张卡-一个副本与一个成绩"><span class="toc-text">先定义一张卡、一个副本与一个成绩</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9b-先改变部署单位-再调整草稿长度"><span class="toc-text">9B：先改变部署单位，再调整草稿长度</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#30b-moe-专家并行不等于默认更快"><span class="toc-text">30B MoE：专家并行不等于默认更快</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#35b-与-80b-mtp-有效-但不能跨模型照搬"><span class="toc-text">35B 与 80B：MTP 有效，但不能跨模型照搬</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#27b-一次冷启动复测改变了结论"><span class="toc-text">27B：一次冷启动复测改变了结论</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#deepseek-gptq-和尚未完成的模型分支"><span class="toc-text">DeepSeek、GPTQ 和尚未完成的模型分支</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#最后交付的应当是可解释的配置"><span class="toc-text">最后交付的应当是可解释的配置</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#复核配置时-保留失败路径的作用"><span class="toc-text">复核配置时，保留失败路径的作用</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

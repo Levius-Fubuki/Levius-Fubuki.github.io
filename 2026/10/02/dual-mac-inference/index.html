@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="从两台 16GB Mac 的公开实验出发，解释流水线切层、权重打包、懒执行与上下文验证的边界。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/dual-mac-inference/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="从两台 16GB Mac 的公开实验出发，解释流水线切层、权重打包、懒执行与上下文验证的边界。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/dual-mac-inference.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/dual-mac-inference.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/dual-mac-inference/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="大模型" property="article:tag"/><meta content="MLX" property="article:tag"/><meta content="分布式推理" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/工程实践/">工程实践</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="dual-mac-inference">两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</h1>
+<p>把两台各有 16GB 内存的 Mac 连起来，最容易产生的期待是得到一台“32GB 的机器”。做完 Qwen3-32B 的双机实验后，我更愿意先画两张内存账单：每台机器各自装入多少权重，留多少空间给 KV cache、临时张量和系统，再看哪些张量需要跨机器传递。模型总量放得下，只是开始。</p>
+<p>这篇文章整理我的 <a href="https://github.com/Levius-Fubuki/qwen3-32b-dual-mac-mlx">双 Mac MLX 项目</a>，以公开提交 <code>9208788769</code> 为核验快照，核验日期为 2026-10-02。硬件是 16GB M3 MacBook Air 与 16GB M4 Mac mini，实验使用 MLX 0.32.2、mlx-lm 0.31.3。最终留下两份不同用途的配置：4-bit 的 2K 记录，以及 3-bit 的一次 8K 可行性记录。下面重点解释这些选择怎样形成，以及结果能支持什么判断。</p>
+<h2 id="先把-跑起来-拆成几个问题">先把“跑起来”拆成几个问题</h2>
+<p>权重文件存在、进程成功启动、服务能返回模型列表、一次生成完成、长时间稳定服务，是五个不同状态。第一次失败就发生在它们之间：模型服务启动后，模型列表接口正常返回，真正的生成请求却触发了 Mac mini 上的 Metal timeout，随后另一端才报告 Ring 连接中断。</p>
+<p>如果只看客户端最后一条报错，会把注意力集中到网络；按两端时间顺序整理日志，首先失效的是 GPU 执行。这里的经验很具体：分布式系统的最末端错误通常携带的是“我失去了谁”，它未必解释“对方为什么先退出”。因此应把请求标识、节点角色和时间戳放进同一张事件表，再开始调参数。</p>
+<p>还要区分三类容量。磁盘容量决定模型能否保存，统一内存决定运行时能否驻留，单次 GPU 提交的工作量影响本轮执行是否及时完成。降低模型位宽主要改变前两者的一部分；缩小 prefill chunk 则改变一次提交覆盖的 token 数。它们可能共同影响成功率，但不能互相代替。</p>
+<p>我的验收单位后来改成一条完整请求：固定输入 token 数、输出 token 数、采样策略和软件版本，从两端启动一直记录到输出结束。短 prompt 冒烟之后逐步增加长度，每次失败都保存发生阶段。这样“8K”才有明确含义：输入与新生成 token 合计达到 8,192，而不是配置文件写了一个较大的上限。</p>
+<h2 id="两份独立内存预算">两份独立内存预算</h2>
+<p>粗略估算 32B 参数的原始 4-bit payload，可用参数量乘 0.5 字节，得到约 16GB 的十进制量级。但实际权重还包含量化比例、偏置或其他未量化张量，文件大小不能只靠这一行算式确定。运行时另有模型结构、激活、缓存和临时工作区。</p>
+<p>每台机器都要独立满足：本地权重、KV、执行峰值、通信缓冲和系统占用之和，小于当时可用的内存。统一内存让 CPU/GPU 共享该机器的内存资源，并没有让两台机器通过网络获得统一地址空间。即使一端空闲，另一端也不能无成本地把任意中间张量搬过去使用。</p>
+<p>对于按层切分的模型，KV cache 也跟着本地层数变化。忽略实现额外开销时，可以按“本地层数 × token 数 × KV heads × head dimension × K/V 两份 × 元素字节数”估算。这个式子适合检查量级，真实峰值仍要测量，尤其需要看 prefill 中的大临时张量与懒执行尚未释放的结果。</p>
+<p>异构机器还存在算力差异。把 64 层平均分为 32/32，容易理解，却不保证延迟或内存最均衡。实验最终给 3-bit 配置选择了 M4 前 40 层、M3 后 24 层；4-bit 则保留 32/32。不同位宽、阶段和上下文改变了压力来源，切分比例需要分别验证。</p>
+<h2 id="通信放在哪里-比链路标称速度更重要">通信放在哪里，比链路标称速度更重要</h2>
+<p>原始路线尝试了张量并行：一个线性层的计算分布在多个 rank，层内需要 collective 来合并部分结果。它有自己的适用场景，但在本实验的 TCP/Ring 链路上，每层同步的延迟会重复出现。物理连接显示的带宽上限，也不等于应用能在大量小消息下持续获得的吞吐。</p>
+<p>后续实现改成两个连续的流水线阶段。M4 执行 Embedding 和前段 Transformer 层，再发送 hidden state；M3 执行后段层、归一化与 LM Head，最后完成约定的 gather 和客户端输出。项目把前段放在 rank 1、后段放在 rank 0，这是适配输出角色的具体映射，不能凭 rank 数字猜层序。</p>
+<pre><code class="language-text">输入 token
+  → M4 / rank 1：Embedding + 前段连续层
+  → 发送阶段边界 hidden state
+  → M3 / rank 0：后段层 + Norm + LM Head
+  → 双端按相同次序完成最终通信
+  → 返回 logits，继续下一次解码
+</code></pre>
+<p>连续层切分减少了阶段之间的通信频率，但单个自回归请求依然存在数据依赖。后段拿到前段结果才能继续，下一 token 又依赖本次采样。只有进一步引入合适的请求并行或微批次调度，才可能填补某些空闲时段；本实验没有完成这部分，所以不能把“两台 GPU 都参与”理解成“两台一直满载”。</p>
+<p>这里值得单独检查的是通信顺序与缓存更新。MLX 的懒执行会推迟实际计算，构造了一个 send 表达式，不等于所有相关状态已经完成更新。适配器使用依赖关系把阶段发送与缓存更新关联起来，并让两个 rank 遵守相同的最终通信顺序。涉及有状态解码时，仅对比一次无缓存 forward 不够，还应连续运行多步。</p>
+<p><a href="https://ml-explore.github.io/mlx/build/html/usage/distributed.html">MLX 分布式文档</a> 可以用来理解后端和通信接口；文章描述的是上述固定版本项目的选择，不能直接当作所有当前 MLX 配置的性能结论。</p>
+<h2 id="为什么需要-rank-local-权重包">为什么需要 rank-local 权重包</h2>
+<p>一种看似省事的实现，是两端都打开完整模型，再删除不需要的层。它的问题出在“删除之前”：加载器可能先发现所有 shard、建立映射或触发更大范围的张量加载，短暂峰值就足以改变实验结果。原始 shard 也不一定按层整齐分开，一个文件可能同时包含两端要用的张量。</p>
+<p>项目因此实现了按层重打包。打包器读取 safetensors 的元信息和字节范围，选择当前 rank 的连续层，把量化 payload 原样复制到新的 shard，配套生成索引、配置和 manifest。它不需要先把整个模型反量化成浮点权重，也不应通过重新量化来“顺便”改变数值。</p>
+<p>这条路径的正确性可以拆成两个层面。模型层面检查分层连续、无重叠、无遗漏，Embedding、Norm 与 LM Head 的归属符合执行角色；文件层面检查 dtype、shape、字节长度与 payload 哈希。只比较目标文件总大小，会漏掉张量被错分到另一端、索引指向旧文件等问题。</p>
+<p>打包还是一个发布事务。正在写入的目录不能被推理进程当成完成品，因此需要 staging 状态、临时文件和明确的完成标记；中断后要判断哪些产物属于本次任务，哪些是其他运行留下的。代码中围绕 manifest 发布、恢复与文件所有权做的工作，虽然不直接改善 token 速度，却决定实验能否重复。</p>
+<p>现存 3-bit manifest 没有写入上游 <code>source_revision</code>，而下载记录固定过模型版本。这是一个应保留在报告中的追溯缺口：记录系统的目标是解释已有证据，不能在事后凭记忆补出看似完整的来源。将来更合适的方案，是在打包入口强制接收并保存 checkpoint revision。</p>
+<h2 id="懒执行怎样影响-timeout-排查">懒执行怎样影响 timeout 排查</h2>
+<p><a href="https://ml-explore.github.io/mlx/build/html/usage/lazy_evaluation.html">MLX 的懒执行说明</a> 解释了表达式构造与实际求值之间的区别。对实验排查而言，关键是：异常暴露在 <code>eval</code> 或通信同步点，并不说明该行本身就是最重操作。前面累积的计算可能在这里一起执行。</p>
+<p>第一轮调整是在若干本地层后求值，让长图分段提交。每四层加入一次求值后，4-bit 的 2K 请求通过了，但 4K 仍然失败。把分段间隔继续缩小到每层，也没有消除长上下文失败，这使排查范围进一步缩小到 block 内部。</p>
+<p>随后将 Attention 与 MLP 分开求值，并在长上下文路径中明确处理 hidden state、KV 更新以及 gate/up projection 的中间结果。这样做增加了执行边界，也可能减少跨操作优化机会，不能默认只会更快。它在本实验中的首要目的，是把一次难以完成的大提交变成能够完成的若干段。</p>
+<p>这类改动需要独立的数值检查。逻辑上仍然使用同一套权重和算式，不等于实现细节自动正确；残差连接、cache 长度、位置编码和中间 dtype 都可能在拆分时被改坏。公开报告记录了与上游同权重、同缓存状态的对照测试。这里沿用的是历史证据，本轮整理文章没有重新运行两台 Mac。</p>
+<h2 id="prefill-chunk-是执行调度参数">Prefill chunk 是执行调度参数</h2>
+<p>3-bit 路线在拆分之后通过了 4K，但 8K、prefill step 为 64 时仍触发 timeout。最终把 step 改为 32，完成了 <code>8188 prompt + 4 generation</code> 的请求。</p>
+<p>可以用一段仅表达调度结构的伪代码理解它：</p>
+<pre><code class="language-python">for start in range(0, len(prompt_ids), prefill_step):
+    part = prompt_ids[start:start + prefill_step]
+    hidden, cache = run_stages(part, cache)
+    materialize_required_state(hidden, cache)
+</code></pre>
+<p>每轮只处理一部分新的 query token，已有 KV 继续参与 Attention。step 减半并不意味着所有 Attention 工作都减半，也不等于改变总上下文；它改变的是一次推进多少输入及相应提交规模。轮数增加后，会引入更多调度和同步开销，因此需要同时观察完成率与 prefill 耗时。</p>
+<p>选择 chunk 时，我更关心哪一段首先越过执行边界。若减小 step 后能够稳定完成，下一步才是寻找更合适的折中；若仍失败，就要检查单个操作、内存压力或后端状态。逐次只改一个主要因素，比同时改切层、量化、连接数和 chunk 更容易解释。</p>
+<h2 id="最终记录应该怎样读">最终记录应该怎样读</h2>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>M4 / M3 层数</th>
+<th>已完成的总 token 预算</th>
+<th>Prefill step</th>
+<th>历史 decode 记录</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4-bit</td>
+<td>32 / 32</td>
+<td>2,048</td>
+<td>64</td>
+<td>6.18 tok/s</td>
+</tr>
+<tr>
+<td>3-bit</td>
+<td>40 / 24</td>
+<td>8,192，具体为 8188+4</td>
+<td>32</td>
+<td>4.35 tok/s</td>
+</tr>
+</tbody></table>
+<p>数字来自项目的<a href="https://github.com/Levius-Fubuki/qwen3-32b-dual-mac-mlx/blob/9208788769/EXPERIMENT_REPORT.md">公开实验报告</a>。两行的上下文、切层与调度不同，不能据此计算“3-bit 比 4-bit 慢多少”作为位宽的一般规律。3-bit 的那次 prefill 记录为 46.45 tok/s，rank 0 MLX peak 为 6.65GB；后者没有涵盖另一端和两端的系统 swap。</p>
+<p>四个生成 token 足以证明请求走通，却很难估计长时间 decode 的波动。原计划中的长生成、多轮测量、双端监控和质量对照没有全部完成。清理后短 canary 还再次出现 Metal timeout，报告保留了这一现象；因此不能把历史成功记录写成当前可随时启动的稳定服务。</p>
+<p>4-bit 与 3-bit 的语言质量也没有系统比较。较低位宽带来了容量机会，回答质量应由独立任务与固定数据评估，不能只根据文件更小或一次回答流畅来判断。本文保留两条配置，是因为它们回答不同的实验问题。</p>
+<h2 id="重新验证时-先恢复一个最小可解释现场">重新验证时，先恢复一个最小可解释现场</h2>
+<p>假如隔了一个月重新运行，第一件事不是直接挑战最长上下文。我会先检查两端产物是否仍配成同一组：模型修订、量化配置、adapter 哈希和层分配都相互对应。两端目录都叫同一个名字，也可能各自指向不同历史包；名字只方便调用，不能充当身份校验。</p>
+<p>其次检查两端进程对 rank 的理解。前段与后段的层号应首尾相接，通信调用顺序一致，世界大小与 host 配置一致。一次只传一个很小的输入，观察发送张量的形状、元素类型和返回 logits 的形状。这样可以先把配置错误与长上下文资源问题分开。</p>
+<p>随后让缓存真正增长。只有一次 forward 正确，仍可能漏掉第二步位置索引、cache 偏移或依赖关系错误。使用固定 token 序列分几段输入，再与一次性输入的参考路径比较，是检查分块 prefill 语义的一个方向；对数值差异需要预先规定容差与比较位置。</p>
+<p>最后才进行资源和速度测量。双端同时记录进程与系统层面的内存信息，区分 MLX 跟踪的分配、其他进程占用和系统交换。即使某个框架峰值看起来很低，也可能遗漏系统压力。长生成要观察曲线是否随 token 数持续增长，结束后资源是否回落，而不只截取一个最大值。</p>
+<p>如果重启前后的行为不同，应把 boot session 或运行环境变化写进证据。清理缓存、更新软件或调整模型包之后，过去的成功记录仍然存在，但它描述的是过去那套现场。重新完成一条短 canary，能帮助确定现在是否具备继续长测试的条件。</p>
+<p>以上步骤把复现成本放在早期的小请求上。发现层分配不一致时，不必等待一轮长 prefill 才知道失败；发现单步缓存有偏差时，也不用把后续整段生成都归因给量化。这个顺序对其他异构推理项目同样有参考价值，但每种后端仍要按自己的同步与内存规则验证。</p>
+<h2 id="从这次实验带走的工作方式">从这次实验带走的工作方式</h2>
+<p>下一次搭建类似系统，我会先保存一份完整的运行描述：模型及 tokenizer 修订、两端配置、层分配、通信后端、cache 类型、提交边界、输入输出预算和日志位置。把这份描述与产物 manifest 放在一起，才能知道重现失败时究竟缺了什么。</p>
+<p>验证顺序则从小到大：单机 tiny model 数值对照、两 rank 短 forward、连续 cache 更新、短生成、长 prompt、长 decode，再到真实服务入口。每一层都补充新的故障面。模型列表接口只能证明进程响应了请求，长生成才会暴露另一部分问题。</p>
+<p>这项实验留下的价值，是一条从错误日志到架构与执行粒度的可解释路径：用独立节点预算确定权重分配，用阶段边界控制通信频率，用实际求值边界限制提交规模，最后用有范围的请求记录定义成功。后续若要服务化，仍需补足重启后的复验、质量测试、长生成与运维恢复；这些可以沿着现有证据继续做，而不用重新猜测之前的选择。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/dual-mac-inference/">https://leviusspace.top/2026/10/02/dual-mac-inference/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><a class="post-meta__tags" href="/tags/MLX/">MLX</a><a class="post-meta__tags" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E6%8E%A8%E7%90%86/">分布式推理</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/gr308-language/" title="GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="engineering">
+<img alt="《两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/dual-mac-inference.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>⚙ 工程实践</span><span>VOL. I</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>双 Mac</span><span>模型推理</span></span><span class="book-cover-english">THE TWIN TOWERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/工程实践/">⚙ 工程实践 ↗</a><span>第 I 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#先把-跑起来-拆成几个问题"><span class="toc-text">先把“跑起来”拆成几个问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#两份独立内存预算"><span class="toc-text">两份独立内存预算</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#通信放在哪里-比链路标称速度更重要"><span class="toc-text">通信放在哪里，比链路标称速度更重要</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#为什么需要-rank-local-权重包"><span class="toc-text">为什么需要 rank-local 权重包</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#懒执行怎样影响-timeout-排查"><span class="toc-text">懒执行怎样影响 timeout 排查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#prefill-chunk-是执行调度参数"><span class="toc-text">Prefill chunk 是执行调度参数</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#最终记录应该怎样读"><span class="toc-text">最终记录应该怎样读</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#重新验证时-先恢复一个最小可解释现场"><span class="toc-text">重新验证时，先恢复一个最小可解释现场</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#从这次实验带走的工作方式"><span class="toc-text">从这次实验带走的工作方式</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

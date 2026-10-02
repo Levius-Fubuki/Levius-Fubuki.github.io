@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="用软件机械臂回放解释动作语义、全身几何检查、速度缩放及离散验证的适用范围。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/safe-motion/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="用软件机械臂回放解释动作语义、全身几何检查、速度缩放及离散验证的适用范围。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/safe-motion.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/safe-motion.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/safe-motion/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="机器人" property="article:tag"/><meta content="安全执行" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/智能体/">智能体</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="safe-motion">从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么</h1>
+<p>模型输出一段关节轨迹之后，离“机械臂可以照着走”还有一段距离。动作数组的单位可能解释错，目标点可能越界，末端执行器看起来在工作空间内，中间连杆却可能穿过边界。即使过滤器给出成功标志，真正执行出来的状态也未必等于它预测的状态。</p>
+<p>我在 <a href="https://github.com/Levius-Fubuki/vla-robotic-arm-safety-actuator">SafeMotion 项目</a> 中做了一个纯软件执行层，输入是六关节、50 点的目标轨迹，执行对象是确定性的 MockRobot。本文依据公开提交 <code>0d4c2703b3</code>，核验于 2026-10-02。它适合讨论接口、几何检查和回放验证；真实硬件的延迟、动力学、制动与功能安全不在这个模型内。</p>
+<h2 id="动作数组必须先有语义">动作数组必须先有语义</h2>
+<p><code>50×6</code> 只能说明形状，不能告诉我们数组代表什么。同一组数字可以是绝对角度、角度增量、速度，也可以是模型归一化空间里的动作。它们需要不同的单位转换和积分方式。若把绝对关节位置当成每步增量，后续轨迹会持续累积偏差，输入数值即使都落在一个看似合理的范围内，也无法挽救解释错误。</p>
+<p>SafeMotion 的约定是：每行代表六个关节的绝对目标位置，单位为弧度；执行频率为 20Hz，因此相邻点对应 0.05 秒。50 点描述约 2.5 秒的目标序列。起始 <code>joint_state</code> 是当前状态，<code>workspace</code> 是统一坐标系下的轴对齐边界。</p>
+<p>入口因此先验证维度、点数、有限数值、关节范围和相邻点突跳。NaN 与无穷不能留到优化器里处理；格式错误时应当在执行前拒绝，而不是一边运行一边猜测默认值。完整的接口文档还应写清坐标系、角度正方向、时间戳以及缺测行为，避免两个模块各自正确、接起来却含义不同。</p>
+<p>一种实用的区分是，把“输入无效”与“合法目标暂时不可达”分开。形状错、单位不明应拒绝整项输入；格式合法但运动会越界，可以进入明确的缩放或停止策略。两者使用同一个 success 布尔值，会让调用者难以决定是否修正数据、重新规划或等待人工处理。</p>
+<h2 id="名义控制把目标转换成下一步速度">名义控制把目标转换成下一步速度</h2>
+<p>在固定步长的 MockRobot 中，一个简单名义控制器是：用目标位置减去当前实际位置，除以步长，再按每关节速度范围裁剪。</p>
+<pre><code class="language-text">v_nom = clip((q_target - q_actual) / dt, -v_max, v_max)
+q_next = q_actual + v_safe × dt
+</code></pre>
+<p>如果某关节离目标很远，速度限制意味着它不能在一步内抵达。这时后续目标点仍按照序列到来，控制器要继续使用实际状态计算，不能把内部状态直接设成上一步目标。否则“软件以为的位置”和执行器状态从第一次介入起就分离了。</p>
+<p>比如一维示例中，当前角度为 0，目标为 0.5rad，<code>dt=0.05s</code>，限速为 2rad/s。名义速度从 10rad/s 被裁到 2rad/s，实际只能到达 0.1rad。下一点的误差必须从 0.1rad 计算。这个例子只解释闭环状态更新，没有模拟任何具体机器的动态响应。</p>
+<p>速度限制也不等同于加速度、力矩或冲击约束。MockRobot 用积分式直接更新状态，真实底层控制器还会受到执行周期、跟踪误差和硬件限制的影响。把模型明确写出来，才能知道某项测试到底验证了哪一层。</p>
+<h2 id="几何检查需要覆盖整条链">几何检查需要覆盖整条链</h2>
+<p>六个关节角经过正运动学，得到各个关节坐标和末端点。项目采用标准 DH 变换的连乘，保存从肩部到 TCP 的骨架位置。选择 DH 约定时需要保持参数表、坐标系和变换顺序一致，不能混用标准形式与其他形式的参数。</p>
+<p>只看 TCP 会漏掉中间连杆。公开场景中有一个专门的反例：TCP 仍位于盒子内部，而中间关节点越过工作空间边界。可视化时末端红点看起来“没有碰到边”，并不能证明整条机械臂都在允许区域内。</p>
+<p>对于一个点 <code>p=(x,y,z)</code>，到轴对齐工作空间六个面的有符号最小余量，可以写成：</p>
+<pre><code class="language-python">def box_margin(point, bounds):
+    x, y, z = point
+    return min(x - bounds[0][0], bounds[0][1] - x,
+               y - bounds[1][0], bounds[1][1] - y,
+               z - bounds[2][0], bounds[2][1] - z)
+</code></pre>
+<p>余量为负表示至少跨过一个边界，为零表示位于边界，正值表示这个点处于内部。若几何模型是一组点，需要取所有点的最小值；若要考虑实体连杆，应进一步建模半径、工具外形与自碰撞，单个点的余量不能替代实体间距离。</p>
+<p>项目有一条特别值得保留的简化：连杆被表示为端点之间的直线段，而允许区域是凸长方体。在这个固定姿态模型中，两端点都在盒子里，就能推出整条线段在盒子里。额外采样可以使最坏点报告更细，但不会替这个一维骨架增加真实机械臂的厚度。</p>
+<h2 id="空间上的线段与时间上的运动不同">空间上的线段与时间上的运动不同</h2>
+<p>凸集性质描述的是同一姿态下的一根直连杆。两个安全关节状态之间，关节角插值经过正运动学，通常得到曲线运动。不能因为起点和终点安全，就把中间运动也当作已经检查过。</p>
+<p>SafeMotion 在一次动作的若干子步上重新计算全身位置，降低只检查终点的遗漏。有限子步仍然是离散采样：当运动较快、几何变化较大或允许区域很窄时，采样点之间可能发生越界。增加采样密度会改善某些检测能力，但没有自动给出连续时间证明。</p>
+<p>更强的方案需要对运动区间建立界，例如利用保守的几何包围体、位移上界或连续碰撞检测。那些机制要和所用运动模型一起论证，不能靠把一个 <code>substeps</code> 参数设得很大就宣称完成。</p>
+<p>这个区别影响文章应该怎样描述测试结果。准确的说法是：在当前 MockRobot、几何模型、合法输入和回放采样条件下，检查过的轨迹状态满足约束。把它扩大成真实机械臂全过程的安全保证，会越过模型已经声明的边界。</p>
+<h2 id="速度缩放的收益与限制">速度缩放的收益与限制</h2>
+<p>项目过滤器保持名义速度的方向，寻找缩放系数 <code>s∈[0,1]</code>，使预测动作 <code>q+s·v_nom·dt</code> 通过检查。完整动作可行就取 1；否则缩小幅度；无法找到通过检查的正向动作时，返回零速度。</p>
+<p>这条路径简单、容易检查，也保留了模型动作的大方向。代价是它不能主动换一个方向绕过去。若目标需要先后退再转弯，沿原方向减速最多只会停住；这时应由上层重新规划，执行过滤层不必承担所有规划职责。</p>
+<p>实现使用二分搜索更新安全下界与不安全上界。这里需要收紧 README 中“最大安全缩放”的表述：二分搜索得到全局最大值，需要可行性相对于缩放具备相应单调性质。非线性的正运动学加离散子步检查，并没有自动提供这种证明。因此更适合把当前结果称为“按该检查过程找到的通过候选”，保留其实际检测范围。</p>
+<p>调用边界也很重要。名义控制器已经按 <code>v_max</code> 限速，过滤器按这条受限速度预测并返回结果。如果外部直接传入任意超限速度，再对返回值逐关节裁剪，就可能改变预测过的方向。扩展工具时，应明确前置条件，或者在过滤器入口统一限速后再做全部检查。</p>
+<h2 id="停止是一种动作-不等于恢复安全">停止是一种动作，不等于恢复安全</h2>
+<p>过滤器遇到非有限输入、错误形状、内部异常或无法找到通过候选时，项目返回零速度。这样至少不会在检查失效时继续转发原始目标。对纯积分式 MockRobot 而言，零速度保持当前位置，便于验证失败处理路径。</p>
+<p>但如果当前状态已经在工作空间外，保持不动不会把它带回安全区域；如果真实机械臂正在运动，发出零速度也不代表瞬间停止。当前状态不安全、系统无法判断、正常完成，必须以不同结果对外报告。</p>
+<p>阅读代码还能看到一个细节：名义速度为零时，会直接返回停止状态，没有再次完成同样的全身检查。这个行为不一定使模型继续移动，却说明调用者不能仅凭“停止返回”推断“当前位置已证明安全”。应分别保存执行命令和约束评估结果。</p>
+<p>若要连接真实设备，停止还必须由对应控制器与硬件机制执行，并验证延迟、制动距离和失联行为。本文不提供把教学过滤器直接部署到真机的操作步骤；项目没有涉及的硬件保证，也不会由博客中的措辞补出来。</p>
+<h2 id="回放结果要基于实际状态计算">回放结果要基于实际状态计算</h2>
+<p>项目的回放循环逐点执行：从实际 <code>q</code> 生成名义速度，过滤，交给 MockRobot 更新，再记录实际状态及其几何余量。名义目标轨迹与实际轨迹分别保存。这样可以检查过滤器到底介入了什么，而不只看最终是否到达某个点。</p>
+<p>回放报告至少要保留输入标识、配置、每步名义与实际状态、缩放系数、停止原因和最小余量。<code>modified</code> 与 <code>stopped</code> 次数能说明控制器干预频率，但需要结合误差理解：过于保守的算法可能始终安全却完全没有完成任务；完全不修改则可能只是在一个过于简单的场景里测试。</p>
+<p>可视化应使用相同坐标系和相同轴比例，画出工作空间、连杆和名义/实际轨迹。只展示漂亮的 TCP 曲线，会再次掩盖中间连杆问题。把最小余量对应的姿态单独标出来，通常比反复播放整段动画更容易找到原因。</p>
+<p>当缩放后后续轨迹改变时，还应检查目标序列的时间语义。当前项目继续消费下一目标点，属于固定节拍下的跟踪；另一种系统可能在未到达时暂停序列。二者会形成不同实际轨迹，不能把它们的到达率和完成时间直接横向比较。</p>
+<h2 id="测试应主动覆盖会误判的情况">测试应主动覆盖会误判的情况</h2>
+<p>公开仓库包含 free space、下边界、上边界、TCP 安全但中间连杆越界、关节目标超限等场景，以及非法数值和形状测试。它们分别针对不同错误模型，不能用一个成功动画代替。</p>
+<p>其中 free space 的作用并不只是证明“不出错”。它还检查合法、安全的轨迹不应被无意义地改动。执行器若总是返回零速度，可能满足某些静态位置检查，却显然没有完成跟踪任务；因此安全约束与有用性应分别评估。</p>
+<p>异常注入也应覆盖整个链路：正运动学失败、过滤函数抛出异常、MockRobot 拒绝越限指令、输入缺失、回放中途停止。每一项都要明确后续是否还消费目标、是否发送命令，以及错误记录是否足以重现。测试不只断言函数返回，还需要确认实际执行状态没有被悄悄替换成目标。</p>
+<p>本轮文章根据公开实现与历史材料整理，没有重新运行机械臂或宣称重新完成仓库中的全部测试。项目的测试数量是特定快照下的记录；真正可复用的是场景构造方法和对不变量的检查。</p>
+<h2 id="把一条约束写成可审查的验收记录">把一条约束写成可审查的验收记录</h2>
+<p>以“中间连杆不能越过上边界”为例，验收记录需要给出初始关节状态、目标点、时间步长、几何配置和检查子步。先用相同运动学函数计算初始姿态，确认测试究竟从合法状态开始，还是故意检验非法初始状态；这两种输入的预期处理不同。</p>
+<p>随后保留不经过过滤的名义预测与过滤后的实际推进结果。如果名义轨迹本来就没有触碰约束，这条样本只能证明普通路径能够运行，不能说明过滤器成功阻止了越界。反例应明确触发被检验的条件，同时避免混入另一个更早触发的关节限位，让失败原因难以区分。</p>
+<p>对于返回零速度的情况，应分别断言命令为零、MockRobot 状态没有推进，以及结果中能识别停止原因。若初始位置已经非法，几何检查仍应报告该事实；不能把“没有继续恶化”写成“恢复到允许区域”。若过滤函数异常，则应看到异常处理路径，不能借用正常完成的状态码。</p>
+<p>最后对保存的实际轨迹独立重算余量。这里的独立是指验证器不直接相信控制器写下的布尔结果；它仍可能复用同一个运动学模型，因此无法排除模型本身的共同错误。若要扩展保证，就需要额外的模型校验和硬件证据，而不是简单增加同类单元测试数量。</p>
+<p>这样的记录使一次回放能回答三个不同问题：目标本来会导致什么、执行层改变了什么、实际状态在所声明的模型下满足了什么。把这三项放在一起，读者就能识别过于容易的样本，也能看清“测试通过”究竟覆盖到哪里。</p>
+<h2 id="如何继续扩展这个执行层">如何继续扩展这个执行层</h2>
+<p>如果将来增加障碍物，先选清楚几何表示。轴对齐边界可以用简单余量表达，任意障碍和自碰撞则需要更丰富的模型。更复杂的模型会增加计算与配置成本，验收标准也要包含漏检、误报和实时性，不能只比较过滤调用耗时。</p>
+<p>如果更换机器人，首先校验运动学约定、关节方向、工具偏置和控制接口，已有的 UR5 测试不能自动继承。若改变动作形式，例如使用末端位姿或增量动作，则应在明确的位置完成变换，把得到的关节目标交给下游，并单独验证该变换的失败方式。</p>
+<p>如果上游模型可以感知过滤结果，可以返回结构化反馈：哪些约束触发、实际执行多少、从哪里开始偏离目标。它可能帮助上游重规划，但不能让模型自己取消执行层的约束。权限和约束仍应由确定的控制路径维护。</p>
+<p>这个项目最终形成了一个清楚的分工：上游提出目标，执行层根据约定的模型检查下一步，回放器记录真正发生的状态，测试用反例审查每一条保证。把这些边界说清楚，才有可能逐步扩大模型和硬件范围，同时知道新增能力需要补什么证据。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/safe-motion/">https://leviusspace.top/2026/10/02/safe-motion/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E6%9C%BA%E5%99%A8%E4%BA%BA/">机器人</a><a class="post-meta__tags" href="/tags/%E5%AE%89%E5%85%A8%E6%89%A7%E8%A1%8C/">安全执行</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/heartbeat-agent/" title="Heartbeat 的工程拆解：主动触发、分层记忆与工具边界"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">Heartbeat 的工程拆解：主动触发、分层记忆与工具边界</div></div></div></a><a class="pagination-related" href="/2026/10/02/inference-evidence/" title="推理优化怎样形成可信结论：从算子实验到服务验收"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">推理优化怎样形成可信结论：从算子实验到服务验收</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="agents">
+<img alt="《从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/safe-motion.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>◇ 智能体</span><span>VOL. II</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>机械臂</span><span>轨迹执行</span></span><span class="book-cover-english">THE GUARDED HAND</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/智能体/">◇ 智能体 ↗</a><span>第 II 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#动作数组必须先有语义"><span class="toc-text">动作数组必须先有语义</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#名义控制把目标转换成下一步速度"><span class="toc-text">名义控制把目标转换成下一步速度</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#几何检查需要覆盖整条链"><span class="toc-text">几何检查需要覆盖整条链</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#空间上的线段与时间上的运动不同"><span class="toc-text">空间上的线段与时间上的运动不同</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#速度缩放的收益与限制"><span class="toc-text">速度缩放的收益与限制</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#停止是一种动作-不等于恢复安全"><span class="toc-text">停止是一种动作，不等于恢复安全</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#回放结果要基于实际状态计算"><span class="toc-text">回放结果要基于实际状态计算</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#测试应主动覆盖会误判的情况"><span class="toc-text">测试应主动覆盖会误判的情况</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#把一条约束写成可审查的验收记录"><span class="toc-text">把一条约束写成可审查的验收记录</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#如何继续扩展这个执行层"><span class="toc-text">如何继续扩展这个执行层</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

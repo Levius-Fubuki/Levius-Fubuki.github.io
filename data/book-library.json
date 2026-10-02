@@ -24,6 +24,56 @@
       "description": "在行动与反馈之间，探索价值、策略与决策。"
     },
     {
+      "id": "engineering",
+      "title": "工程实践",
+      "subtitle": "工匠手记",
+      "english": "THE ENGINEER’S WORKSHOP",
+      "mark": "⚙",
+      "href": "/categories/工程实践/",
+      "description": "记录具体项目的技术选型、实现过程、故障定位与最终效果。",
+      "sequence": "双机推理 · GR308 模型调优 · 多模态移植"
+    },
+    {
+      "id": "agents",
+      "title": "智能体",
+      "subtitle": "时钟与行动",
+      "english": "CLOCKWORK AND AGENCY",
+      "mark": "◇",
+      "href": "/categories/智能体/",
+      "description": "研究记忆、主动行为与执行边界，让模型输出进入可检查的系统。",
+      "sequence": "主动触发 · 分层记忆 · 轨迹执行"
+    },
+    {
+      "id": "experience",
+      "title": "工程经验",
+      "subtitle": "度量与方法",
+      "english": "THE CRAFT OF EVIDENCE",
+      "mark": "⌘",
+      "href": "/categories/工程经验/",
+      "description": "沉淀跨项目可复用的测量、调试、结构设计与交付方法。",
+      "sequence": "实验设计 · 文档结构 · 验收方法"
+    },
+    {
+      "id": "opensource",
+      "title": "开源贡献",
+      "subtitle": "共同修筑",
+      "english": "THE COMMON WORKS",
+      "mark": "⛉",
+      "href": "/categories/开源贡献/",
+      "description": "从真实问题、补丁与评审出发，记录贡献如何被复现、验证和合并。",
+      "sequence": "问题复现 · 补丁实现 · 评审验证"
+    },
+    {
+      "id": "infra",
+      "title": "AI Infra",
+      "subtitle": "计算与系统",
+      "english": "THE COMPUTING VAULT",
+      "mark": "✣",
+      "href": "/categories/AI-Infra/",
+      "description": "连接 GPU 架构、算子、模型结构与推理系统，区分学习推导和实测证据。",
+      "sequence": "硬件基础 · 算子机制 · 模型与服务"
+    },
+    {
       "id": "notes",
       "title": "序章",
       "subtitle": "旅途之始",
@@ -46,7 +96,7 @@
       "english": "THE ASCENT",
       "path": "/2026/04/07/0-大模型学习路线图/",
       "date": "2026-04-07",
-      "summary": "从深度学习基础出发，串起预训练、微调、对齐、推理部署与 Agent 的学习路径。",
+      "summary": "保留基础课程路线，补充从推理基线、算子分析到服务测量、CUDA Graph 与开源贡献的实践路径。",
       "art": "/img/books/llm-roadmap-color.webp"
     },
     {
@@ -122,7 +172,7 @@
       "english": "THE TWIN OATH",
       "path": "/2026/04/06/4-Actor-Critic/",
       "date": "2026-04-06",
-      "summary": "让 Actor 选择动作、Critic 评估价值，通过双网络协作与时序差分反馈改进策略。",
+      "summary": "理解 Actor 与 Critic 的协作，区分 Q 值训练残差、状态基线与优势估计，掌握一致的更新方向。",
       "art": "/img/books/actor-critic-color.webp"
     },
     {
@@ -137,8 +187,318 @@
       "english": "THE TREE OF FUTURES",
       "path": "/2026/04/06/5-Monte Carlo Tree Search/",
       "date": "2026-04-06",
-      "summary": "在选择、扩展、评估与回传的循环中模拟多种未来，逐步找到更好的行动。",
+      "summary": "梳理 MCTS 的选择、扩展、评估与回传，区分策略先验、环境转移和价值估计。",
       "art": "/img/books/tree-search-color.webp"
+    },
+    {
+      "id": "dual-mac-inference",
+      "collection": "engineering",
+      "volume": "I",
+      "title": "两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度",
+      "coverTitle": [
+        "双 Mac",
+        "模型推理"
+      ],
+      "english": "THE TWIN TOWERS",
+      "path": "/2026/10/02/dual-mac-inference/",
+      "date": "2026-10-02",
+      "summary": "从两台 16GB Mac 的公开实验出发，解释流水线切层、权重打包、懒执行与上下文验证的边界。",
+      "art": "/img/books/dual-mac-inference.png",
+      "source": "content/posts/dual-mac-inference.md",
+      "tags": [
+        "大模型",
+        "MLX",
+        "分布式推理"
+      ]
+    },
+    {
+      "id": "gr308-language",
+      "collection": "engineering",
+      "volume": "II",
+      "title": "GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收",
+      "coverTitle": [
+        "GR308",
+        "语言模型"
+      ],
+      "english": "THE CALIBRATION",
+      "path": "/2026/10/02/gr308-language/",
+      "date": "2026-10-02",
+      "summary": "覆盖 Qwen、DeepSeek 等模型的并行拓扑、MTP、Graph 与量化分支，保留正式测试、短测及失败边界。",
+      "art": "/img/books/gr308-language.png",
+      "source": "content/posts/gr308-language.md",
+      "tags": [
+        "GR308",
+        "大模型",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "gr308-image",
+      "collection": "engineering",
+      "volume": "III",
+      "title": "Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE",
+      "coverTitle": [
+        "GR308",
+        "图像生成"
+      ],
+      "english": "THE MOSAIC ENGINE",
+      "path": "/2026/10/02/gr308-image/",
+      "date": "2026-10-02",
+      "summary": "从 Qwen Image 单卡出图、分块 VAE 到 TP2 DiT，追踪实现细节、数值差异与尚未完成的验收。",
+      "art": "/img/books/gr308-image.png",
+      "source": "content/posts/gr308-image.md",
+      "tags": [
+        "GR308",
+        "多模态",
+        "分布式推理"
+      ]
+    },
+    {
+      "id": "gr308-video",
+      "collection": "engineering",
+      "volume": "IV",
+      "title": "GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门",
+      "coverTitle": [
+        "GR308",
+        "视频调优"
+      ],
+      "english": "THE MOVING LANTERN",
+      "path": "/2026/10/02/gr308-video/",
+      "date": "2026-10-02",
+      "summary": "记录 Wan2.2 混合精度路径与 H3 解码权重缓存，分别解释有效收益、质量门和长视频阻塞。",
+      "art": "/img/books/gr308-video.png",
+      "source": "content/posts/gr308-video.md",
+      "tags": [
+        "GR308",
+        "多模态",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "heartbeat-agent",
+      "collection": "agents",
+      "volume": "I",
+      "title": "Heartbeat 的工程拆解：主动触发、分层记忆与工具边界",
+      "coverTitle": [
+        "主动 Agent",
+        "分层记忆"
+      ],
+      "english": "THE QUIET CLOCK",
+      "path": "/2026/10/02/heartbeat-agent/",
+      "date": "2026-10-02",
+      "summary": "拆解 Heartbeat 的候选触发、状态与冷却、分层记忆、云端请求边界和工具授权。",
+      "art": "/img/books/heartbeat-agent.png",
+      "source": "content/posts/heartbeat-agent.md",
+      "tags": [
+        "Agent",
+        "记忆系统"
+      ]
+    },
+    {
+      "id": "safe-motion",
+      "collection": "agents",
+      "volume": "II",
+      "title": "从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么",
+      "coverTitle": [
+        "机械臂",
+        "轨迹执行"
+      ],
+      "english": "THE GUARDED HAND",
+      "path": "/2026/10/02/safe-motion/",
+      "date": "2026-10-02",
+      "summary": "用软件机械臂回放解释动作语义、全身几何检查、速度缩放及离散验证的适用范围。",
+      "art": "/img/books/safe-motion.png",
+      "source": "content/posts/safe-motion.md",
+      "tags": [
+        "机器人",
+        "安全执行"
+      ]
+    },
+    {
+      "id": "inference-evidence",
+      "collection": "experience",
+      "volume": "I",
+      "title": "推理优化怎样形成可信结论：从算子实验到服务验收",
+      "coverTitle": [
+        "推理优化",
+        "实验与证据"
+      ],
+      "english": "THE MEASURE",
+      "path": "/2026/10/02/inference-evidence/",
+      "date": "2026-10-02",
+      "summary": "从算子契约到服务请求，建立对照实验、正确性门槛、失败语义与版本证据的完整记录。",
+      "art": "/img/books/inference-evidence.png",
+      "source": "content/posts/inference-evidence.md",
+      "tags": [
+        "大模型",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "markdown-word",
+      "collection": "experience",
+      "volume": "II",
+      "title": "Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失",
+      "coverTitle": [
+        "文档转换",
+        "结构与样式"
+      ],
+      "english": "THE SCRIPTORIUM",
+      "path": "/2026/10/02/markdown-word/",
+      "date": "2026-10-02",
+      "summary": "以 Markdown 转 Word 工具为例，分析语义保存、样式设计、格式丢失和转换验收。",
+      "art": "/img/books/markdown-word.png",
+      "source": "content/posts/markdown-word.md",
+      "tags": [
+        "文档工程",
+        "Markdown"
+      ]
+    },
+    {
+      "id": "opensource-streams",
+      "collection": "opensource",
+      "volume": "I",
+      "title": "两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败",
+      "coverTitle": [
+        "开源贡献",
+        "流式错误"
+      ],
+      "english": "THE VERIFIED STREAM",
+      "path": "/2026/10/02/opensource-streams/",
+      "date": "2026-10-02",
+      "summary": "复盘 vLLM-Omni 两个已合并 PR：从 SSE 错误复现到聊天与图像编辑客户端的终态修复。",
+      "art": "/img/books/opensource-streams.png",
+      "source": "content/posts/opensource-streams.md",
+      "tags": [
+        "开源贡献",
+        "vLLM-Omni",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "infra-topology",
+      "collection": "infra",
+      "volume": "I",
+      "title": "八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态",
+      "coverTitle": [
+        "八卡推理",
+        "拓扑与状态"
+      ],
+      "english": "THE EIGHT TOWERS",
+      "path": "/2026/10/02/infra-topology/",
+      "date": "2026-10-02",
+      "summary": "从八卡学习包理解 Qwen、GLM 的部署选择、Graph、混合状态和联合实验的边界。",
+      "art": "/img/books/infra-topology.png",
+      "source": "content/posts/infra-topology.md",
+      "tags": [
+        "AI Infra",
+        "分布式推理",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "infra-operators",
+      "collection": "infra",
+      "volume": "II",
+      "title": "AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证",
+      "coverTitle": [
+        "算子学习",
+        "依赖与契约"
+      ],
+      "english": "THE THREE MECHANISMS",
+      "path": "/2026/10/02/infra-operators/",
+      "date": "2026-10-02",
+      "summary": "完整拆解 MoE 双流、视觉 QKV/RoPE 融合与投机验证的契约、代码和回归门。",
+      "art": "/img/books/infra-operators.png",
+      "source": "content/posts/infra-operators.md",
+      "tags": [
+        "AI Infra",
+        "算子优化",
+        "投机解码"
+      ]
+    },
+    {
+      "id": "amd-architecture",
+      "collection": "infra",
+      "volume": "III",
+      "title": "AMD GPU 架构笔记：从 Wavefront 到大模型性能分析",
+      "coverTitle": [
+        "AMD GPU",
+        "架构基础"
+      ],
+      "english": "THE COMPUTE CHAMBER",
+      "path": "/2026/10/02/amd-architecture/",
+      "date": "2026-10-02",
+      "summary": "从 HIP 线程层次、CU 与内存出发，理解 occupancy、数据布局、架构差异及 LLM 性能分析。",
+      "art": "/img/books/amd-architecture.png",
+      "source": "content/posts/amd-architecture.md",
+      "tags": [
+        "AI Infra",
+        "GPU架构"
+      ]
+    },
+    {
+      "id": "gpu-attention",
+      "collection": "infra",
+      "volume": "IV",
+      "title": "FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线",
+      "coverTitle": [
+        "FlashAttention",
+        "流水线设计"
+      ],
+      "english": "THE ASYMMETRIC ENGINE",
+      "path": "/2026/10/02/gpu-attention/",
+      "date": "2026-10-02",
+      "summary": "保留 FlashAttention-4 的在线 Softmax 推导、七张技术图与前后向流水线分析，明确论文实验范围。",
+      "art": "/img/books/gpu-attention.png",
+      "source": "content/posts/gpu-attention.md",
+      "tags": [
+        "AI Infra",
+        "Attention",
+        "算子优化"
+      ]
+    },
+    {
+      "id": "kimi-architecture",
+      "collection": "infra",
+      "volume": "V",
+      "title": "Kimi K3 架构笔记：KDA、深度残差与稀疏专家",
+      "coverTitle": [
+        "Kimi K3",
+        "模型架构"
+      ],
+      "english": "THE THREE RIVERS",
+      "path": "/2026/10/02/kimi-architecture/",
+      "date": "2026-10-02",
+      "summary": "沿序列、深度与专家三个方向拆解 KDA、MLA、AttnRes 与 Stable LatentMoE。",
+      "art": "/img/books/kimi-architecture.png",
+      "source": "content/posts/kimi-architecture.md",
+      "tags": [
+        "AI Infra",
+        "模型架构",
+        "MoE"
+      ]
+    },
+    {
+      "id": "kimi-systems",
+      "collection": "infra",
+      "volume": "VI",
+      "title": "Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存",
+      "coverTitle": [
+        "Kimi K3",
+        "训练与部署"
+      ],
+      "english": "THE MEMORY OBSERVATORY",
+      "path": "/2026/10/02/kimi-systems/",
+      "date": "2026-10-02",
+      "summary": "解释长上下文训练、Agent RL、KCP、MoonEP、混合缓存及部署感知量化之间的联系。",
+      "art": "/img/books/kimi-systems.png",
+      "source": "content/posts/kimi-systems.md",
+      "tags": [
+        "AI Infra",
+        "模型架构",
+        "分布式推理"
+      ]
     },
     {
       "id": "hello-world",

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>AMD GPU 架构笔记：从 Wavefront 到大模型性能分析 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="从 HIP 线程层次、CU 与内存出发，理解 occupancy、数据布局、架构差异及 LLM 性能分析。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="AMD GPU 架构笔记：从 Wavefront 到大模型性能分析" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/amd-architecture/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="从 HIP 线程层次、CU 与内存出发，理解 occupancy、数据布局、架构差异及 LLM 性能分析。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/amd-architecture.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/amd-architecture.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/amd-architecture/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="AI Infra" property="article:tag"/><meta content="GPU架构" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/AI-Infra/">AI Infra</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="amd-architecture">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</h1>
+<p>这篇长文由 AMD 架构课程的五份中文学习材料整理而成，依次连接编程模型、CU 资源、内存、架构家族与 LLM 工作负载。材料来源为 AMD 官方文档，采集于 2026-09-05；这里不把教学关系图当成特定芯片实测，也不将 AMD 术语直接套用到 GR308。</p>
+<p>阅读顺序是先区分软件线程组织与硬件资源，再看数据如何移动，最后讨论推理阶段的瓶颈。每节保留“来源直接说明”和“教学推导”的区别；产品特定参数仍需对照实际 gfx 目标。</p>
+<h2 id="amd-gpu-基础-从-cpu-到-hip-执行层次">AMD GPU 基础：从 CPU 到 HIP 执行层次</h2>
+<h3 id="extracted-来源直接说明的概念">EXTRACTED｜来源直接说明的概念</h3>
+<h4>CPU 与 GPU：优化目标不同</h4>
+<p>CPU 的核心目标是让单个、可能包含复杂分支的指令序列尽快完成；这通常被称为<strong>低延迟</strong>。GPU 的目标则是让大量相似操作同时推进，以提高单位时间完成的工作量，即<strong>高吞吐量</strong>。延迟是一次操作从开始到结果出现的等待时间；吞吐量是每秒（或每周期）完成的操作数。二者并非互斥，但对硬件资源的取舍不同。</p>
+<p>因此，复杂控制流、少量相互依赖的任务通常更适合 CPU；大量数据上执行相同或近似相同操作、分支较少的部分更适合 GPU。HIP 把这类数据并行 C/C++ 程序映射到 GPU 的 SIMT 执行模型：源代码看起来像许多独立线程，硬件把一组线程的同一条指令送入 SIMD 执行资源。</p>
+<h4>并行工作的 HIP 层次</h4>
+<p>一个 <code>__global__</code> kernel 是为设备编译的函数定义；<strong>kernel launch</strong> 则是主机对该函数的一次具体发射，会创建一个待执行的 grid。函数定义本身不属于线程包含层次。一次 launch 的执行实例从大到小严格包含为：<code>grid → work-group → wavefront → thread/work-item</code>。</p>
+<table>
+<thead>
+<tr>
+<th>HIP / 常用术语</th>
+<th>含义</th>
+<th>与硬件的关系</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>grid</td>
+<td>此次 launch 的全部线程块</td>
+<td>工作组被调度到整个 GPU 的可用 CU</td>
+</tr>
+<tr>
+<td>block / work-group</td>
+<td>能协作的一组线程</td>
+<td>在本课采用的 CU/CDNA 教学模型中，视为驻留在一个 CU，能使用 LDS 与块内同步；RDNA 的 WGP 例外见下文</td>
+</tr>
+<tr>
+<td>warp / wavefront</td>
+<td>最紧密的锁步执行线程组</td>
+<td>由多条 lane 以 SIMT/SIMD 方式执行</td>
+</tr>
+<tr>
+<td>thread / work-item</td>
+<td>wavefront 中的一个独立执行实例</td>
+<td>具有自己的索引和寄存器状态</td>
+</tr>
+</tbody></table>
+<p>HIP 文档同时使用 CUDA 风格的 <code>thread/block/grid</code> 与 AMD/HSA 风格的 <code>work-item/work-group</code>。教学中可把它们分别视为同一层的常用别名，但不要把 API 名称与底层实现细节混为一谈。块和 grid 都可为一、二或三维；常见的一维索引为 <code>global_id = blockIdx.x * blockDim.x + threadIdx.x</code>。</p>
+<p><strong>架构范围说明：</strong>“一个 work-group 在一个 CU”是本课为说明 CU/LDS 与块内同步采用的 CU-based（尤其 CDNA）模型，并非 AMD 各代的统一物理放置规则。AMD 的 RDNA 架构资料说明，一个 WGP 由两个 CU 的资源共同服务于单个 work-group；在该 WGP 模式下，同一 work-group 的 wave 可以分布在 WGP 的两个 CU 上。初学时仍可把 work-group 看作共享 LDS、可使用块内 barrier 的协作单元；分析 RDNA 实现和性能时，应把 WGP 而不是单个 CU 作为这一层的硬件边界。补充来源：<a href="https://gpuopen.com/wp-content/uploads/2019/08/RDNA_Architecture_public.pdf">https://gpuopen.com/wp-content/uploads/2019/08/RDNA_Architecture_public.pdf</a>。</p>
+<h4>Wavefront 与分歧</h4>
+<p>wavefront 中的 lane 通常执行同一条指令。若分支让不同 lane 走不同路径，硬件会以掩码方式分时执行这些路径，未参与当前路径的 lane 不产生有用结果；这称为<strong>控制流分歧</strong>。它不是程序错误，却可能降低有效吞吐量。若相邻线程处理的数据遵循相近的控制路径，通常更容易发挥 SIMT 硬件。</p>
+<p>当一个 wavefront 等待内存数据或其他操作数时，CU 可以从其他已驻留且就绪的 wavefront 发射指令。GPU 不需要像传统 CPU 线程切换那样把寄存器状态写回全局内存；这种快速选择就绪 wave 的能力是隐藏延迟的基础。</p>
+<p>来源：<a href="https://rocm.docs.amd.com/projects/HIP/en/develop/understand/programming_model.html">https://rocm.docs.amd.com/projects/HIP/en/develop/understand/programming_model.html</a></p>
+<h3 id="inferred-面向初学者的教学推导">INFERRED｜面向初学者的教学推导</h3>
+<p>把 kernel 想成一张待分发的练习题：grid 是整套题，work-group 是被分到同一张桌子的小组，work-item 是每位学生，wavefront 是一排会同时听到同一条指令的学生。LDS 只方便同桌协作；不同桌不能用块内 barrier 直接会合。</p>
+<p>选择线程块大小时，先保证问题能被足够多的 work-group 覆盖，再用测量判断资源是否足够。<code>256</code> 线程并非普遍最佳值；寄存器、LDS、wave 大小和具体 GPU 都会改变结果。也不要把“GPU 有很多线程”理解为每个线程都在同一时刻发射指令：驻留、就绪和实际发射是不同状态。</p>
+<h4>学习检查</h4>
+<ol>
+<li>为什么高吞吐量不等于单次操作低延迟？</li>
+<li>哪一层可以使用 LDS 和块内同步？</li>
+<li>如果一个 wavefront 的一半 lane 进入 <code>if</code>、另一半进入 <code>else</code>，为什么可能变慢？</li>
+</ol>
+<h2 id="amd-compute-unit-调度-执行管线与片上状态">AMD Compute Unit：调度、执行管线与片上状态</h2>
+<h3 id="extracted-来源直接说明的概念-2">EXTRACTED｜来源直接说明的概念</h3>
+<p>Compute Unit（CU）是 AMD GPU 上执行 work-group/wavefront 的基本计算组织。一个 CU 包含用于执行指令、保存线程状态、访问片上共享存储和连接缓存/内存系统的资源。具体数量、互连方式与哪些单元共享资源会因 GCN、RDNA、CDNA 和产品代际而变化；以下术语不应被读成所有 AMD GPU 的固定方块图。</p>
+<h4>调度器与“换一个就绪 wave”</h4>
+<p>wavefront 的指令会在 CU 内被选择和发射。若某个 wave 由于内存读取或数据依赖尚未就绪，调度器可选择另一个就绪的驻留 wave。这是 GPU 以并发 work 隐藏等待时间的核心机制。Profiler 的管线指标把瓶颈分为不同管线和等待原因；解释计数器时需要结合目标架构和该版本工具的指标定义。</p>
+<h4>指令与寄存器资源</h4>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>教学上的作用</th>
+<th>适用边界</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>VALU</td>
+<td>Vector ALU：对 wave 中各 lane 的向量/逐线程数据做算术与逻辑运算</td>
+<td>AMD ISA/Profiler 术语；吞吐和指令支持随架构变化</td>
+</tr>
+<tr>
+<td>SALU</td>
+<td>Scalar ALU：处理 wave 统一的标量控制或标量数据操作</td>
+<td>不代表每条源代码标量表达式都只走 SALU</td>
+</tr>
+<tr>
+<td>VMEM</td>
+<td>Vector memory：由 lane 地址参与的内存访问路径/指令类别</td>
+<td>“VMEM 忙”不能单独证明带宽已饱和</td>
+</tr>
+<tr>
+<td>VGPR</td>
+<td>每 lane 的向量通用寄存器状态</td>
+<td>用量影响可同时驻留的 wave 数</td>
+</tr>
+<tr>
+<td>SGPR</td>
+<td>wave 共享的标量通用寄存器状态</td>
+<td>可用量和分配规则依架构/编译器而异</td>
+</tr>
+<tr>
+<td>LDS</td>
+<td>一个 work-group 内可协作使用的片上 Local Data Share</td>
+<td>容量、bank 组织和带宽是架构特定的</td>
+</tr>
+<tr>
+<td>vL1D</td>
+<td>向量 L1 数据缓存相关的层级/指标命名</td>
+<td>命名与层级组织须按目标 GPU 文档核对</td>
+</tr>
+<tr>
+<td>MFMA</td>
+<td>Matrix Fused Multiply-Add 指令族</td>
+<td>属于支持该指令的 AMD 数据中心架构/目标；数据类型和形状受 ISA 限制</td>
+</tr>
+</tbody></table>
+<p>在 CDNA 的 ROCm Compute Profiler 文档中，管线描述讨论 VALU、SALU、VMEM、LDS 与 MFMA 等活动；CDNA Matrix Core 指令的工作由 MFMA 相关管线呈现。它们是性能归因的有用坐标系，不是“每周期固定完成多少工作”的跨代承诺。</p>
+<p>来源：<a href="https://rocm.docs.amd.com/projects/rocprofiler-compute/en/docs-6.3.2/conceptual/compute-unit.html">https://rocm.docs.amd.com/projects/rocprofiler-compute/en/docs-6.3.2/conceptual/compute-unit.html</a>；<a href="https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/conceptual/cdna/pipeline-descriptions.html">https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/conceptual/cdna/pipeline-descriptions.html</a></p>
+<h3 id="inferred-面向初学者的教学推导-2">INFERRED｜面向初学者的教学推导</h3>
+<p>可把 CU 看作一间有多种工位的车间：VALU 处理逐 lane 的普通计算，SALU 处理全 wave 一致的控制/标量工作，VMEM 负责把分散的逐 lane 数据请求送往内存路径，LDS 是同一 work-group 的共享白板，VGPR/SGPR 则是各自的随手状态。此比喻用于建立直觉，不能替代 ISA 或计数器定义。</p>
+<p>优化的第一问不应是“增加多少线程”，而是“哪个资源使 wave 不就绪或某条管线拥堵”。例如，高 VGPR 使用可能降低驻留 wave 数，因而减少隐藏内存延迟的机会；但强行压低寄存器也可能导致 spill 或更多指令。合理流程是：在目标 GPU 上编译，使用 ROCm profiler 观察占用率、管线活动和内存指标，然后只改一个因素并重新测量。</p>
+<h4>学习检查</h4>
+<ol>
+<li>VGPR 的增加为什么可能影响 latency hiding？</li>
+<li>为什么看到 VMEM 指标较高还不足以断定优化方向？</li>
+<li>MFMA 是否等同于所有 AMD GPU 都有同样的矩阵执行单元？为什么？</li>
+</ol>
+<h2 id="amd-gpu-内存与性能-层次-延迟隐藏和数据布局">AMD GPU 内存与性能：层次、延迟隐藏和数据布局</h2>
+<h3 id="extracted-来源直接说明的概念-3">EXTRACTED｜来源直接说明的概念</h3>
+<h4>从近到远的存储视图</h4>
+<p>GPU 程序通常会接触如下层次：每个线程/wave 的寄存器（VGPR、SGPR），供 work-group 协作的 LDS，缓存层次（常以 L1/vL1D、L2 等名称讨论），以及容量最大、延迟相对高的设备全局内存（数据中心产品常配 HBM）。寄存器和 LDS 是片上显式或近显式管理的重要资源；全局内存面向整个 grid 可见。</p>
+<p>“L1、L2、HBM 的确切容量、延迟、带宽、是否共享以及 LDS 与缓存的物理关系”均为架构和产品特定参数。课程中不把某一芯片的数字当作 AMD GPU 通用常数；应查询目标型号的 AMD 文档，或以 profiler 的实际测量为准。</p>
+<h4>隐藏延迟与 occupancy</h4>
+<p>当一个 wave 等待内存操作时，CU 可发射另一个就绪 wave 的指令。<strong>occupancy</strong> 是相对于目标架构上限的驻留 active wave 比率：<code>active/resident waves ÷ 该 CU 可驻留的最大 waves</code>。它受 VGPR、SGPR、LDS、work-group 大小和硬件限制共同影响。</p>
+<p>这里要分清两种数值：<strong>理论/估算 occupancy</strong> 是根据 launch 配置、寄存器/LDS 申请量和目标硬件上限计算的上界；<strong>实测/achieved occupancy</strong> 是 profiler 在 kernel 执行期间观察到的实际 active wave 程度。二者都不表示“下一条指令一定可发射”，因为 active wave 还可能因数据依赖、内存或 barrier 而不 eligible。更高 occupancy 可能有助于提供足够多的候选 wave 来隐藏等待，但不等于性能必然更高：带宽、依赖链、分歧和执行管线同样可能是瓶颈。</p>
+<h4>合并访问、分歧、bank conflict 与 spill</h4>
+<ul>
+<li><strong>合并（coalescing）</strong>：同一 wave 的 lane 若访问相邻或可合并的地址，内存系统通常能以更少、更有效的事务服务它们。具体事务粒度和规则依 ISA/架构而变。</li>
+<li><strong>分歧（divergence）</strong>：同一 wave 的不同控制路径会以掩码执行，可能浪费 lane 执行机会；数据相关的地址模式也可能使内存访问更难高效合并。</li>
+<li><strong>LDS bank conflict</strong>：LDS 按 bank 组织。同一访问中多个 lane 竞争同一个 bank 的不同地址时，访问可能序列化或产生冲突开销；若读取同一地址则可能是广播而非同一种冲突。Composable Kernel 文档明确要求按目标硬件的 bank 映射理解该问题。</li>
+<li><strong>register spill</strong>：编译器无法把所有活跃值保留在寄存器时，会把一部分私有状态放入更远的内存位置并插入额外读写。它会增加指令与内存流量，且未必只由“声明了很多变量”决定；应看编译结果和 profiler。</li>
+</ul>
+<h4>算术强度与 roofline</h4>
+<p>AMD HIP 的性能文档将算术强度（arithmetic intensity）定义为 kernel 的浮点操作数与搬运字节数之比，即 FLOPs/byte；该数值既可理论计算，也可用实测流量计算。该文档还将 Roofline 定义为用算术强度为横轴、性能为纵轴，并以计算峰值与内存带宽构成两个上限的分析框架：较低算术强度的 kernel 往往更容易受数据移动限制，较高算术强度的 kernel 则可能接近计算侧限制。Roofline 有意忽略部分延迟和控制流影响，因此是定位起点而不是性能保证。峰值、有效带宽和数据计数边界必须针对具体硬件与精度定义。</p>
+<p>来源：<a href="https://rocm.docs.amd.com/projects/HIP/en/develop/understand/programming_model.html">https://rocm.docs.amd.com/projects/HIP/en/develop/understand/programming_model.html</a>；<a href="https://rocmdocs.amd.com/projects/HIP/en/latest/understand/performance_optimization.html">https://rocmdocs.amd.com/projects/HIP/en/latest/understand/performance_optimization.html</a>；<a href="https://rocm.docs.amd.com/projects/composable_kernel/en/docs-7.1.1/conceptual/ck_tile/hardware/lds_bank_conflicts.html">https://rocm.docs.amd.com/projects/composable_kernel/en/docs-7.1.1/conceptual/ck_tile/hardware/lds_bank_conflicts.html</a>；<a href="https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/conceptual/cdna/pipeline-descriptions.html">https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/conceptual/cdna/pipeline-descriptions.html</a></p>
+<h3 id="inferred-面向初学者的教学推导-3">INFERRED｜面向初学者的教学推导</h3>
+<p>可按下面顺序审视一个慢 kernel：先确认正确性与测量边界；再看全局内存访问是否连续、是否重复读取；随后评估能否以寄存器或 LDS 重用数据；最后检查寄存器压力、LDS bank 映射、分歧与实际 occupancy。这个顺序是排查启发式，不是对所有 kernel 的固定优化配方。</p>
+<p>例如，矩阵分块会尝试让一个 work-group 协作把数据块读入 LDS，并在多个乘加中重用它，从而提升算法层面的算术强度；但 tile 过大也可能占用太多 LDS/VGPR，降低并发度。应在目标 GPU、目标数据类型、真实输入大小和真实库/编译选项下测量。</p>
+<h4>学习检查</h4>
+<ol>
+<li>为什么 “更高 occupancy” 不能单独作为优化成功的证据？</li>
+<li>LDS bank conflict 与两个 lane 读取相同 LDS 地址是一回事吗？</li>
+<li>一个 kernel 算术强度高时，还可能被哪些因素限制？</li>
+</ol>
+<h2 id="amd-gpu-家族-gcn-rdna-与-cdna-的定位边界">AMD GPU 家族：GCN、RDNA 与 CDNA 的定位边界</h2>
+<h3 id="extracted-来源直接说明的概念-4">EXTRACTED｜来源直接说明的概念</h3>
+<p>AMD 文档把 GPU 架构支持按 gfx 目标与产品代际描述；同一个“AMD GPU”并不是单一微架构。写 kernel、解释 profiler 或选择库实现前，应先确认 <code>gfx</code> 目标、产品型号和 ROCm 版本。</p>
+<table>
+<thead>
+<tr>
+<th>家族</th>
+<th>官方材料中的定位</th>
+<th>本文可安全采用的代际范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GCN</td>
+<td>AMD 早期 GPU 架构家族，资料常以 CU 与 Wave64 语境描述</td>
+<td>仅在该代或明确兼容的目标上引用其组织细节</td>
+</tr>
+<tr>
+<td>RDNA</td>
+<td>面向图形/游戏工作负载的架构家族；RDNA 公开资料介绍 Work Group Processor（WGP）和 Wave32 执行能力</td>
+<td>WGP、Wave32 等描述须按 RDNA 代际/产品查证</td>
+</tr>
+<tr>
+<td>CDNA</td>
+<td>面向数据中心与计算的架构家族；ROCm profiler 对 CDNA 管线和 MFMA 提供专门说明</td>
+<td>CDNA 细节不可直接套给 RDNA 或 GCN</td>
+</tr>
+</tbody></table>
+<h4>RDNA：WGP 与 Wave32</h4>
+<p>AMD 的 RDNA 公开架构资料将 Work Group Processor（WGP）作为组织单位来说明，并强调 Wave32 对图形和计算调度的意义。RDNA 性能指南还讨论 wavefront size、occupancy、缓存、LDS 和 SIMD 使用效率。这里的正确读法是：Wave32 是 RDNA 文档强调的执行模式/能力；具体支持的 wave 模式、吞吐与最优分组仍由所用 RDNA 代、着色器/编译目标和工作负载决定。</p>
+<h4>CDNA / Instinct：XCD、Matrix Core 与 MFMA</h4>
+<p>MI300 系列架构资料以 chiplet 组织说明 XCD（Accelerator Complex Die）和其计算资源，并以 Infinity Fabric 连接相关组件。ROCm 的 CDNA 管线说明把 MFMA（矩阵 fused multiply-add）作为矩阵计算路径的一部分讨论。Matrix Core/MFMA 的确切数据类型、矩阵形状和指令可用性需要以目标 GPU 的 ISA、ROCm 支持矩阵与库文档为准。</p>
+<h4>Infinity Fabric</h4>
+<p>Infinity Fabric 是 AMD 用于连接系统/封装内组件的互连技术。在 MI300 的说明中，它参与连接 chiplet、内存和平台组件的架构叙述。它不是一个可由单个 HIP kernel 直接替代或绕过的“内存层级”，也不能由其名称直接推导出固定通信带宽或延迟。</p>
+<p>来源：<a href="https://gpuopen.com/learn/rdna-performance-guide/">https://gpuopen.com/learn/rdna-performance-guide/</a>；<a href="https://gpuopen.com/wp-content/uploads/2019/08/RDNA_Architecture_public.pdf">https://gpuopen.com/wp-content/uploads/2019/08/RDNA_Architecture_public.pdf</a>；<a href="https://instinct.docs.amd.com/develop/gpu-arch/mi300.html">https://instinct.docs.amd.com/develop/gpu-arch/mi300.html</a>；<a href="https://rocm.docs.amd.com/en/latest/reference/gpu-arch/index.html">https://rocm.docs.amd.com/en/latest/reference/gpu-arch/index.html</a></p>
+<h3 id="inferred-面向初学者的教学推导-4">INFERRED｜面向初学者的教学推导</h3>
+<p>可用“产品定位”而非“谁更快”来建立第一印象：RDNA 材料优先讲图形/游戏效率与 WGP；CDNA/Instinct 材料优先讲数据中心计算、矩阵工作负载和多芯粒系统；GCN 则常用于理解较早 AMD GPU 的历史与兼容背景。这是阅读路径，不是性能排名，也不表示任一架构不能运行另一类工作负载。</p>
+<p>把代际标记写在笔记里能避免常见错误：</p>
+<ul>
+<li><code>Wave32</code>：RDNA 公开资料的语境；不要据此宣布所有 AMD GPU 的 wave 大小都为 32。</li>
+<li><code>Wave64</code>：在 GCN 与数据中心/CDNA 语境常见；具体支持与编译目标仍须确认。</li>
+<li><code>WGP</code>：RDNA 组织术语；不能替换所有代的 CU 解释。</li>
+<li><code>XCD</code>、<code>Matrix Core</code>、<code>MFMA</code>：以 MI300/CDNA 或已确认支持的目标为前提。</li>
+<li><code>Infinity Fabric</code>：系统/封装互连语境；需要按拓扑和产品资料分析通信。</li>
+</ul>
+<h4>学习检查</h4>
+<ol>
+<li>为什么用 RDNA 的 WGP 图解释 CDNA profiler 指标可能误导？</li>
+<li>在看到 MFMA 优化建议前，应核实哪三类信息？</li>
+<li>Infinity Fabric 为什么不等同于某一级 GPU cache？</li>
+</ol>
+<h2 id="llm-工作负载到-amd-gpu-的教学映射">LLM 工作负载到 AMD GPU 的教学映射</h2>
+<h3 id="extracted-可作为映射边界的硬件事实">EXTRACTED｜可作为映射边界的硬件事实</h3>
+<p>HIP 将数据并行 kernel 组织为 grid、work-group、work-item 和 wavefront；CU 通过寄存器、LDS、缓存/内存路径及不同执行管线推进这些工作。ROCm Compute Profiler 的 CDNA 管线说明包含 VALU、VMEM、LDS 与 MFMA 等类别。AMD GPU 架构参考要求按具体 <code>gfx</code> 目标确定支持能力。</p>
+<p>这些资料给出的是硬件与编程模型的词汇边界；它们<strong>没有</strong>把某个 LLM 算法名与某一条硬件管线一一绑定，也没有给出适用于所有模型、批量、精度和 AMD 产品的定量性能结论。</p>
+<p>来源：<a href="https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/conceptual/cdna/pipeline-descriptions.html">https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/conceptual/cdna/pipeline-descriptions.html</a>；<a href="https://rocm.docs.amd.com/projects/HIP/en/develop/understand/programming_model.html">https://rocm.docs.amd.com/projects/HIP/en/develop/understand/programming_model.html</a>；<a href="https://rocm.docs.amd.com/en/latest/reference/gpu-arch/index.html">https://rocm.docs.amd.com/en/latest/reference/gpu-arch/index.html</a></p>
+<h3 id="inferred-跨层教学映射-非硬件等价关系">INFERRED｜跨层教学映射（非硬件等价关系）</h3>
+<p>以下全部是为帮助定位测量问题的<strong>推导式映射</strong>。实际 kernel 划分、数据布局、通信、融合策略和瓶颈由框架、模型形状、精度、库版本、GPU 架构和运行时决定。</p>
+<table>
+<thead>
+<tr>
+<th>LLM 概念</th>
+<th>常见计算/数据动作</th>
+<th>可先观察的 GPU 侧线索</th>
+<th>必须保留的边界</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GEMM</td>
+<td>大规模矩阵乘加，常有分块与数据复用</td>
+<td>支持的目标上可观察矩阵指令/VALU 活动、VGPR/LDS 和内存流量</td>
+<td>GEMM 不等于 MFMA；库可能采用不同 kernel 或回退路径</td>
+</tr>
+<tr>
+<td>Attention</td>
+<td>QKᵀ、softmax、与 V 的乘法及中间数据处理</td>
+<td>多阶段 kernel 的读写、归约、分歧、算术强度</td>
+<td>“Attention 是内存受限/计算受限”取决于形状与实现</td>
+</tr>
+<tr>
+<td>KV Cache</td>
+<td>保存并读取历史 token 的 K/V 状态</td>
+<td>全局内存访问、缓存命中、地址连续性、容量压力</td>
+<td>cache 的逻辑含义不等于硬件 L1/L2 cache</td>
+</tr>
+<tr>
+<td>Prefill</td>
+<td>同时处理一段 prompt，通常有较大并行度</td>
+<td>GEMM/attention 的大批工作、数据重用和矩阵路径</td>
+<td>不能从阶段名推导固定吞吐或占用率</td>
+</tr>
+<tr>
+<td>Decode</td>
+<td>每步生成少量新 token，并读取历史 KV</td>
+<td>小工作量调度、KV 读取、通信与批处理策略</td>
+<td>不等价于“只有内存访问”；实现仍含计算和同步</td>
+</tr>
+<tr>
+<td>Continuous batching</td>
+<td>在服务端动态合并/调度请求</td>
+<td>kernel 发射粒度、形状变化、队列和资源利用</td>
+<td>它是运行时服务策略，不是 CU 硬件功能</td>
+</tr>
+<tr>
+<td>Tensor parallel</td>
+<td>张量维度跨设备划分，并在需要处汇总</td>
+<td>设备间通信、拓扑、计算/通信重叠</td>
+<td>不是某一种 Infinity Fabric 拓扑的同义词</td>
+</tr>
+<tr>
+<td>RCCL</td>
+<td>ROCm 生态中的集合通信库</td>
+<td>all-reduce 等通信调用、拓扑和同步</td>
+<td>RCCL 调用并不自动保证最佳拓扑或重叠</td>
+</tr>
+</tbody></table>
+<h4>一条可操作的分析链</h4>
+<p>从模型层的“decode 延迟高”开始，不应跳到“某个硬件单元太慢”。可依次确认：请求形状与批处理策略 → 框架实际发出的 kernel/通信 → 每个热点 kernel 的时间和内存/管线指标 → 目标 <code>gfx</code> 的可用指令与内存拓扑。这样能区分计算、内存、发射开销和跨设备通信，而非把一个 LLM 名词误当作单一硬件模块。</p>
+<h4>学习检查</h4>
+<ol>
+<li>为什么 KV cache 不是硬件 cache？</li>
+<li>为什么 tensor parallel 的性能分析必须包含通信拓扑？</li>
+<li>哪些条件会改变 prefill 与 decode 的相对瓶颈？</li>
+</ol>
+<h2 id="工作区补记-四个线程不等于四条物理-lane">工作区补记：四个线程不等于四条物理 Lane</h2>
+<p>对应学习工作区进一步澄清了一个容易误读的教学例子。启动一个只有四个 work-item 的 work-group，只是在描述四份逻辑工作，并不会把硬件配置成只有四条 lane。若目标使用 Wave32，这四个 work-item 占据一个部分填充的 wave，其他位置被屏蔽；若使用 Wave64，仍需按对应执行模式理解。</p>
+<p>例如计算 <code>output[i] = input[i] * 2 + 1</code>，输入为十、二十、三十、四十，输出应为二十一、四十一、六十一、八十一。图中只画四行寄存器值，是省略了无效位置，不是在宣布真实 wave 大小为四。VGPR 编号对应一组逐 lane 的值，也不是每条向量指令临时创建一个四元素寄存器数组。</p>
+<p>同样，一百个 work-item 在假设的 Wave32 模式下需要四个 wave，最后一个只有四个有效位置。这种尾部利用率损失与分支分歧有所区别：前者来自工作量未填满，后者来自有效工作在执行时走向不同控制路径。理解这点之后，才能正确阅读线程块大小、掩码与占用率之间的关系。</p>
+<p>工作区还讨论了部署配方与硬件说明的分工。框架启动参数可以说明如何调用某个后端，但不能仅从 HIP 兼容接口或 <code>torch.cuda</code> 这个上层名字，推断底层设备就是某种 NVIDIA 或 AMD 微架构。底层资源与编译目标仍需查对应实现；本文保留 AMD 文档自身的适用边界。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/amd-architecture/">https://leviusspace.top/2026/10/02/amd-architecture/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/AI%20Infra/">AI Infra</a><a class="post-meta__tags" href="/tags/GPU%E6%9E%B6%E6%9E%84/">GPU架构</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/infra-operators/" title="AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</div></div></div></a><a class="pagination-related" href="/2026/10/02/gpu-attention/" title="FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="infra">
+<img alt="《AMD GPU 架构笔记：从 Wavefront 到大模型性能分析》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/amd-architecture.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>✣ AI Infra</span><span>VOL. III</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>AMD GPU</span><span>架构基础</span></span><span class="book-cover-english">THE COMPUTE CHAMBER</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/AI-Infra/">✣ AI Infra ↗</a><span>第 III 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#amd-gpu-基础-从-cpu-到-hip-执行层次"><span class="toc-text">AMD GPU 基础：从 CPU 到 HIP 执行层次</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#extracted-来源直接说明的概念"><span class="toc-text">EXTRACTED｜来源直接说明的概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inferred-面向初学者的教学推导"><span class="toc-text">INFERRED｜面向初学者的教学推导</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#amd-compute-unit-调度-执行管线与片上状态"><span class="toc-text">AMD Compute Unit：调度、执行管线与片上状态</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#extracted-来源直接说明的概念-2"><span class="toc-text">EXTRACTED｜来源直接说明的概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inferred-面向初学者的教学推导-2"><span class="toc-text">INFERRED｜面向初学者的教学推导</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#amd-gpu-内存与性能-层次-延迟隐藏和数据布局"><span class="toc-text">AMD GPU 内存与性能：层次、延迟隐藏和数据布局</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#extracted-来源直接说明的概念-3"><span class="toc-text">EXTRACTED｜来源直接说明的概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inferred-面向初学者的教学推导-3"><span class="toc-text">INFERRED｜面向初学者的教学推导</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#amd-gpu-家族-gcn-rdna-与-cdna-的定位边界"><span class="toc-text">AMD GPU 家族：GCN、RDNA 与 CDNA 的定位边界</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#extracted-来源直接说明的概念-4"><span class="toc-text">EXTRACTED｜来源直接说明的概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inferred-面向初学者的教学推导-4"><span class="toc-text">INFERRED｜面向初学者的教学推导</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#llm-工作负载到-amd-gpu-的教学映射"><span class="toc-text">LLM 工作负载到 AMD GPU 的教学映射</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#extracted-可作为映射边界的硬件事实"><span class="toc-text">EXTRACTED｜可作为映射边界的硬件事实</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inferred-跨层教学映射-非硬件等价关系"><span class="toc-text">INFERRED｜跨层教学映射（非硬件等价关系）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#工作区补记-四个线程不等于四条物理-lane"><span class="toc-text">工作区补记：四个线程不等于四条物理 Lane</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

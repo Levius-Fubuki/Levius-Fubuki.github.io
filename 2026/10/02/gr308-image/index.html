@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="从 Qwen Image 单卡出图、分块 VAE 到 TP2 DiT，追踪实现细节、数值差异与尚未完成的验收。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/gr308-image/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="从 Qwen Image 单卡出图、分块 VAE 到 TP2 DiT，追踪实现细节、数值差异与尚未完成的验收。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/gr308-image.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/gr308-image.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/gr308-image/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="GR308" property="article:tag"/><meta content="多模态" property="article:tag"/><meta content="分布式推理" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/工程实践/">工程实践</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="gr308-image">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</h1>
+<p>Qwen Image 2.1 的 GR308 实验经历了三次目标变化：先让完整链路真正生成图片，再把解码阶段压下来，最后把 DiT 的计算拆到两个逻辑芯片。三步分别解决兼容性、阶段瓶颈和计算并行，不能用一个总加速比抹平中间发生的变化。</p>
+<p>本文以 2026-09-21 主目录测试记录和 09-22 独立工作树报告为依据，补充对应 Codex 工作区最后的算子定位。10 月 2 日只整理既有证据，没有重跑 GPU 实验。最新工作区仍在探索原生 SDPA，没有完成新的融合注意力验收。</p>
+<h2 id="第一阶段-把模型框架与设备后端接起来">第一阶段：把模型框架与设备后端接起来</h2>
+<p>最初环境包含四张物理卡、八个逻辑设备；单个可见逻辑设备约 55.48 GiB。PyTorch 是 2.7.1+cpu，设备能力通过 torch_fant 插件提供，配合 FTUCA、FHCCL 和厂商扩展。Diffusers 固定在当时的 0.41 开发版提交 <code>9f1246971270…</code>，模型权重约 30.9 GiB。</p>
+<p>这类移植不能只替换 <code>cuda</code> 字符串。Python 层调用成功，下面可能落到通用分解，也可能走设备专用内核；设备名称能够被识别，也不代表框架涉及的全部张量操作都有对应实现。项目首先沿着真实出图路径逐项排除不支持的操作。</p>
+<p>RoPE 原实现涉及复数路径，适配中改为在 CPU 准备实数 cos/sin 查找表，再在 FANT 上做实数旋转。缓存 tuple 的切片、<code>repeat_interleave</code>、高维布局转换和 pixel shuffle 也分别处理：索引可以先在 CPU 构造，再通过 <code>index_select</code> 取值；超过后端适用范围的八维 permute 拆成较低维的步骤；pixel shuffle 用切片与拷贝表达。</p>
+<p>这些替换的目的首先是保存张量语义。输出 shape 相同还不够，head 顺序、位置索引、轴排列和最终像素位置必须一致。某个操作的替代写法也可能更慢，所以兼容层需要留下清晰入口，便于在端到端基线成立后再定位热点。</p>
+<p>模型组件的生命周期是第二个问题。让 DiT 与 VAE 同时驻留时，已占用约 47.45 GiB 后再申请约 5.06 GiB 会失败。项目改为分阶段执行：先完成去噪并保存 latent，再让 VAE 解码。这样增加了阶段切换，却让两个大组件不必同时占据设备内存。</p>
+<h2 id="单卡基线-真正出图以后再计时">单卡基线：真正出图以后再计时</h2>
+<p>1024 分辨率、40 步、BF16 的单卡记录中，DiT 耗时 1622.44 秒，平均每步约 40.56 秒，峰值 37.81 GiB；独立 VAE 解码耗时 1241.47 秒，峰值 30.15 GiB。两段相加为 2863.92 秒，约 47 分 44 秒，已有实际 PNG。</p>
+<p>这是阶段耗时之和，不应自动包含模型下载、冷加载、进程启动和所有 CPU 后处理。4 步 smoke 的 DiT 约 162.6 秒，也能走通路径，但图像质量不足，不能用它替代 40 步成品的质量验证。低步数实验的用途是缩短工程迭代时间。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th align="right">40 步单卡记录</th>
+<th>可以确认的事情</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DiT 去噪</td>
+<td align="right">1622.44 s</td>
+<td>真实模型、目标分辨率的计算链路完成</td>
+</tr>
+<tr>
+<td>独立 VAE</td>
+<td align="right">1241.47 s</td>
+<td>latent 能被解码并落成 PNG</td>
+</tr>
+<tr>
+<td>两阶段求和</td>
+<td align="right">2863.92 s</td>
+<td>阶段计算成本基线，不是完整冷启动响应时间</td>
+</tr>
+</tbody></table>
+<p>VAE 在总计算时间中占了很大部分。继续只优化 DiT，即使把它减半，剩余 VAE 仍会占据主要等待。因此下一步先调整解码路径，再比较多芯执行。</p>
+<h2 id="第二阶段-用阶段接口隔离运行时差异">第二阶段：用阶段接口隔离运行时差异</h2>
+<p>工作树中的适配器没有把整个 vLLM-Omni CUDA 路径直接搬过来，而是复用 Diffusers 与 FANT，围绕四个阶段接口组织流程：<code>prepare_encode</code>、<code>denoise_step</code>、<code>step_scheduler</code>、<code>post_decode</code>。这样编码、每步模型计算、调度器状态更新和最终解码可以分别测量。</p>
+<p>这一结构对验证很有帮助。同一 latent 可以交给不同 VAE 路径；同一初始噪声和时间步可以交给单卡、流水线或 TP2 DiT；scheduler 的输入输出则保持独立。否则 loader、scheduler、dtype 与通信拓扑同时变化，很难解释图片差异来自哪一层。</p>
+<p>通信能力也先单独探测。在同一物理卡的两个逻辑芯片间，64 MiB BF16 AllReduce 约 2.68 ms，对应报告口径约 25 GB/s bus bandwidth；AllGather 约 3.91 ms，聚合口径约 34.3 GB/s。这里两个 bandwidth 定义不同，不能直接据数值判定哪个原语“更快”。<code>all_to_all_base</code> 当时不支持，意味着依赖该能力的 Ulysses 路径不能直接启用。</p>
+<p>工程选择由已验证的原语约束。一个并行算法理论上适合模型，不代表目标后端已经提供其通信基础。项目因此分别探索分块 VAE、按层流水线和真正的张量并行，避免把一种方案失败误写成多卡完全不可用。</p>
+<h2 id="分块-vae-主要收益先来自算法路径">分块 VAE：主要收益先来自算法路径</h2>
+<p>VAE 的优化先把大图拆成 tile。1024 分辨率的记录使用 36 个 tile；双芯时每芯处理 18 个。为了隔离变量，报告比较了单卡整体解码、单卡串行分块和双芯分块，而不是只给出首尾两个数字。</p>
+<table>
+<thead>
+<tr>
+<th>VAE 路径</th>
+<th align="right">耗时</th>
+<th>相对关系</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>旧单卡整体解码</td>
+<td align="right">1241.47 s</td>
+<td>原阶段基线</td>
+</tr>
+<tr>
+<td>单卡串行分块</td>
+<td align="right">154.70 s</td>
+<td>更换解码组织后大幅降低耗时</td>
+</tr>
+<tr>
+<td>双芯分块</td>
+<td align="right">143.50 s</td>
+<td>相对串行分块再降低约 7.2%</td>
+</tr>
+</tbody></table>
+<p>从 1241.47 到 143.50 的变化同时包含分块方式和设备数，不能叫作“双卡带来 8.65 倍加速”。严格分辨后，主要收益发生在分块路径；加第二个芯片只带来额外约 7.2% 的阶段延迟下降。tile 调度、尾块与合并成本都会影响并行效率。</p>
+<p>分块还改变了内存需求。串行分块峰值约 39.64 GiB；双芯记录分别约 17.4 / 23.0 GiB。跨芯不均衡说明显存占用除了 tile 数，还受缓存、临时张量和各阶段驻留影响，不能按任务一半就假设内存完全相等。</p>
+<p>数值方面，报告记录图像 MAE 0.0435/255，99.9815% 的通道差异不超过 1，最大差异 11。平均误差很小，最大差异仍要保留。这个结果支持当前样本的分块实现，尚不是各种构图、尺寸和随机种子下都没有接缝的证明。</p>
+<h2 id="按层流水线-容量收益成立-延迟收益没有成立">按层流水线：容量收益成立，延迟收益没有成立</h2>
+<p>DiT 首先尝试把 32 层分成 16+16。前半在一芯片，后半在另一芯片，阶段之间传递激活。直接 P2P 路径遇到 <code>palRbTree</code> 断言，实验因此采用 CPU 中转，而没有把不稳定的传输留在默认路径。</p>
+<p>512 分辨率、2 步的 DiT 从 9.28 变为 9.73 秒；1024、4 步从 163.33 变为 164.07 秒，后者约慢 0.45%。峰值从约 40.595 GB 降到 32.889 GB，约减少 19%，latent 完全一致。</p>
+<p>这个结果并不矛盾。单个样本先经过前 16 层，再经过后 16 层；在没有足够微批填满流水线时，两段并没有同时为同一个样本计算。CPU 中转还增加等待。因此该方案的实际成果是分散权重和显存压力，保留正确性，而不是降低当前单样本延迟。</p>
+<p>如果未来要把它用于吞吐服务，需要另外设计微批、缓冲区和阶段调度，测量填充、稳态与排空阶段。当前报告没有完成那种服务测试，不能把潜在吞吐并行写成已获得收益。</p>
+<h2 id="真正的-tp2-切分每一层的计算">真正的 TP2：切分每一层的计算</h2>
+<p>随后实现的 TP2 进入了每个 DiT block。每 rank 保留 16 个 attention head，QKV、gate 和部分投影沿输出方向切分；attention 输出与 MLP 输出沿输入方向切分，再汇总局部结果。32 层中每层有两次 AllReduce。</p>
+<p>与 16+16 流水线相比，TP2 让两个芯片参与同一层，缩短这一步的计算量，但需要支付每层通信。权重从单卡约 14.230 GB 降到每 rank 约 7.250 GB，没有严格减半是因为还存在复制模块和非切分状态。</p>
+<table>
+<thead>
+<tr>
+<th>DiT 条件</th>
+<th align="right">单卡</th>
+<th align="right">TP2</th>
+<th align="right">比例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>512，2 步</td>
+<td align="right">9.28 s</td>
+<td align="right">5.51 s</td>
+<td align="right">1.68×</td>
+</tr>
+<tr>
+<td>1024，4 步</td>
+<td align="right">163.33 s</td>
+<td align="right">89.60 s</td>
+<td align="right">1.82×</td>
+</tr>
+</tbody></table>
+<p>1024 短测中每 rank 峰值约 29.495 GB。两个 rank 的 latent 相同，但与未分片单卡基线并非逐位一致：512 的 MAE 0.00921、最大差 0.203125；1024 的 MAE 0.00575、最大差 0.09375，均为有限值。并行归约顺序变化后，需要把这种误差带入后续图像质量验收。</p>
+<p>按 4 步平均耗时估算，40 步 DiT 约 896 秒，再加 143.5 秒 VAE，约 1040 秒、17.3 分钟。<strong>这只是投影，报告没有完成 TP2 的 40 步端到端出图计时。</strong> 不能把这个数字与早期实测 47 分 44 秒直接配成“已实现的完整生成加速”。</p>
+<h2 id="剩余瓶颈-名字叫-sdpa-实际走哪条路径">剩余瓶颈：名字叫 SDPA，实际走哪条路径</h2>
+<p>TP2 block0、sequence length 4096 的分解中，SDPA 约 0.485–0.489 秒；按 32 层粗略外推，占约 22.4 秒 step 的七成。GEMM 约 0.0195 秒，norm 与布局操作约 0.085–0.088 秒。AllReduce 调用的墙钟还可能包含等待前序计算，不能把它全部归因于链路。</p>
+<p>独立 32 MiB AllReduce 约 1.57 ms；按每层两次估算，一步约 0.1 秒，只占当前 step 的约 0.45%。这个拆解说明，在该形状下优先缩短 SDPA 比继续争论通信峰值更有依据。不过缺少 DRAM 等硬件计数器，仍不能直接断定 SDPA 已经带宽饱和或计算饱和。</p>
+<p>后续工作区确认的调用链是 Diffusers → PyTorch <code>scaled_dot_product_attention</code> → 通用 math decomposition → torch_fant 的 bmm/mm/softmax，而不是已经注册的 FANT fused SDPA。强制选择 FLASH 或 EFFICIENT 标志，测试仍落到近似相同的约 484 ms；显式 math 路径约 569 ms，反而增加 17.6%。Python 层选项名不能代替底层 dispatch 证据。</p>
+<p>在线 softmax 分块候选也没自动胜出。sequence 1024 的 Python 组合路径约 76–85 ms，对照约 34.7 ms，慢了 2.2–2.4 倍；4096 尚未完成对应测试。公式减少中间存储，并不保证由很多小算子拼出的实现比后端大算子快。原生 FTUCA SDPA 仍在开发调查中，本文不提供尚不存在的性能结果。</p>
+<h2 id="小算子融合-单点很快-整块提升更小">小算子融合：单点很快，整块提升更小</h2>
+<p>厂商扩展 <code>vllm_fant._custom_ops</code> 接到 iFormer 算子后，RMSNorm 从 11.69 降到 0.615 ms，RoPE 从 24.69 降到约 0.62–0.64 ms，SiLU 从 8.83 降到 0.679 ms。但把 SiLU 放回包含投影和布局的 MLP 片段后，仅 9.35→9.21 ms，不足 2%，因此没有仅凭单点倍率保留它。</p>
+<p>组合到真实 block 的结果是 0.67934→0.63190 秒，下降 6.98%。误差 MAE 0.00360、最大值 2；相对未分片参考的 MAE 从 0.00394 变为 0.00412。有限值和平均误差不能遮住最大值，最终仍需要完整图像验证。</p>
+<p>候选已接入 TP2 路径，但由 <code>ENABLE_FANT_OPERATORS=1</code> 显式控制，默认关闭。它通过的是当前 block 的性能与误差门，还没有完成完整 40 步生成质量与稳定性验收。保留一个可回退的候选入口，比提前宣布全链优化完成更有工程价值。</p>
+<h2 id="用阶段数据重建一次请求的成本">用阶段数据重建一次请求的成本</h2>
+<p>从这些结果可以重建优化的实际顺序，而不需要虚构一条已经跑完的最终服务。第一阶段的观测单位是“一个完整模型组件”：先确认编码后的 latent 可以进入 DiT，DiT 输出可以进入独立 VAE，最后能落成图片。只有这条链成立，后面的计时才有对象。</p>
+<p>第二阶段的观测单位是“相同输入下的替代路径”。VAE 复用同一 latent，把整体解码与分块解码比较；DiT 固定分辨率、步数与初始状态，把未分片、按层流水线和张量并行比较。这样，某一路径变快时，至少可以知道它有没有同时改输入问题。</p>
+<p>第三阶段再下钻到一个 block。此时才比较 SDPA、投影、归一化、布局转换和 collective。单 block 的结果不能直接替代完整 step，因为不同层、首次缓存建立与 scheduler 开销可能不同。报告使用“按三十二层外推”的说法，恰好保留了实测与估算之间的距离。</p>
+<p>这些数据也解释了一个表面上的反差：RMSNorm 和 RoPE 的单点倍率远大于 TP2，最终对整块的作用却只有几个百分点。原因不是单点数字失效，而是它们只占一部分执行时间。即使把一个占总耗时百分之十的模块彻底消除，其余百分之九十仍然存在；若融合又增加布局处理，实际收益还会更小。</p>
+<p>同样，通信 microbenchmark 与 block 里的通信调用不能直接相减。独立探针在输入已准备好时启动；真实层中的 collective 可能等待前序 kernel 或其他 rank。两者之间的差异包含依赖与同步，只有进一步加时间线证据，才能分清链路传输和迟到的生产者。</p>
+<p>当前记录因此留下了三种可复用制品：能够复现输入的阶段接口、记录各候选实际路径的参数，以及同时保存平均和最大误差的比较结果。后续如果换驱动或算子扩展，可以先重新比较这些制品，再决定是否重跑昂贵的完整生成。这里没有声称已经完成自动化生产回归系统，只说明现有工程接口为何便于继续验证。</p>
+<h2 id="这次实现留下了什么">这次实现留下了什么</h2>
+<p>项目形成了可运行的单卡出图基线、按阶段组织的适配器、分块 VAE、两种跨芯 DiT 方案，以及能定位到真实 dispatch 的算子剖析。每个结果回答的问题不同：分块 VAE 改变主要阶段耗时，流水线降低容量压力，TP2 在短测中取得计算加速，小算子融合则进一步减少 block 开销。</p>
+<p>当前最值得继续验证的是 TP2 完整 40 步出图，以及原生 SDPA 是否能在固定 shape、正确性和数值门下胜过通用分解。已有记录足以说明实现过程和短测效果，却还不支持把全部候选默认打开并称为稳定服务。</p>
+<p>资料来自《Qwen Image 2.1 GR308 Test》（2026-09-21）、独立工作树《Qwen Image 2.1 Omni FANT Test》（09-22）与对应算子调查工作区。公开的模型框架入口可参考 <a href="https://github.com/huggingface/diffusers">Diffusers</a>。本文所有 GR308 数值均来自本地历史实验，不代表 Diffusers 上游的性能声明。</p>
+<p>继续实验时还需固定计时是否包含首次缓存建立。首次执行可能分配缓冲区、构建位置编码或初始化通信；稳定步骤则复用这些状态。若一个候选记录首轮、另一个只记录暖运行，比较就会把生命周期成本误归给计算实现。当前文章保持每份报告原有的阶段范围，没有把这些未对齐成本强行补成统一总延迟。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/gr308-image/">https://leviusspace.top/2026/10/02/gr308-image/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/GR308/">GR308</a><a class="post-meta__tags" href="/tags/%E5%A4%9A%E6%A8%A1%E6%80%81/">多模态</a><a class="post-meta__tags" href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E6%8E%A8%E7%90%86/">分布式推理</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/gr308-language/" title="GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</div></div></div></a><a class="pagination-related" href="/2026/10/02/gr308-video/" title="GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="engineering">
+<img alt="《Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/gr308-image.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>⚙ 工程实践</span><span>VOL. III</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>图像生成</span></span><span class="book-cover-english">THE MOSAIC ENGINE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/工程实践/">⚙ 工程实践 ↗</a><span>第 III 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#第一阶段-把模型框架与设备后端接起来"><span class="toc-text">第一阶段：把模型框架与设备后端接起来</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#单卡基线-真正出图以后再计时"><span class="toc-text">单卡基线：真正出图以后再计时</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#第二阶段-用阶段接口隔离运行时差异"><span class="toc-text">第二阶段：用阶段接口隔离运行时差异</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#分块-vae-主要收益先来自算法路径"><span class="toc-text">分块 VAE：主要收益先来自算法路径</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#按层流水线-容量收益成立-延迟收益没有成立"><span class="toc-text">按层流水线：容量收益成立，延迟收益没有成立</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#真正的-tp2-切分每一层的计算"><span class="toc-text">真正的 TP2：切分每一层的计算</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#剩余瓶颈-名字叫-sdpa-实际走哪条路径"><span class="toc-text">剩余瓶颈：名字叫 SDPA，实际走哪条路径</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#小算子融合-单点很快-整块提升更小"><span class="toc-text">小算子融合：单点很快，整块提升更小</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#用阶段数据重建一次请求的成本"><span class="toc-text">用阶段数据重建一次请求的成本</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#这次实现留下了什么"><span class="toc-text">这次实现留下了什么</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="复盘 vLLM-Omni 两个已合并 PR：从 SSE 错误复现到聊天与图像编辑客户端的终态修复。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/opensource-streams/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="复盘 vLLM-Omni 两个已合并 PR：从 SSE 错误复现到聊天与图像编辑客户端的终态修复。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/opensource-streams.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/opensource-streams.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/opensource-streams/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="开源贡献" property="article:tag"/><meta content="vLLM-Omni" property="article:tag"/><meta content="性能测量" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/开源贡献/">开源贡献</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="opensource-streams">两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败</h1>
+<p>一次推理请求收到 HTTP 200，已经输出部分文字，随后服务端又发送 error 事件。这次请求应该算成功还是失败？对流式接口而言，连接建立时的 HTTP 状态只说明传输开始，生成任务的最终结果还在后续事件中。</p>
+<p>我提交的 <a href="https://github.com/vllm-project/vllm-omni/pull/8000">vLLM-Omni PR #8000</a> 和 <a href="https://github.com/vllm-project/vllm-omni/pull/8015">#8015</a> 处理的就是这个问题，分别覆盖聊天与图像编辑基准客户端。两者均于 2026-09-22 合并；状态在 10 月 2 日重新通过 GitHub 核查。这是测量正确性修复，没有声称模型吞吐获得提升。</p>
+<p>这篇文章按问题出现、代码定位、补丁设计、回归验证和评审扩展的顺序记录实现。Codex 参与了根因分析、编码和验证，两个 PR 的说明中也披露了这点。下面的历史测试成绩引用当时的记录，本轮博客整理没有重跑模型服务。</p>
+<h2 id="问题出在客户端对-成功-的定义">问题出在客户端对“成功”的定义</h2>
+<p>流式请求至少有三层状态。第一层是 HTTP：是否连接成功、请求是否被服务器接受。第二层是事件协议：数据能否按 SSE 边界解析，JSON 是否符合约定。第三层是生成任务：模型有没有完成约定输出，服务端是否在中途报告错误。</p>
+<p>旧客户端在 HTTP 200 分支中读取完整个流，最后直接设置 <code>output.success = True</code>。它可以正确收集先前的文字，却没有把顶层 error 事件纳入终态。这样一来，后端已经报告失败，基准仍把请求放进成功集合。</p>
+<p>这个错误会污染后续指标。成功率首先被高估；如果统计只对成功请求计算延迟、输出长度或 goodput，失败请求的部分输出也可能进入错误的分组。实际影响取决于汇总逻辑，因此补丁没有凭空声称某个吞吐数字被高估多少，而是先修正请求记录本身。</p>
+<p>一个最小输入就能暴露问题：</p>
+<pre><code class="language-text">HTTP 200
+data: 部分文字输出
+data: 顶层 error，携带服务端消息
+data: [DONE]
+</code></pre>
+<p><code>[DONE]</code> 说明流结束，并不自动撤销此前发生的错误。客户端需要保留“本次尝试曾收到 error”这一事实，直到决定最终状态。</p>
+<h2 id="先把模型故障与协议复现拆开">先把模型故障与协议复现拆开</h2>
+<p>相关背景来自 issue #5109，但修复客户端不要求稳定复现原模型崩溃。模型 crash 可能受硬件、版本、输入和采样配置影响；客户端对一个确定 error 事件的反应则可以独立验证。</p>
+<p>因此先构造确定的 SSE 序列，用真实客户端处理，而不让测试等待一个不稳定的后端故障。在生产修复缺席时，新增用例应失败，表现为 <code>success=True</code>；加入补丁后，同一序列应产生 <code>success=False</code>，并保留错误消息。这种先复现后修复的顺序，确保测试确实覆盖了原问题。</p>
+<p>它也限制了结论范围。协议回放能够证明给定事件序列被正确分类，不能证明原始模型 crash 已修复，更不能替代模型性能基准。把两种验证分开以后，每个实验都有明确用途，PR 描述也更容易审核。</p>
+<h2 id="聊天路径-一个按尝试重置的错误状态">聊天路径：一个按尝试重置的错误状态</h2>
+<p>第一份补丁位于 <code>vllm_omni/benchmarks/patch/patch.py</code> 的 <code>async_request_openai_chat_omni_completions</code>。核心增加了一个布尔状态，在每次请求尝试开始时重置，然后在解析 JSON 后、处理正常输出指标前检查顶层 error。</p>
+<p>下面是依据补丁整理的控制流示意，省略了原函数中音频、时间与指标处理：</p>
+<pre><code class="language-python">streaming_error_received = False
+for event in parsed_events:
+    error = event.get("error")
+    if error is not None:
+        streaming_error_received = True
+        output.error = extract_error_message(error)
+        continue
+    collect_normal_output(event)
+output.success = not streaming_error_received
+</code></pre>
+<p>这段设计包含几个容易忽略的细节。状态属于一次 attempt，不能错误继承上一次重试，也不能被后续正常 chunk 冲掉。error 判断使用“不是 None”，而不是仅检查其真值，以便保持明确的事件语义。错误事件被识别后，跳过正常 stage metrics 与内容解析，避免把错误对象当成输出数据。</p>
+<p>实际补丁还兼容不同 error 形态。如果它是字典，优先保留非空 <code>message</code>，否则保留对象的字符串表示；如果不是字典，则转换为字符串。这样基准结果中有可诊断的信息，而不是只剩一个没有解释的 false。</p>
+<p>补丁没有因为收到 error 就删除已经接收的部分输出。部分文字对于定位失败仍然有价值，但保留它不应改变请求失败的终态。这正是“诊断数据”和“成功资格”两个字段需要分开的原因。</p>
+<h2 id="回归用例实际覆盖了什么">回归用例实际覆盖了什么</h2>
+<p>聊天回归测试放在 <code>tests/benchmarks/patch/test_patch.py</code>。它创建请求对象，用模拟的 200 响应依次发送部分文字、包含服务端消息的 error 和 <code>[DONE]</code>，再调用真实的异步客户端函数。最后断言请求失败，且错误消息与服务端提供的一致。</p>
+<p>测试不是重新写一套与实现镜像的状态机，而是从客户端公开行为验证终态。即使内部解析组织变化，只要错误流仍被正确记录，该用例就有意义。相反，只断言新增布尔变量存在，既不能暴露旧 bug，也不能保护外部行为。</p>
+<p>这个用例本身没有覆盖每一种网络分块、所有 error 对象形态或全部模态协议。完整测试模块与回放补充了范围，但文章不把一个回归用例写成全协议证明。工程上更重要的是指出已覆盖的触发条件，以及哪些新行为仍应另加测试。</p>
+<p>对正常流的验证同样必要。如果修复只是把所有请求改成失败，错误用例也可能通过。PR 因此检查正常文字流仍为成功，并对真实模型的文字和文字加音频请求做了兼容性检查，确认没有损坏常规输出路径。</p>
+<h2 id="三层验证与各自的环境边界">三层验证与各自的环境边界</h2>
+<table>
+<thead>
+<tr>
+<th>验证层</th>
+<th>当时的结果</th>
+<th>它回答的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>benchmark patch 单元测试模块</td>
+<td>61 passed</td>
+<td>模块已有行为和新增错误终态是否通过回归</td>
+</tr>
+<tr>
+<td>localhost HTTP/SSE 回放</td>
+<td>旧客户端把同一错误流记成功，新客户端记失败；正常流均成功</td>
+<td>真实 HTTP/SSE 处理链是否符合预期</td>
+</tr>
+<tr>
+<td>MiniCPM-o-4_5，2×A800 80GB</td>
+<td>两个客户端均完成文字与文字加音频请求，均解析 5.68 秒音频</td>
+<td>正常模型输出路径是否保持可用</td>
+</tr>
+</tbody></table>
+<p>版本也需要保留。基准客户端测试使用 vLLM 0.29.0，客户端基线为 <code>939e6ba56e3d…</code>；实验模型服务使用 vLLM 0.28.0、Omni <code>69c2127a</code>，并带有 Python 3.10 timeout 兼容调整与原生采样配置。两边不是同一提交，不能简称“某版本全链全部通过”。</p>
+<p>原始 issue 中的模型崩溃没有在这套真实模型环境中复现。因而该 GPU 检查支持正常请求兼容性，不支持“已修复原 crash”。错误终态的直接证据来自确定性回放与回归测试。</p>
+<p>静态检查还包含 Ruff、Python 3.10 mypy、CI 标记、SPDX、禁止导入与 torch.cuda 相关门。它们检查格式、类型或仓库约定，无法代替运行时验证；报告把它们和协议测试并列列出，而没有用静态通过去替代模型结果。</p>
+<h2 id="从评审扩展到图像编辑">从评审扩展到图像编辑</h2>
+<p>第一份 PR 的评审提出把同类问题覆盖到图像编辑基准。于是第二份 #8015 针对 <code>async_request_openai_image_edits_omni</code> 实现同样的终态语义，但没有直接假设两个函数的解析过程完全相同。</p>
+<p>图像编辑流可以先发送 <code>ar_delta</code> 的部分文本，再发送顶层 error，最后结束。它通过 <code>StreamedResponseHandler</code> 从网络字节中切出事件；一次 <code>iter_any()</code> 收到的数据可能包含多个 SSE 事件，不能把网络 chunk 当作协议事件。</p>
+<p>新增回归用例特意把三种事件放在同一段字节中。客户端应依次解析它们，保留 <code>generated_text == "partial"</code>，记录 <code>image generation failed</code>，并将 <code>success</code> 设为 false。这比只发送三个恰好一一对应的网络 chunk，更接近 SSE 解析需要面对的边界。</p>
+<p>补丁仍然很小：增加按流重置的错误状态，识别顶层 error，保留消息，最终从该状态决定成功。没有重写整个图像编辑客户端，也没有顺便修改模型执行。这样评审可以围绕同一个行为合同检查两条路径。</p>
+<p>这次本地环境是 macOS，缺少 vLLM 的 Linux 运行依赖。PR 如实写明完整 pytest 交给仓库 CI，本地完成 test-first 复现、修复后同序列检查及静态门。不能把第一份 PR 的“61 passed”搬到第二份，也不能把“已提交 CI”说成在本机完成了整套测试。</p>
+<h2 id="从输入序列检查状态转移">从输入序列检查状态转移</h2>
+<p>把这次补丁当作状态转移来读，会比只盯着最终一行赋值更清楚。请求开始时还没有看到流内错误；正常内容事件只累积文字、音频或指标，不改变这一事实；错误事件将状态切到“已出错”；随后的正常事件和结束标记都不能恢复成功。终态只在这次响应处理完以后落入输出记录。</p>
+<p>这是一种单向变化。它避免了最后一个事件覆盖之前错误的情况，也让“部分成功”不会被误解为整个请求成功。对于基准客户端，这个选择直接服务于统计语义：生成任务既然声明失败，就不能因为此前已有几个字符而进入成功样本集合。</p>
+<p>不过，状态机解释并不意味着补丁已经定义了所有协议事件。例如，取消、超时、连接中断和 JSON 解析异常本来还有各自处理路径。这次修改针对的是此前被遗漏的顶层 error 事件，不能据此宣称所有失败模式已经统一。范围越清楚，评审者越容易判断是否需要额外回归。</p>
+<p>实现位置也有意义。如果先进入正常输出解析，再在函数末尾搜索错误文本，就可能已经把错误对象误计为 stage 信息，或者只能依靠消息字符串猜测失败。补丁在事件完成 JSON 解析后立即识别类型，让错误终态由结构字段驱动，而不是由自然语言内容驱动。</p>
+<p>测试中的网络边界则属于另一层。一次读取可能只包含半个事件，也可能含多个事件；协议解析器负责还原完整事件，生成状态处理器负责解释事件。图像编辑用例把多个事件合到一段字节，至少确认这两个职责没有依赖“一次网络读取等于一个事件”的偶然条件。</p>
+<h2 id="贡献记录中哪些结果不能合并">贡献记录中哪些结果不能合并</h2>
+<p>两个补丁很相似，但验证记录仍要分别保存。聊天路径有模块测试、真实回放和正常多模态请求检查；图像编辑路径使用自己的回归输入，并受本地运行依赖限制。它们共同证明一个修复思路适用于两条入口，却不是同一套测试运行两次的成绩。</p>
+<p>同样，合并日期说明维护者接受了补丁，不说明作者在此后每一个版本上都重新验证过。博客在十月重新查询了合并状态和实际 diff，这属于公开证据复核；九月的 GPU 实验属于历史执行证据。把核验时间和实验时间分别写出，可以避免读者误以为刚刚完成了整套复现。</p>
+<p>这些细节让文章可以在未来继续更新。如果客户端后来重构，原来的函数名和行号可能改变，但触发条件、错误事件与终态合同仍可用于寻找对应路径。贡献复盘的长期价值在于解释为什么改、如何证明，而不是永久依赖某一行代码的位置。</p>
+<h2 id="小补丁为什么仍然值得单独成文">小补丁为什么仍然值得单独成文</h2>
+<p>两个 PR 的生产代码都只增加了少量行，实际工作却跨越了请求语义、异步事件边界、模态差异和验证环境。代码规模不是工程难度的可靠计数器。最关键的判断是找出错误发生在哪一层，再用最小输入让它稳定出现。</p>
+<p>第一层判断把 HTTP 接受与生成成功分开；第二层把模型 crash 与客户端错误分类分开；第三层把聊天事件和图像编辑事件按各自解析方式验证。少了任何一层，都可能得到一个看似通过、实际上没有保护目标行为的补丁。</p>
+<p>这也解释了为什么修复测量工具和优化模型本身同样值得记录。如果失败请求被当成成功，后续性能优化建立在错误账本上。先让一次请求的终态可信，才能讨论成功请求中的吞吐、延迟和成本。</p>
+<p>但这两份修复没有解决所有 benchmark 问题。部分输出是否进入其他统计、取消请求如何处理、音频或图像产物怎样定义有效，以及未知事件是否应拒绝，都需要各自合同与测试。这篇复盘只对实际提交的错误流行为负责。</p>
+<h2 id="公开证据与后续阅读">公开证据与后续阅读</h2>
+<p>公开记录中，#8000 的提交为 <code>94a1ab3d6f25…</code>，#8015 为 <code>6a3d35327f15…</code>；两者修改同一客户端模块，并分别增加针对性的回归测试。代码、测试、评审及合并状态可从 <a href="https://github.com/vllm-project/vllm-omni/pull/8000/files">聊天流修复</a> 和 <a href="https://github.com/vllm-project/vllm-omni/pull/8015/files">图像编辑流修复</a> 直接核查。</p>
+<p>这类文章与一般“工程经验”的区别，是每个判断都能回到具体触发序列、实现位置和验证结果。可迁移的方法另见 <a href="/2026/10/02/inference-evidence/">推理优化怎样形成可信结论</a>；这里保留的是一次贡献如何从可复现问题走到两个合并补丁的完整过程。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/opensource-streams/">https://leviusspace.top/2026/10/02/opensource-streams/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%BC%80%E6%BA%90%E8%B4%A1%E7%8C%AE/">开源贡献</a><a class="post-meta__tags" href="/tags/vLLM-Omni/">vLLM-Omni</a><a class="post-meta__tags" href="/tags/%E6%80%A7%E8%83%BD%E6%B5%8B%E9%87%8F/">性能测量</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/markdown-word/" title="Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失</div></div></div></a><a class="pagination-related" href="/2026/10/02/infra-topology/" title="八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="opensource">
+<img alt="《两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/opensource-streams.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>⛉ 开源贡献</span><span>VOL. I</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>开源贡献</span><span>流式错误</span></span><span class="book-cover-english">THE VERIFIED STREAM</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/开源贡献/">⛉ 开源贡献 ↗</a><span>第 I 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#问题出在客户端对-成功-的定义"><span class="toc-text">问题出在客户端对“成功”的定义</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#先把模型故障与协议复现拆开"><span class="toc-text">先把模型故障与协议复现拆开</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#聊天路径-一个按尝试重置的错误状态"><span class="toc-text">聊天路径：一个按尝试重置的错误状态</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#回归用例实际覆盖了什么"><span class="toc-text">回归用例实际覆盖了什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#三层验证与各自的环境边界"><span class="toc-text">三层验证与各自的环境边界</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#从评审扩展到图像编辑"><span class="toc-text">从评审扩展到图像编辑</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#从输入序列检查状态转移"><span class="toc-text">从输入序列检查状态转移</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#贡献记录中哪些结果不能合并"><span class="toc-text">贡献记录中哪些结果不能合并</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#小补丁为什么仍然值得单独成文"><span class="toc-text">小补丁为什么仍然值得单独成文</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#公开证据与后续阅读"><span class="toc-text">公开证据与后续阅读</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

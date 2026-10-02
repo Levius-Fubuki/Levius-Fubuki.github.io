@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证 | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="完整拆解 MoE 双流、视觉 QKV/RoPE 融合与投机验证的契约、代码和回归门。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/02/infra-operators/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="完整拆解 MoE 双流、视觉 QKV/RoPE 融合与投机验证的契约、代码和回归门。" property="og:description"/>
+<meta content="zh_CN" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/infra-operators.png" property="og:image"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/infra-operators.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/infra-operators/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F's Blog" type="application/atom+xml"/>
+<link href="/css/home.css" rel="stylesheet"/><link href="/css/katex/katex.min.css" rel="stylesheet"/><link href="/css/inner-pages.css" rel="stylesheet"/><link href="/css/book-library.css" rel="stylesheet"/><script defer="" src="/js/home.js"></script><script defer="" src="/js/inner-pages.js"></script><script defer="" src="/js/book-library.js"></script><meta content="AI Infra" property="article:tag"/><meta content="算子优化" property="article:tag"/><meta content="投机解码" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">跳到正文</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F's Blog 首页" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="展开导航" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="主导航" class="main-nav" id="main-nav">
+<a href="/#profile">首页</a>
+<a href="/#articles">文章</a>
+<a aria-current="page" href="/archives/">归档</a>
+<a href="/Gallery/">画廊</a>
+<button class="search-open" hidden="">搜索</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="当前位置" class="breadcrumbs"><a href="/#profile">主页</a><span>/</span><a href="/archives/">文章档案</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/AI-Infra/">AI Infra</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">专注阅读</button><button class="copy-page" type="button">复制链接</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="infra-operators">AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</h1>
+<p>这篇笔记沿着三种不同优化阅读源码：双流调整执行依赖，RoPE 融合减少中间数据物化，投机解码改变一次验证后可以提交的 token 数。材料来自 8×RTX 5090 学习包和对应 Codex 逐算子学习记录；以下历史实验由参考材料提供，不将整包实现归为我的原创，也不把它们写成 GR308 成绩。</p>
+<p>学习时应先固定张量契约，再画依赖，最后看候选在真实服务路径上是否通过验收。三个主题因此保留各自的输入形状、测量口径与拒绝条件。QKV/RoPE 的 kernel 实现体未随学习包提供，文中融合内部数据流是依据调用契约的推断，不能当作逐行源码复现。</p>
+<h2 id="qwen3-6-moe-router-first-dual-stream-学习笔记">Qwen3.6 MoE Router-First Dual Stream 学习笔记</h2>
+<h3 id="1-结论">1. 结论</h3>
+<p>该优化没有改变 MoE 数学计算，也没有新增计算 kernel。它把 routed experts 放到当前主 CUDA stream，把 shared expert 放到 alternate stream，从而改变两条独立工作流的调度顺序和临界路径。</p>
+<p>在固定 <code>4×TP2、NUMA-local、NCCL auto、decode Graph、Triton linear attention</code> 的强基线上，严格 A-B-B-A 结果为：</p>
+<pre><code class="language-text">aggregate output tok/s：3904.68 → 3990.23，+2.19%
+C1 TPOT P50：4.2609 → 4.2058 ms，-1.29%
+C1 TPOT P99：4.482 → 4.351 ms，-2.91%
+</code></pre>
+<p>该候选只在 Qwen3.6 的精确 MoE geometry 下开启。</p>
+<h3 id="2-模型结构背景">2. 模型结构背景</h3>
+<p>Qwen3.6-35B-A3B-FP8 的关键结构：</p>
+<pre><code class="language-text">40 层
+30 层 GDN + 10 层 full attention
+hidden size = 2048
+routed experts = 256
+每 token TopK = 8
+另有 shared expert
+生产拓扑 = 4 个 TP2 replica
+</code></pre>
+<p>每个 MoE block 有两条相对独立的分支：</p>
+<pre><code class="language-text">hidden states
+   ├─ router / TopK → routed experts ─┐
+   └─ shared expert ──────────────────┤
+                                     ▼
+                                   combine
+</code></pre>
+<p>两条分支读取同一份输入，分别产生输出，最终再组合。因此它们具备并行执行的基础。</p>
+<h3 id="3-候选源码">3. 候选源码</h3>
+<p>新增构造参数：</p>
+<pre><code class="language-python">prefer_router_on_main_stream: bool = False
+</code></pre>
+<p>候选分支：</p>
+<pre><code class="language-python">current_stream = torch.cuda.current_stream()
+self.alt_stream.wait_stream(current_stream)
+
+with torch.cuda.stream(self.alt_stream):
+    shared_output = self._forward_shared_experts(
+        hidden_states.clone(),
+        apply_gate=not use_fused_gate,
+    )
+
+router_output = self._forward_router_experts(hidden_states)
+
+current_stream.wait_stream(self.alt_stream)
+return router_output, shared_output
+</code></pre>
+<h3 id="4-stream-依赖关系">4. Stream 依赖关系</h3>
+<p>第一处同步：</p>
+<pre><code class="language-python">self.alt_stream.wait_stream(current_stream)
+</code></pre>
+<p>含义是：alternate stream 在读取 <code>hidden_states</code> 前，等待主 stream 上此前产生输入的工作完成。它向 GPU stream 插入依赖，不是让 CPU 同步等待。</p>
+<p>随后两条分支并行排队：</p>
+<pre><code class="language-text">main stream： routed experts ───────────────┐
+                                            ├─ join → downstream
+alt stream ： shared expert ────────────────┘
+</code></pre>
+<p>第二处同步：</p>
+<pre><code class="language-python">current_stream.wait_stream(self.alt_stream)
+</code></pre>
+<p>含义是：主 stream 的后续工作必须等 shared expert 完成。函数返回后，下游 combine 可以安全读取两份输出。</p>
+<p>完整 happens-before 关系：</p>
+<pre><code class="language-text">上游产生 hidden states
+          │
+          ├─────────────┐
+          ▼             ▼
+ routed experts    shared expert
+          │             │
+          └──────┬──────┘
+                 ▼
+               combine
+</code></pre>
+<h3 id="5-为什么-router-first-可能更快">5. 为什么 router-first 可能更快</h3>
+<p>原先的双流方向是：</p>
+<pre><code class="language-text">main stream：shared expert
+alt stream ：routed experts
+</code></pre>
+<p>候选方向是：</p>
+<pre><code class="language-text">main stream：routed experts
+alt stream ：shared expert
+</code></pre>
+<p>Routed 分支通常包含 router、TopK、多个 expert 的计算以及相关 TP/调度工作，临界路径更长、更复杂。把它留在主 stream，可减少它与主执行链、CUDA Graph 和后续通信调度之间的额外制约；较短的 shared 分支放在 alternate stream 作为被覆盖的支路。</p>
+<p>但“更长分支放主 stream”不是通用定律。实际效果还取决于：</p>
+<ul>
+<li>routed/shared expert 的计算量比例；</li>
+<li>token 数和 TopK；</li>
+<li>TP/EP geometry；</li>
+<li>两条分支的 SM、带宽和 workspace 竞争；</li>
+<li>CUDA stream 优先级；</li>
+<li>Graph 捕获后的调度 DAG；</li>
+<li>下游 combine 和 collective 的依赖位置。</li>
+</ul>
+<p>因此报告只在精确 geometry 下保留。</p>
+<h3 id="6-为什么数学结果不变">6. 为什么数学结果不变</h3>
+<p>优化前后仍计算相同的两个函数：</p>
+<pre><code class="language-text">router_output = routed_experts(hidden_states)
+shared_output = shared_expert(hidden_states)
+</code></pre>
+<p>变化的是二者被 enqueue 到哪个 stream，不是权重、TopK、激活函数或 combine 公式。</p>
+<p>正确性的必要条件：</p>
+<ol>
+<li>两个分支不能对同一个输入或输出发生冲突写入；</li>
+<li>alternate stream 读取输入前必须等待输入生产完成；</li>
+<li>下游读取 shared output 前，主 stream 必须等待 alternate stream；</li>
+<li>tensor 生命周期必须覆盖两个 stream 的使用期；</li>
+<li>CUDA Graph capture/replay 中依赖和地址必须稳定。</li>
+</ol>
+<p><code>hidden_states.clone()</code> 给 shared 分支独立输入存储，可避免 shared 路径中的潜在原地操作或别名影响 routed 分支。由于 clone 在 alternate stream 中执行，它也受到前置 <code>alt.wait_stream(main)</code> 的保护。</p>
+<h3 id="7-geometry-gate">7. Geometry gate</h3>
+<p>环境变量：</p>
+<pre><code class="language-text">SGLANG_QWEN36_SWAP_MOE_DUAL_STREAM=1
+</code></pre>
+<p>不会直接无条件启用候选，而是经过：</p>
+<pre><code class="language-python">def _qwen36_swap_moe_dual_stream_covered(config):
+    return (
+        _qwen36_swap_moe_dual_stream
+        and _qwen36_exact_moe_layout(config)
+    )
+</code></pre>
+<p>当前 bundle 没有展开 <code>_qwen36_exact_moe_layout()</code> 的完整函数体，但报告明确其目标是只覆盖 Qwen3.6 的精确 expert/TP/hidden/layer geometry。</p>
+<p>这是 fail-closed 设计：环境变量只表达“请求启用”，模型结构 gate 决定“是否允许启用”。</p>
+<h3 id="8-a-b-b-a-单变量实验">8. A-B-B-A 单变量实验</h3>
+<p>顺序：</p>
+<pre><code class="language-text">A1：baseline
+B1：router-first
+B2：router-first
+A2：baseline
+</code></pre>
+<p>唯一变化的变量：</p>
+<pre><code class="language-bash">SGLANG_QWEN36_SWAP_MOE_DUAL_STREAM=0/1
+</code></pre>
+<p>其他候选明确关闭：</p>
+<pre><code class="language-text">Qwen vision QKV/RoPE fusion = 0
+GDN corrected merge = 0
+CUDA shared expert fusion = 0
+disable dual stream = 0
+</code></pre>
+<p>固定实验条件：</p>
+<pre><code class="language-text">profile = qwen36-fp8
+layout = 4×TP2
+Graph = on
+linear attention decode backend = Triton
+aggregate prompts = 32
+C1 prompts = 8
+input/output = 128 → 128
+CPU offload = 关闭
+</code></pre>
+<p>整个 bracket 持有同一个 GPU lock，避免其他实验插入 A-B-B-A 中间。</p>
+<h3 id="9-summarizer-审计">9. Summarizer 审计</h3>
+<p>Summarizer 不只计算性能，还检查实验身份：</p>
+<pre><code class="language-text">profile/scope
+主模型源码 SHA-256
+qwen2_moe.py 支持源码 SHA-256
+4×TP2 + Graph-on
+四个 replica
+无 offload 参数
+prefill/decode 均为 Triton
+运行时 layout audit
+四个 server 日志
+候选日志 marker
+生成文本 SHA-256
+</code></pre>
+<p>候选日志必须出现：</p>
+<pre><code class="language-text">Qwen3.6 MoE router-first dual-stream candidate active:
+routed experts on main stream, shared expert on alternate stream.
+</code></pre>
+<p>A 组不能出现 marker，B 组四个 replica 必须全部出现 marker。这样可以防止“设置了环境变量，但候选因 gate/fallback 没真正运行”的假阳性。</p>
+<h3 id="10-keep-gate">10. Keep gate</h3>
+<p>最终保留条件：</p>
+<pre><code class="language-python">keep = (
+    generated_text_equal
+    and output_speedup &gt;= 1.01
+    and candidate_c1_tpot_p99
+        &lt;= baseline_c1_tpot_p99 * 1.05
+)
+</code></pre>
+<p>即：</p>
+<pre><code class="language-text">所有 A/B 输出摘要一致；
+aggregate output throughput 至少提升 1%；
+C1 TPOT P99 退化不超过 5%。
+</code></pre>
+<p>测试还显式验证：输出摘要不同、P99 超限或候选 marker 缺失时必须拒绝或 fail closed。</p>
+<h3 id="11-源码入口">11. 源码入口</h3>
+<ul>
+<li>候选补丁：<code>qwen36_moe_router_first_remote.patch</code>（学习包文件）</li>
+<li>A-B-B-A 队列：<code>qwen36_shared_expert_ab_queue.sh</code>（学习包文件）</li>
+<li>Summarizer：<code>qwen36_shared_expert_ab_summarize.py</code>（学习包文件）</li>
+<li>合同测试：<code>test_qwen36_shared_expert_ab_summarize.py</code>（学习包文件）</li>
+</ul>
+<h3 id="12-记忆卡">12. 记忆卡</h3>
+<pre><code class="language-text">类型：调度型算子优化，不是新数学 kernel
+主 stream：routed experts
+alternate stream：shared expert
+开始依赖：alt.wait_stream(main)
+结束依赖：main.wait_stream(alt)
+正确性：两分支数学不变，join 后再读取
+保护：环境变量 + exact geometry gate
+证据：强 Graph 基线上的严格 A-B-B-A
+收益：throughput +2.19%，C1 TPOT P99 -2.91%
+</code></pre>
+<h2 id="qwen3-vl-qkv-rope-fusion-学习笔记">Qwen3-VL QKV/RoPE Fusion 学习笔记</h2>
+<h3 id="1-结论-2">1. 结论</h3>
+<p>该算子把视觉注意力中的以下操作融合起来：</p>
+<pre><code class="language-text">QKV 拆分
+→ Q/K/V reshape 与连续布局整理
+→ Q/K 的 NeoX RoPE
+→ 直接写出最终 Q、K、V
+</code></pre>
+<p>融合的主要价值是减少中间张量、显存重复读写和 kernel launch。它不会消除最终 Q、K、V 的输出写入，也不会优化整个视觉编码器的所有阶段。</p>
+<p>在最终 <code>2×TP4 + CPU feature transport + DP encoder + Graph</code> 路径上，严格 A-B-B-A 的 aggregate output throughput 为：</p>
+<pre><code class="language-text">76.702 → 77.772 output tok/s，+1.40%
+</code></pre>
+<p>TTFT P50 降低约 1.69%，因此在该精确部署路径上保留。</p>
+<h3 id="2-输入输出契约">2. 输入输出契约</h3>
+<p>真实 shape gate 默认使用：</p>
+<pre><code class="language-text">tokens   = 1024 / 4096 / 16384
+heads    = 16
+head_dim = 72
+</code></pre>
+<p>输入：</p>
+<pre><code class="language-text">qkv: [1, T, 3 × 16 × 72] = [1, T, 3456]，BF16
+cos: [T, 36]，FP32
+sin: [T, 36]，FP32
+</code></pre>
+<p>输出：</p>
+<pre><code class="language-text">Q': [T, 16, 72]，已应用 RoPE
+K': [T, 16, 72]，已应用 RoPE
+V : [T, 16, 72]，只完成拆分和布局整理
+</code></pre>
+<p>调用接口：</p>
+<pre><code class="language-python">q, k, v = fused_qkv_split_rope(qkv, cos, sin, heads, head_dim)
+</code></pre>
+<h3 id="3-baseline-数据流">3. Baseline 数据流</h3>
+<p>基线实现：</p>
+<pre><code class="language-python">q, k, v = qkv.split([heads * head_dim] * 3, dim=-1)
+q = q.reshape(-1, heads, head_dim).contiguous()
+k = k.reshape(-1, heads, head_dim).contiguous()
+v = v.reshape(-1, heads, head_dim).contiguous()
+
+if cos.shape[-1] * 2 == head_dim:
+    cos = torch.cat([cos, cos], dim=-1)
+    sin = torch.cat([sin, sin], dim=-1)
+
+q, k = apply_rotary_pos_emb_native_eager(q, k, cos, sin)
+</code></pre>
+<p><code>split()</code> 通常只产生 view，但 Q、K、V 仍继承原始 QKV 的行跨度。后续 <code>.contiguous()</code> 会真正分配和写入连续的 Q、K、V。</p>
+<p>基线近似数据流：</p>
+<pre><code class="language-text">QKV
+ ├─ 读取并写出 contiguous Q
+ ├─ 读取并写出 contiguous K
+ ├─ 读取并写出 contiguous V
+ ├─ 物化扩展后的 cos
+ ├─ 物化扩展后的 sin
+ └─ RoPE 再次读取 Q/K，并写出旋转后的 Q'/K'
+</code></pre>
+<h3 id="4-neox-rope-数学">4. NeoX RoPE 数学</h3>
+<p>对于一个 <code>head_dim=72</code> 的向量，将其分为两个 36 维半区：</p>
+<pre><code class="language-text">x = [x_left | x_right]
+</code></pre>
+<p>NeoX 风格旋转：</p>
+<pre><code class="language-text">rotate_half(x) = [-x_right | x_left]
+x_rope = x × cos + rotate_half(x) × sin
+</code></pre>
+<p>等价的逐元素形式：</p>
+<pre><code class="language-text">x_left'  = x_left × cos - x_right × sin
+x_right' = x_right × cos + x_left  × sin
+</code></pre>
+<p>该操作分别应用于 Q 和 K，V 不旋转。</p>
+<h3 id="5-融合后的预期数据流">5. 融合后的预期数据流</h3>
+<p>当前学习 bundle 没有保存 <code>qwen3_vl_qkv_rope.py</code> 的 kernel 实现体，因此下面是根据调用接口、baseline 和候选名称得到的实现级推断：</p>
+<pre><code class="language-text">读取 row-major QKV 与半宽 cos/sin
+→ 在寄存器中定位 Q/K/V 和 head 内维度
+→ 在寄存器中计算 Q/K 的 NeoX RoPE
+→ 直接写出最终 Q'/K'/V
+</code></pre>
+<p>它可以避免：</p>
+<ul>
+<li>单独物化连续 Q/K 中间结果；</li>
+<li>显式生成 <code>[T, 72]</code> 的 cos/sin；</li>
+<li>RoPE 重新读取刚写出的 Q/K；</li>
+<li>多个独立 PyTorch/CUDA kernel launch。</li>
+</ul>
+<h3 id="6-正确性-gate">6. 正确性 gate</h3>
+<p>Gate 固定随机种子，并对 Q、K、V 三个输出逐一比较：</p>
+<pre><code class="language-python">torch.manual_seed(20260825)
+
+torch.testing.assert_close(
+    got,
+    expected,
+    rtol=1e-2,
+    atol=2e-2,
+)
+</code></pre>
+<p>同时记录：</p>
+<pre><code class="language-text">max_abs：发现局部索引、半区映射、符号或尾部 mask 错误
+mean_abs：发现整体数值的系统性偏移
+</code></pre>
+<p>当前 gate 的重点是报告对应的真实 geometry，而不是证明该算子支持所有 shape。若扩展为通用算子，还应增加 batch、非 2 次幂 token、不同 heads/head_dim、非连续输入、真实 cos/sin、NaN/Inf 和 CUDA Graph capture 测试。</p>
+<h3 id="7-microbenchmark">7. Microbenchmark</h3>
+<p>计时方法：</p>
+<pre><code class="language-text">warmup 20 次
+→ CUDA synchronize
+→ CUDA Event 重复计时 100 次
+→ 使用中位数
+</code></pre>
+<p>Microbenchmark 只能说明该 exact-shape 算子调用更快，不能直接作为模型 E2E 收益。</p>
+<h3 id="8-e2e-a-b-b-a">8. E2E A-B-B-A</h3>
+<p>实验顺序：</p>
+<pre><code class="language-text">A1：关闭融合
+B1：开启融合
+B2：开启融合
+A2：关闭融合
+</code></pre>
+<p>开关：</p>
+<pre><code class="language-bash">SGLANG_QWEN_VIT_FUSED_QKV_ROPE=0/1
+</code></pre>
+<p>固定条件包括：</p>
+<pre><code class="language-text">layout = 2×TP4
+Graph = on
+aggregate prompts = 32
+C1 prompts = 8
+input/output = 128 → 64
+</code></pre>
+<p>Summarizer 的保留条件：</p>
+<pre><code class="language-text">日志确认融合路径实际命中；
+aggregate output throughput 至少提升 1%；
+C1 TPOT P99 退化不超过 5%。
+</code></pre>
+<p>日志命中检查很重要：只设置环境变量并不能证明候选算子真正执行，shape/backend 不支持时可能发生 fallback。</p>
+<h3 id="9-为什么-e2e-只有-1-40">9. 为什么 E2E 只有 +1.40%</h3>
+<p>完整 Qwen3-VL 请求还包括：</p>
+<pre><code class="language-text">图片预处理
+→ patch embedding
+→ 多层 ViT attention/MLP
+→ 视觉特征传输
+→ language prefill
+→ language decode
+→ TP collective
+</code></pre>
+<p>QKV/RoPE fusion 只覆盖视觉链路中的一个局部阶段。即使局部 kernel 加速明显，最终收益仍受该阶段在总延迟中占比限制，即 Amdahl 定律。</p>
+<h3 id="10-源码入口">10. 源码入口</h3>
+<ul>
+<li>Gate：<code>qwen_vit_qkv_rope_gate.py</code>（学习包文件）</li>
+<li>A-B-B-A 队列：<code>qwen_vit_fusion_ab_queue.sh</code>（学习包文件）</li>
+<li>汇总与 keep gate：<code>qwen_vit_fusion_ab_summarize.py</code>（学习包文件）</li>
+<li>E2E runner：<code>qwen_vit_fusion_e2e_runner.py</code>（学习包文件）</li>
+</ul>
+<h3 id="11-记忆卡">11. 记忆卡</h3>
+<pre><code class="language-text">融合对象：QKV split + contiguous/layout + Q/K NeoX RoPE
+核心收益：减少中间张量、显存读写和 launch
+真实 shape：H=16，D=72，T=1024/4096/16384
+正确性：Q/K/V 全量 assert_close
+实验方法：最终 topology 上 A-B-B-A
+模型收益：+1.40%，TTFT P50 -1.69%
+证据边界：不能与通信拓扑的 1.932× 直接相乘
+</code></pre>
+<h2 id="投机解码-提出候选-验证与提交">投机解码：提出候选、验证与提交</h2>
+<p>下面的连续匹配伪代码描述 greedy 合同。随机采样的无损验证还涉及接受概率与拒绝后的分布修正，不能仅用 token 相等条件代替。全候选接受时的额外 token 来自 target 的下一位置；首次不匹配时由 target 给出纠正 token。</p>
+<h3 id="1-总体机制">1. 总体机制</h3>
+<p>投机解码使用较便宜的 draft 一次提出多个候选 token，再由完整 target 一次并行验证：</p>
+<pre><code class="language-text">draft 生成候选块
+→ target 并行 verify
+→ 接受从左到右连续匹配的前缀
+→ 追加一个 target bonus token
+→ 更新 target/draft KV Cache
+</code></pre>
+<p>正确实现不会直接提交未经 target 验证的 draft token。</p>
+<h3 id="2-两条实验线">2. 两条实验线</h3>
+<h4>EAGLE</h4>
+<p>Qwen3.6 实验配置：</p>
+<pre><code class="language-text">algorithm = EAGLE
+num_steps = 3
+topk = 1
+num_draft_tokens = 4
+draft attention = Triton
+</code></pre>
+<p><code>topk=1</code> 表示生成线性候选链，不构造分叉 token tree。</p>
+<p>结果：</p>
+<pre><code class="language-text">aggregate output tok/s：3808.20 → 3915.29，+2.81%
+C1 TPOT P50：4.2155 → 2.3030 ms，基线约为候选的 1.83 倍
+C1 TTFT P50：66.91 → 78.18 ms，退化约 16.8%
+</code></pre>
+<p>输出摘要未通过严格一致性 gate，因此 <code>keep=false</code>。当前只能作为低延迟候选。</p>
+<h4>DFlash2</h4>
+<p>DFlash2 draft 没有自己的 embedding 和 lm_head：</p>
+<pre><code class="language-text">target embedding
+→ DFlash2 draft hidden states
+→ 复用 target lm_head 选择候选 token
+→ target verify
+</code></pre>
+<p>在 TP 环境中，每个 rank 先取本地 TopK，然后只 AllGather <code>TP × K</code> 个候选分数和 ID，再做全局 TopK，避免聚合完整 vocabulary logits。</p>
+<p>结果：</p>
+<pre><code class="language-text">C1 TPOT P50：12.8667 → 3.8852 ms，基线约为候选的 3.31 倍
+接受长度中位数：约 3.034
+C32 output tok/s：1011.77 → 782.89，退化 22.6%
+C1 TTFT P50：退化约 5.7%
+</code></pre>
+<p>因此 DFlash2 更适合作为低并发 latency lane，不适合作为 C32 吞吐默认。</p>
+<h3 id="3-dflash2-关键源码结构">3. DFlash2 关键源码结构</h3>
+<h4>Draft model</h4>
+<pre><code class="language-text">target 多层 hidden states
+→ concat
+→ fc
+→ RMSNorm
+→ draft transformer layers
+→ candidate hidden states
+</code></pre>
+<p>Draft forward 返回 hidden states，不直接返回 logits。</p>
+<h4>Candidate selector</h4>
+<p>每个位置先产生 K 个基础候选，然后根据 token 自身分数与相邻候选转移分数选择一条候选路径：</p>
+<pre><code class="language-text">score = unary logit + context-conditioned transition score
+</code></pre>
+<h4>Verify and commit</h4>
+<p>Greedy 验证从左到右比较：</p>
+<pre><code class="language-python">accept_len = 0
+for i in range(num_draft_tokens):
+    if draft[i] == target[i]:
+        accept_len += 1
+    else:
+        break
+</code></pre>
+<p>提交长度：</p>
+<pre><code class="language-text">commit_len = accept_len + 1
+</code></pre>
+<p>额外的 1 是 target 在第一个不匹配位置提供的 bonus token。因此即使 draft 第一个 token 就失败，每轮仍至少前进一个正确 token。</p>
+<h4>KV Cache</h4>
+<p>Verify 完成后，只能将已提交位置对应的 target hidden states 写入 draft KV Cache。被拒绝的候选不能留在缓存中，否则后续生成会使用错误上下文。</p>
+<h3 id="4-验收指标">4. 验收指标</h3>
+<p>投机解码不能只看 TPOT，还要同时检查：</p>
+<pre><code class="language-text">accept length
+aggregate throughput
+C1 TPOT P50/P99
+TTFT
+输出正确性
+greedy 与 stochastic sampling 的不同合同
+</code></pre>
+<p>随机 sampling 下输出摘要不同不一定代表错误，但成为默认配置前必须补充 greedy 条件下的确定性一致性 gate。</p>
+<h3 id="5-关键源码入口">5. 关键源码入口</h3>
+<ul>
+<li>DFlash draft model：<code>dflash.py</code>（学习包文件）</li>
+<li>DFlash worker：<code>dflash_worker_v2.py</code>（学习包文件）</li>
+<li>Accept/prepare Triton kernel：<code>dflash.py</code>（学习包文件）</li>
+<li>EAGLE 实验队列：<code>qwen36_spec_decode_ab_queue.sh</code>（学习包文件）</li>
+<li>EAGLE 汇总 gate：<code>qwen36_spec_decode_ab_summarize.py</code>（学习包文件）</li>
+</ul>
+<h2 id="把三种优化放回同一条服务路径">把三种优化放回同一条服务路径</h2>
+<p>双流优化主要改变关键路径，融合主要改变数据搬运，投机解码主要改变验证与提交比例。三者都可能在某个局部指标上获益，却在整体服务中被资源竞争、首 token 等待或错误状态抵消。不能将各自的单点倍率相乘。</p>
+<p>这里的 gate 是实验预设的选择条件，不是全形状、全采样分布的证明。输出摘要一致支持当前输入和执行配置；未提供的 kernel 源码、未测的 dtype 与未覆盖的并发仍是边界。系统层配置与拓扑背景见 <a href="/2026/10/02/infra-topology/">八卡推理系统学习笔记</a>。公开框架入口为 <a href="https://github.com/sgl-project/sglang">SGLang</a>，文中源码文件名对应保存于本地的历史学习包，不能假设上游 main 仍是相同实现。</p>
+<h2 id="按输入契约手算一次正确性检查">按输入契约手算一次正确性检查</h2>
+<p>以视觉 QKV 为例，一个 token 的最后一维先排 Q，再排 K，再排 V。每段又含多个 head，每个 head 内是旋转前的通道。如果融合实现只保证输出元素总数相同，却把 head 和 token 的顺序交换，后续矩阵乘仍可能接受这个张量，最终结果却已经改变。因而 shape、stride、元素映射和 dtype 都属于契约。</p>
+<p>NeoX 旋转把一个 head 的前半与后半配对。可以用四维玩具向量理解：先取前两个数和后两个数，后半取负后放到前面，前半移到后面，再分别乘正弦和余弦。若改成相邻两个元素配对，得到的是另一种布局合同，即使公式也叫 RoPE，仍不能互换。真实算子检查因此必须覆盖所有位置，而不能只打印头几个数。</p>
+<p>误差门还要同时保存绝对误差与参考幅值。相对误差在参考值接近零时可能放大，绝对容差则可能掩盖大幅值处的比例偏移。学习包同时使用相对与绝对容差，并记录最大值与平均值，正是为了让极端索引错误和整体数值偏移都有机会被看见。通过这些检查依然只覆盖当前几何形状，不能把未测试的非连续输入自动列为支持。</p>
+<p>双流例子关注的则是时间契约。同一个输入 tensor 可以被两条流读取，但输入生产必须先完成；两份输出可以分别计算，但 combine 必须等两边都完成。两个 wait 分别位于分叉之前与汇合之前，作用不同。将第二个 wait 提前到分叉处会让两条支路失去重叠，完全删除它又可能产生读写竞争。</p>
+<p>这里的 clone 也不是免费操作。它增加内存读写，却可以隔离潜在原地写入或别名关系。是否能安全去掉，要检查真实子函数的写行为、生命周期与图捕获约束，不能因为数学上两条分支独立就直接删除。调度优化最终仍受共享执行资源约束：两条流表示允许并发，不保证硬件一定同时执行。</p>
+<p>投机验证再增加了序列契约。假设草稿提出三个 token，前两个与 target 一致，第三个不一致，本轮只能提交前两个和 target 在第三个位置的纠正结果。被拒绝位置之后的候选既不能出现在输出里，也不能残留为下一轮可见缓存。若全接受，额外 token 则来自 target 对下一位置的预测，不能把两种情况混成同一个数组索引。</p>
+<p>这三种合同分别落在空间、时间和序列上。优化代码有时只改几行，却可能破坏其中任意一层。阅读源码时，先找输入何时有效、输出采用什么布局、哪些状态允许提交，再去看计时结果，可以更快理解为什么某个候选必须受精确 shape 或并发条件限制。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/02/infra-operators/">https://leviusspace.top/2026/10/02/infra-operators/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/AI%20Infra/">AI Infra</a><a class="post-meta__tags" href="/tags/%E7%AE%97%E5%AD%90%E4%BC%98%E5%8C%96/">算子优化</a><a class="post-meta__tags" href="/tags/%E6%8A%95%E6%9C%BA%E8%A7%A3%E7%A0%81/">投机解码</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/02/infra-topology/" title="八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态"><div class="info"><div class="info-1"><div class="info-item-1">较新一篇</div><div class="info-item-2">八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态</div></div></div></a><a class="pagination-related" href="/2026/10/02/amd-architecture/" title="AMD GPU 架构笔记：从 Wavefront 到大模型性能分析"><div class="info"><div class="info-1"><div class="info-item-1">较早一篇</div><div class="info-item-2">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="本篇封面" class="article-book">
+<span class="book-cover" data-collection="infra">
+<img alt="《AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证》暗黑中世纪插画封面" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/infra-operators.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>✣ AI Infra</span><span>VOL. II</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>算子学习</span><span>依赖与契约</span></span><span class="book-cover-english">THE THREE MECHANISMS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/AI-Infra/">✣ AI Infra ↗</a><span>第 II 卷</span></div>
+</section><details class="contents-panel" open=""><summary>文章目录 <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#qwen3-6-moe-router-first-dual-stream-学习笔记"><span class="toc-text">Qwen3.6 MoE Router-First Dual Stream 学习笔记</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-结论"><span class="toc-text">1. 结论</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-模型结构背景"><span class="toc-text">2. 模型结构背景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-候选源码"><span class="toc-text">3. 候选源码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-stream-依赖关系"><span class="toc-text">4. Stream 依赖关系</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-为什么-router-first-可能更快"><span class="toc-text">5. 为什么 router-first 可能更快</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-为什么数学结果不变"><span class="toc-text">6. 为什么数学结果不变</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-geometry-gate"><span class="toc-text">7. Geometry gate</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-a-b-b-a-单变量实验"><span class="toc-text">8. A-B-B-A 单变量实验</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-summarizer-审计"><span class="toc-text">9. Summarizer 审计</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-keep-gate"><span class="toc-text">10. Keep gate</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-源码入口"><span class="toc-text">11. 源码入口</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-记忆卡"><span class="toc-text">12. 记忆卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#qwen3-vl-qkv-rope-fusion-学习笔记"><span class="toc-text">Qwen3-VL QKV/RoPE Fusion 学习笔记</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-结论-2"><span class="toc-text">1. 结论</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-输入输出契约"><span class="toc-text">2. 输入输出契约</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-baseline-数据流"><span class="toc-text">3. Baseline 数据流</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-neox-rope-数学"><span class="toc-text">4. NeoX RoPE 数学</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-融合后的预期数据流"><span class="toc-text">5. 融合后的预期数据流</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-正确性-gate"><span class="toc-text">6. 正确性 gate</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-microbenchmark"><span class="toc-text">7. Microbenchmark</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-e2e-a-b-b-a"><span class="toc-text">8. E2E A-B-B-A</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-为什么-e2e-只有-1-40"><span class="toc-text">9. 为什么 E2E 只有 +1.40%</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-源码入口"><span class="toc-text">10. 源码入口</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-记忆卡"><span class="toc-text">11. 记忆卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#投机解码-提出候选-验证与提交"><span class="toc-text">投机解码：提出候选、验证与提交</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#1-总体机制"><span class="toc-text">1. 总体机制</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-两条实验线"><span class="toc-text">2. 两条实验线</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-dflash2-关键源码结构"><span class="toc-text">3. DFlash2 关键源码结构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-验收指标"><span class="toc-text">4. 验收指标</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-关键源码入口"><span class="toc-text">5. 关键源码入口</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#把三种优化放回同一条服务路径"><span class="toc-text">把三种优化放回同一条服务路径</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#按输入契约手算一次正确性检查"><span class="toc-text">按输入契约手算一次正确性检查</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>把想法写进代码。
+        </p>
+<div class="footer-links">
+<a href="/archives/">全部文章</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">搜索文章</h2>
+<button aria-label="关闭搜索" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">文章关键词</span><input autocomplete="off" id="search-input" placeholder="搜索标题或正文，例如 Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        输入关键词，查找学习笔记。
+      </p>
+<ul aria-label="搜索结果" id="search-results"></ul>
+<div class="search-footer">
+<span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+</div>
+</dialog><button aria-label="回到顶部" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>
