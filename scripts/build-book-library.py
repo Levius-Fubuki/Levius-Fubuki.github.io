@@ -23,3 +23,7 @@ if '/js/collection-reader.js' not in text:
     text = text.replace('<script src="/js/book-library.js"', '<script src="/js/collection-reader.js" defer></script>\n<script src="/js/book-library.js"')
 page.write_text(text)
 print('Homepage: opening title, collection cabinet and article volumes updated.')
+
+# Keep regenerated public UI and metadata in English.
+import subprocess as _localize_subprocess
+_localize_subprocess.run(["python3", str(ROOT / "scripts/localize-english.py")], check=True)

@@ -1,6 +1,6 @@
 const {chromium} = require('playwright');
 const fs = require('node:fs');
-const data = JSON.parse(fs.readFileSync('data/book-library.json', 'utf8'));
+const data = JSON.parse(fs.readFileSync('data/book-library.en.json', 'utf8'));
 const base = 'http://127.0.0.1:4173';
 const out = 'docs/design/book-library';
 
@@ -92,7 +92,7 @@ const out = 'docs/design/book-library';
     check('deep learning stays a large-model branch', await branch.evaluate(node => node.closest('[data-collection]').dataset.collection === 'llm'));
     await screenshot({path:out+'/collections-desktop.png',fullPage:true});
     await branch.click();
-    check('branch routes to deep-learning volume', await page.locator('.has-book-preview').count() === 1 && (await page.locator('.article-sort-item-title').innerText()) === '深度学习基础');
+    check('branch routes to deep-learning volume', await page.locator('.has-book-preview').count() === 1 && (await page.locator('.article-sort-item-title').innerText()) === 'Deep Learning Fundamentals');
 
     for(const width of [390,320]) {
       await page.setViewportSize({width,height:844});

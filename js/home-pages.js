@@ -3,7 +3,7 @@
   const main=document.querySelector('.site-shell main');
   if(!main)return;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  const ids=['welcome','profile','terminal','articles'],labels=['开场','个人介绍','站内终端','文章索引'];
+  const ids=['welcome','profile','terminal','articles'],labels=['Welcome','Profile','Terminal','Articles'];
   const panels=ids.map(id=>{
     const section=document.getElementById(id),panel=document.createElement('section'),body=document.createElement('div');
     panel.className='page-panel';panel.dataset.page=id;panel.setAttribute('aria-label',labels[ids.indexOf(id)]);
@@ -11,14 +11,14 @@
   });
   panels[3].firstElementChild.append(document.querySelector('.site-footer'));
   main.classList.add('page-stack');document.documentElement.classList.add('paged-home');
-  const position=document.createElement('nav');position.className='page-position';position.setAttribute('aria-label','版面导航');
+  const position=document.createElement('nav');position.className='page-position';position.setAttribute('aria-label','Page navigation');
   const counter=document.createElement('span'),dots=document.createElement('div');dots.className='page-dots';position.append(counter,dots);document.body.append(position);
   let index=0,moving=false,scrollFrame=0,lastWheel=0,latched=false,wheelTotal=0,touch=null;
   const animated=()=>!reduced.matches&&window.LeviusMotion?.getState().enabled!==false;
 
   // Decode text nodes in place; never rebuild links, controls, or their listeners.
   const active=new Map(),seen=new WeakSet();let decodeFrame=0,lastDecode=0;
-  const glyphs='01_/:+<>[]';const cjk='零壹数码字元解析';
+  const glyphs='01_/:+<>[]';
   function excluded(node){return !node.parentElement||node.parentElement.closest('script,style,textarea,input,option,.sr-only,[data-no-decode],.terminal-input-path,.terminal-count,#terminal-path,#terminal-index-state');}
   function finishDecode(){active.forEach((state,node)=>{if(node.isConnected)node.nodeValue=state.original;state.parent.removeAttribute('data-decoding')});active.clear();document.querySelectorAll('[data-decoding]').forEach(node=>node.removeAttribute('data-decoding'));cancelAnimationFrame(decodeFrame);decodeFrame=0;}
   function decodeTick(now){
@@ -33,7 +33,7 @@
         const count=Math.floor(progress*state.chars.length),tick=Math.floor(now/55);
         node.nodeValue=state.chars.map((char,i)=>{
           if(i<count||/\s/.test(char))return char;
-          const alphabet=/[\u3400-\u9fff]/.test(char)?cjk:glyphs;
+          const alphabet=glyphs;
           return alphabet[(tick+i*7)%alphabet.length];
         }).join('');
       });

@@ -39,7 +39,7 @@ export async function fetchCardResource(path, {timeout = 4000, hedgeDelay = 500,
     } catch (error) { cause = error; }
     finally { retry.abort(); }
   }
-  throw new Error(`${local.pathname.split('/').pop()} 加载失败，请点击重试`, {cause});
+  throw new Error(`${local.pathname.split('/').pop()} could not load. Please try again.`, {cause});
 }
 
 export async function prepareCardAssets(config, progress = () => {}) {

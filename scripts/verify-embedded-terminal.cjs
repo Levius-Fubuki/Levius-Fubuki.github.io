@@ -24,7 +24,7 @@ const fs=require('node:fs');
  check('terminal is within homepage main',await page.locator('.site-shell main #terminal').count()===1);
  check('frames and keyboard retained',await page.locator('.table-inside').isVisible()&&await page.locator('#terminal-keyboard').isVisible());
  check('terminal palette is monochrome',await page.locator('#terminal').evaluate(root=>[root,...root.querySelectorAll('*')].every(n=>['color','backgroundColor','borderTopColor'].every(p=>{const m=getComputedStyle(n)[p].match(/^rgba?\((\d+), (\d+), (\d+)/);return !m||(m[1]===m[2]&&m[2]===m[3])}))));
- await run('search 强化学习');check('real Chinese search',(await page.locator('#terminal-output').innerText()).includes('强化学习基本概念'));
+ await run('search 强化学习');check('real Chinese search',(await page.locator('#terminal-output').innerText()).includes('Reinforcement Learning Fundamentals'));
  await run('cat 5');check('real article preview',(await page.locator('#terminal-output').innerText()).includes('Actor-Critic'));
  await page.locator('#terminal-input').fill('');for(const key of ['h','e','l','p'])await page.locator(`[data-terminal-key="${key}"]`).click();check('virtual keyboard input',await page.locator('#terminal-input').inputValue()==='help');
  await page.locator('[data-terminal-key="Enter"]').click();await page.waitForFunction(()=>document.querySelector('#terminal-form').dataset.busy==='false');

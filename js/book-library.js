@@ -134,11 +134,11 @@
     window.LeviusDecode?.finish();
     const cover = link.querySelector('.book-cover');
     if (!cover) { location.assign(destination.href); return; }
-    const title = (link.getAttribute('aria-label') || '文章').replace(/^阅读[：:]\s*/, '');
+    const title = (link.getAttribute('aria-label') || 'Article').replace(/^(?:Read|阅读)[:：]\s*/i, '');
     const dialog = document.createElement('dialog');
     dialog.className = 'book-opening';
-    dialog.setAttribute('aria-label', `正在翻开《${title}》`);
-    dialog.innerHTML = '<div class="book-opening-stage" aria-hidden="true"><div class="book-opening-volume"><div class="book-opening-paper"><span class="book-opening-edition">LEVIUS / COLLECTED NOTES</span><span class="book-opening-ornament">✧</span><strong></strong><span class="book-opening-rules"></span><span class="book-opening-author">LEVIUS FUBUKI</span></div><div class="book-turning-leaf leaf-two"></div><div class="book-turning-leaf leaf-one"></div><div class="book-turning-cover"><div class="book-opening-inside"><span>EX LIBRIS<br>LEVIUS FUBUKI</span></div></div></div></div><p class="book-opening-status" role="status">正在翻开<span></span></p>';
+    dialog.setAttribute('aria-label', `Opening ${title}`);
+    dialog.innerHTML = '<div class="book-opening-stage" aria-hidden="true"><div class="book-opening-volume"><div class="book-opening-paper"><span class="book-opening-edition">LEVIUS / COLLECTED NOTES</span><span class="book-opening-ornament">✧</span><strong></strong><span class="book-opening-rules"></span><span class="book-opening-author">LEVIUS FUBUKI</span></div><div class="book-turning-leaf leaf-two"></div><div class="book-turning-leaf leaf-one"></div><div class="book-turning-cover"><div class="book-opening-inside"><span>EX LIBRIS<br>LEVIUS FUBUKI</span></div></div></div></div><p class="book-opening-status" role="status">Opening <span></span></p>';
     dialog.querySelector('.book-opening-paper strong').textContent = title;
     dialog.querySelector('.book-opening-status span').textContent = title;
     const duplicate = cover.cloneNode(true);

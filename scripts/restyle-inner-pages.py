@@ -23,7 +23,7 @@ libnav='''<nav class="library-nav" aria-label="文章索引导航"><a href="/arc
 def sidebar(toc=None):
  if toc:
   return f'<aside class="inner-sidebar"><details class="contents-panel" open><summary>文章目录 <span>CONTENTS</span></summary>{toc}</details><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside>'
- return f'''<aside class="inner-sidebar"><section class="index-panel"><h2>探索索引 <span>/ INDEX</span></h2>{libnav}<div class="index-note"><b>LEVIUS / FUBUKI</b><p>把想法写进代码。</p><p>AI Infra<br>多模态推理<br>AI Agent</p><a href="https://github.com/Levius-Fubuki" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div></section><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside>'''
+ return f'''<aside class="inner-sidebar"><section class="index-panel"><h2>探索索引 <span>/ INDEX</span></h2>{libnav}<div class="index-note"><b>LEVIUS / FUBUKI</b><p lang="en">From papers to implementations, with questions along the way.</p><p lang="en">Main focus: AI Infra<br>Also exploring multimodal inference and AI agents</p><a href="https://github.com/Levius-Fubuki" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div></section><a class="back-terminal" href="/#terminal">↙ 返回站内终端</a></aside>'''
 def clean_shell(node):
  for n in node.select('script,.post-share,.cover,.info-2,i[class*="fa"]'):n.decompose()
  for n in node.select('.tag-cloud-list a'):n.attrs.pop('style',None)
@@ -101,3 +101,7 @@ missing.select_one('.empty-frame span').string='404'
 missing.select_one('.gallery-empty h2').string='换一条路径，继续探索'
 missing.select_one('.gallery-empty p').string='返回首页，或从文章归档中查找内容。'
 (ROOT/'404.html').write_text(str(missing))
+
+# Keep regenerated public UI and metadata in English.
+import subprocess as _localize_subprocess
+_localize_subprocess.run(["python3", str(ROOT / "scripts/localize-english.py")], check=True)

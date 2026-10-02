@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101010" />
     <meta
       name="description"
-      content="Levius 的个人博客。把想法写进代码。关注 AI Infra、多模态推理与 AI Agent。"
+      content="Levius&#x27;s personal tech blog, focused on AI Infra. Notes on GPU computing, inference optimization, and AI systems, with explorations in multimodal inference and AI agents."
     />
     <meta name="author" content="Levius" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="L_F's Blog — Levius Notes" />
+    <meta property="og:title" content="L_F&#x27;s Blog — Levius Notes" />
     <meta
       property="og:description"
-      content="把想法写进代码。AI Infra、多模态推理与 AI Agent。"
+      content="Levius&#x27;s personal tech blog, focused on AI Infra. Notes on GPU computing, inference optimization, and AI systems, with explorations in multimodal inference and AI agents."
     />
     <meta property="og:url" content="https://leviusspace.top/" />
     <meta
@@ -26,7 +26,7 @@
     <link
       rel="alternate"
       href="/atom.xml"
-      title="L_F's Blog"
+      title="L_F&#x27;s Blog"
       type="application/atom+xml"
     />
     <link
@@ -43,31 +43,32 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="/css/home.css" />
-    <link rel="stylesheet" href="/css/home-motion.css" />
-    <link rel="stylesheet" href="/css/encom-shell.css" />
-    <link rel="stylesheet" href="/css/home-pages.css" />
-    <script src="/js/home.js" defer></script>
-    <script src="/js/home-pages.js" defer></script>
-    <script src="/js/home-motion.js" defer></script>
-    <script src="/js/encom-shell.js" defer></script>
-    <script src="/js/home-terminal.js" defer></script>
-  <link rel="stylesheet" href="/css/book-library.css" />
-<script src="/js/collection-reader.js" defer></script>
-<script src="/js/book-library.js" defer></script>
+    <link rel="stylesheet" href="/css/home.css?v=3c5fb2432ae5" />
+    <link rel="stylesheet" href="/css/home-motion.css?v=141bb057456c" />
+    <link rel="stylesheet" href="/css/encom-shell.css?v=a67bfc433302" />
+    <link rel="stylesheet" href="/css/home-pages.css?v=9bc3ef2e2485" />
+    <script src="/js/home.js?v=eda3add540ca" defer></script>
+    <script src="/js/home-pages.js?v=cc4e5bd16d28" defer></script>
+    <script src="/js/home-motion.js?v=0bf8e655d614" defer></script>
+    <script src="/js/encom-shell.js?v=ca2935dc45eb" defer></script>
+    <script src="/js/home-terminal.js?v=52f0b12d564f" defer></script>
+  <link rel="stylesheet" href="/css/book-library.css?v=48bcd40514f4" />
+<script src="/js/collection-reader.js?v=d5aba4a7f230" defer></script>
+<script src="/js/book-library.js?v=c879c12ecbd2" defer></script>
+<link rel="stylesheet" href="/css/english-ui.css?v=6cf5979146e8" />
 </head>
   <body>
-    <a class="skip-link" href="#articles">跳到文章</a>
+    <a class="skip-link" href="#articles">Skip to articles</a>
     <div class="site-shell">
       <header class="site-header">
-        <a class="brand" href="/" aria-label="L_F's Blog 首页"
+        <a class="brand" href="/" aria-label="L_F&#x27;s Blog Home"
           >L_F's <span>Blog</span></a
         >
         <button
           class="menu-toggle"
           aria-expanded="false"
           aria-controls="main-nav"
-          aria-label="展开导航"
+          aria-label="Open navigation"
           hidden
         >
           <img
@@ -77,12 +78,12 @@
             height="24"
           />
         </button>
-        <nav id="main-nav" class="main-nav" aria-label="主导航">
-          <a href="/" aria-current="page">首页</a>
-          <a href="#articles">文章</a>
-          <a href="/archives/">归档</a>
-          <a href="/Gallery/">画廊</a>
-          <button class="search-open" hidden>搜索</button>
+        <nav id="main-nav" class="main-nav" aria-label="Main navigation">
+          <a href="/" aria-current="page">Home</a>
+          <a href="#articles">Articles</a>
+          <a href="/archives/">Archive</a>
+          <a href="/Gallery/">Gallery</a>
+          <button class="search-open" hidden>Search</button>
         </nav>
         <a
           class="github-link"
@@ -99,9 +100,9 @@
       </header>
       <main>
         <section id="welcome" class="opening-page" aria-labelledby="opening-title">
-          <div class="opening-wordmark"><h2 id="opening-title" aria-label="Levius_Fubuki's BLOGS"><span>Levius_Fubuki's</span> <span>BLOGS</span></h2></div>
-          <p class="opening-subtitle">把想法写进代码。<span class="opening-cursor" aria-hidden="true"></span></p>
-          <a class="opening-scroll" href="#profile">SCROLL<span aria-hidden="true">⌄</span><span class="sr-only">进入个人介绍</span></a>
+          <div class="opening-wordmark"><h2 id="opening-title" aria-label="Levius_Fubuki&#x27;s BLOGS"><span>Levius_Fubuki's</span> <span>BLOGS</span></h2></div>
+          <p class="opening-subtitle" lang="en">Turning ideas into code.<span class="opening-cursor" aria-hidden="true"></span></p>
+          <a class="opening-scroll" href="#profile">SCROLL<span aria-hidden="true">⌄</span><span class="sr-only">View profile</span></a>
         </section>
         <section id="profile" class="hero" aria-labelledby="hero-title">
           <div class="hero-window">
@@ -124,39 +125,40 @@
               <div class="hero-card">
                 <iframe
                   class="identity-card"
-                  src="/card/?embed=1&amp;v=1479f68cc7b4"
-                  title="Sun Yunfei 与 Levius-Fubuki 的双面身份卡，单击翻面、长按拖拽、右键复位"
+                  src="/card/?embed=1&amp;v=91f6c78d55a2"
+                  title="Sun Yunfei and Levius-Fubuki identity card. Click to flip, hold to drag, right-click to reset."
                   width="600" height="550"
                   loading="eager"
                 ></iframe>
-                <noscript><p>Sun Yunfei · 哈尔滨工业大学 · 信息安全<br />Levius-Fubuki · AI Infra · 开源贡献</p></noscript>
+                <noscript><p>Sun Yunfei · Harbin Institute of Technology · Information Security<br />Levius-Fubuki · AI Infra · Open Source</p></noscript>
               </div>
               <div class="hero-copy">
                 <h1 id="hero-title"><span class="sr-only">LEVIUS</span><span class="text-ink" aria-hidden="true">LEVIUS</span></h1>
-                <p class="hero-intro">把想法写进代码。</p>
-                <p class="hero-topics">
-                  AI Infra <span>/</span> 多模态推理 <span>/</span> AI Agent
+                <p class="hero-intro" lang="en">I'm Levius, currently focused on AI Infra and the systems behind modern AI.</p>
+                <p class="hero-topics" lang="en">
+                  Main focus: AI Infra<br />
+                  Also exploring multimodal inference and AI agents
                 </p>
                 <div class="hero-actions">
                   <a class="button primary" href="#articles"
-                    >阅读文章
+                    >Read articles
                     <img
                       src="/img/redesign/icons/arrow-right.svg"
                       alt=""
                       width="24"
                       height="24" /></a
-                  ><a class="button secondary terminal-launch" href="#terminal">启动终端</a>
+                  ><a class="button secondary terminal-launch" href="#terminal">Launch terminal</a>
                 </div>
               </div>
             </div>
             <div class="scene-status" hidden>
               <span class="scene-signal" aria-hidden="true"><i></i> LEVIUS / PERSONAL ARCHIVE</span>
-              <button class="motion-toggle" type="button" aria-pressed="true">环境动效：开</button>
+              <button class="motion-toggle" type="button" aria-pressed="true">Ambient motion: on</button>
             </div>
           </div>
         </section>
-<section id="terminal" class="light-table terminal-workbench" aria-label="Levius 终端工作台">
-        <h2 class="terminal-section-title">站内终端 <span>/ INTERACTIVE ARCHIVE</span></h2>
+<section id="terminal" class="light-table terminal-workbench" aria-label="Levius terminal workspace">
+        <h2 class="terminal-section-title">Terminal <span>/ INTERACTIVE ARCHIVE</span></h2>
 <div class="terminal-stage">
 <div class="terminal-screen">
 <div class="table-outside" aria-hidden="true"></div>
@@ -167,11 +169,11 @@
               <div class="lt-content"><h2>README <b>.TXT</b><em>END. PROGRAM</em></h2>
                 <div class="readme-body">
                   <p>Hello <strong>User</strong>. Welcome to <strong>Levius</strong>'s personal archive.</p>
-                  <p>把想法写进代码。这里收录我的<strong>强化学习</strong>、<strong>深度学习</strong>与<strong>大模型</strong>学习笔记。</p>
-                  <p>选择右侧的 <b>ARTICLE STREAM</b> 浏览文章。文件夹会在终端中依次输入目录与启动命令。</p>
-                  <p>也可以直接输入：<br /><code>help</code> 查看命令<br /><code>search 强化学习</code> 搜索文章<br /><code>run articles.exe</code> 启动文章视图</p>
-                  <p>↑ ↓ 历史 · Tab 补全 · Enter 执行。<br />文章视图中的返回按钮可返回这里。</p>
-                  <p><a href="https://github.com/Levius-Fubuki" target="_blank" rel="noopener noreferrer">@Levius-Fubuki</a> · <a href="/archives/">全部归档</a><br /><span class="reference-credit">Interface study · <a href="https://www.robscanlon.com/encom-boardroom/" target="_blank" rel="noopener noreferrer">Rob Scanlon / ENCOM</a></span></p>
+                  <p lang="en">Notes from my learning and experiments in AI Infra, covering GPU architecture, kernel optimization, and LLM inference, alongside earlier work on reinforcement learning and deep learning.</p>
+                  <p>Select <b>ARTICLE STREAM</b> to browse articles. Folders enter directory and launch commands in the terminal.</p>
+                  <p>Or enter a command:<br /><code>help</code> Show commands<br /><code>search Reinforcement Learning</code> Search articles<br /><code>run articles.exe</code> Open the article view</p>
+                  <p>↑ ↓ History · Tab Complete · Enter Run.<br />Use the Back button in the article view to return here.</p>
+                  <p><a href="https://github.com/Levius-Fubuki" target="_blank" rel="noopener noreferrer">@Levius-Fubuki</a> · <a href="/archives/">Full archive</a><br /><span class="reference-credit">Interface study · <a href="https://www.robscanlon.com/encom-boardroom/" target="_blank" rel="noopener noreferrer">Rob Scanlon / ENCOM</a></span></p>
                 </div>
               </div>
             </section>
@@ -185,11 +187,11 @@
               <button class="folder-launch folder-primary" data-launch="articles" data-terminal-command="cd /articles" type="button"><span>ARTICLE STREAM</span><img src="/img/encom/encom_folder_big.png" width="95" height="63" alt="" /></button>
               <div class="lt-command-line">
                 <div class="command-header">Levius archive / <span class="terminal-count">—</span> articles / <span id="terminal-path">/</span></div>
-                <div id="terminal-output" class="terminal-output" role="log" aria-live="off" aria-label="终端输出记录" tabindex="0"></div>
+                <div id="terminal-output" class="terminal-output" role="log" aria-live="off" aria-label="Terminal output" tabindex="0"></div>
                 <form id="terminal-form" class="terminal-input-row" data-busy="false" hidden>
-                  <label class="terminal-prompt" for="terminal-input">levius-sh:<span class="terminal-input-path">root</span>$<span class="sr-only">输入站内命令</span></label>
+                  <label class="terminal-prompt" for="terminal-input">levius-sh:<span class="terminal-input-path">root</span>$<span class="sr-only">Enter a site command</span></label>
                   <input id="terminal-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="500" enterkeyhint="send" aria-describedby="terminal-hints" />
-                  <button class="terminal-submit" type="submit" aria-label="执行命令">↵</button>
+                  <button class="terminal-submit" type="submit" aria-label="Run command">↵</button>
                 </form>
               </div>
               <div class="folder-row">
@@ -199,19 +201,19 @@
                 <button class="folder-launch" data-launch="about" type="button"><span>ABOUT ME</span><img src="/img/encom/encom_folder_small.png" width="80" height="49" alt="" /></button>
               </div>
             </div></section>
-            <div id="lt-keyboard"><div id="terminal-keyboard" class="terminal-keyboard" aria-label="屏幕键盘"></div></div>
+            <div id="lt-keyboard"><div id="terminal-keyboard" class="terminal-keyboard" aria-label="On-screen keyboard"></div></div>
             <div class="lt-header lt-bottom"><span>TOUCHPOINT KEYBOARD ... <b>INTERACTION SEQUENCING</b></span><span>SYS | O12</span></div>
           </div>
           <div class="lt-rail"><div class="encom-logo">LEVIUS</div><img class="thumbprint" src="/img/encom/thumbprint.png" width="59" height="69" alt="" /></div>
         </div>
-        <div class="terminal-tools" hidden><button class="terminal-keyboard-toggle" type="button" aria-expanded="true" aria-controls="terminal-keyboard">屏幕键盘</button></div>
-        <p id="terminal-hints" class="sr-only">上下箭头历史，Tab 补全，Ctrl L 清屏。输入 help 查看命令。</p>
+        <div class="terminal-tools" hidden><button class="terminal-keyboard-toggle" type="button" aria-expanded="true" aria-controls="terminal-keyboard">On-screen keyboard</button></div>
+        <p id="terminal-hints" class="sr-only">↑ ↓ History · Tab Complete · Ctrl+L Clear. Type help for commands.</p>
         <p id="terminal-announcement" class="sr-only" role="status" aria-live="polite"></p>
-        <noscript><p class="no-script">交互工作台需要 JavaScript。<a href="/archives/">直接浏览文章归档</a></p></noscript>
+        <noscript><p class="no-script">The interactive workspace requires JavaScript.<a href="/archives/">Browse the article archive</a></p></noscript>
       </div>
 <div id="program-transition" aria-hidden="true" hidden><span>ARTICLES</span></div>
 <section class="terminal-program" aria-labelledby="terminal-program-title" hidden>
-  <header><h3 id="terminal-program-title">ARTICLE STREAM</h3><button class="return-terminal" type="button">← 返回终端</button></header>
+  <header><h3 id="terminal-program-title">ARTICLE STREAM</h3><button class="return-terminal" type="button">← Back to terminal</button></header>
   <div id="terminal-program-content" tabindex="0"></div>
 </section>
 </div>
@@ -228,242 +230,242 @@
                 alt=""
                 width="30"
                 height="30"
-              />文章索引
+              />Article index
             </h2>
             <span class="section-rule"></span
             ><a
               class="section-label"
               href="/archives/"
-              aria-label="查看全部文章归档"
+              aria-label="View the full archive"
               >/ ARTICLES</a
             >
           </div>
 <div class="book-library">
-      <section class="collection-shelf" aria-label="合集藏书架"><div class="cabinet-heading"><p>选择一部合集，翻阅其中的篇章。</p><span>08 COLLECTIONS / 23 VOLUMES</span></div><div class="spine-rack"><button class="collection-spine" type="button" data-open-collection="llm" data-title="大模型" data-subtitle="知识圣殿" data-description="从神经网络的基石，走向语言模型的构建与应用。" data-href="/categories/大模型/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开大模型合集，共 2 篇文章">
-          <span class="spine-object" data-collection="llm" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/llm-roadmap-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✧ COLLECTION 01</small><strong>大模型</strong><span>知识圣殿</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 01</span><span class="spine-emblem">✧</span><span class="spine-title">大模型</span><span class="spine-subtitle">知识圣殿</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">知识圣殿<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="rl" data-title="强化学习" data-subtitle="骑士试炼" data-description="在行动与反馈之间，探索价值、策略与决策。" data-href="/categories/强化学习/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开强化学习合集，共 5 篇文章">
-          <span class="spine-object" data-collection="rl" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/rl-foundations-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✥ COLLECTION 02</small><strong>强化学习</strong><span>骑士试炼</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 02</span><span class="spine-emblem">✥</span><span class="spine-title">强化学习</span><span class="spine-subtitle">骑士试炼</span><span class="spine-count">05<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">骑士试炼<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="engineering" data-title="工程实践" data-subtitle="工匠手记" data-description="记录具体项目的技术选型、实现过程、故障定位与最终效果。" data-href="/categories/工程实践/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开工程实践合集，共 4 篇文章">
-          <span class="spine-object" data-collection="engineering" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/dual-mac-inference.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>⚙ COLLECTION 03</small><strong>工程实践</strong><span>工匠手记</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 03</span><span class="spine-emblem">⚙</span><span class="spine-title">工程实践</span><span class="spine-subtitle">工匠手记</span><span class="spine-count">04<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">工匠手记<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="agents" data-title="智能体" data-subtitle="时钟与行动" data-description="研究记忆、主动行为与执行边界，让模型输出进入可检查的系统。" data-href="/categories/智能体/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开智能体合集，共 2 篇文章">
-          <span class="spine-object" data-collection="agents" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/heartbeat-agent.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>◇ COLLECTION 04</small><strong>智能体</strong><span>时钟与行动</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 04</span><span class="spine-emblem">◇</span><span class="spine-title">智能体</span><span class="spine-subtitle">时钟与行动</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">时钟与行动<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="experience" data-title="工程经验" data-subtitle="度量与方法" data-description="沉淀跨项目可复用的测量、调试、结构设计与交付方法。" data-href="/categories/工程经验/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开工程经验合集，共 2 篇文章">
-          <span class="spine-object" data-collection="experience" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/inference-evidence.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>⌘ COLLECTION 05</small><strong>工程经验</strong><span>度量与方法</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 05</span><span class="spine-emblem">⌘</span><span class="spine-title">工程经验</span><span class="spine-subtitle">度量与方法</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">度量与方法<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="opensource" data-title="开源贡献" data-subtitle="共同修筑" data-description="从真实问题、补丁与评审出发，记录贡献如何被复现、验证和合并。" data-href="/categories/开源贡献/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开开源贡献合集，共 1 篇文章">
-          <span class="spine-object" data-collection="opensource" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/opensource-streams.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>⛉ COLLECTION 06</small><strong>开源贡献</strong><span>共同修筑</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 06</span><span class="spine-emblem">⛉</span><span class="spine-title">开源贡献</span><span class="spine-subtitle">共同修筑</span><span class="spine-count">01<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">共同修筑<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="infra" data-title="AI Infra" data-subtitle="计算与系统" data-description="连接 GPU 架构、算子、模型结构与推理系统，区分学习推导和实测证据。" data-href="/categories/AI-Infra/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开AI Infra合集，共 6 篇文章">
-          <span class="spine-object" data-collection="infra" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/infra-topology.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✣ COLLECTION 07</small><strong>AI Infra</strong><span>计算与系统</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 07</span><span class="spine-emblem">✣</span><span class="spine-title">AI Infra</span><span class="spine-subtitle">计算与系统</span><span class="spine-count">06<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">计算与系统<span>抽出 · 翻阅</span></span>
-        </button><button class="collection-spine" type="button" data-open-collection="notes" data-title="序章" data-subtitle="旅途之始" data-description="从第一篇文章开始。" data-href="/2025/03/30/hello-world/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开序章合集，共 1 篇文章">
-          <span class="spine-object" data-collection="notes" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/hello-world-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✦ COLLECTION 08</small><strong>序章</strong><span>旅途之始</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 08</span><span class="spine-emblem">✦</span><span class="spine-title">序章</span><span class="spine-subtitle">旅途之始</span><span class="spine-count">01<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
-          <span class="spine-caption">旅途之始<span>抽出 · 翻阅</span></span>
-        </button></div><div class="cabinet-plinth" aria-hidden="true"></div><p class="cabinet-inscription">LEVIUS’S LIBRARY <span>·</span> 藏于书脊之间</p></section>
+      <section class="collection-shelf" aria-label="Collection bookshelf"><div class="cabinet-heading"><p>Choose a collection and explore its chapters.</p><span>08 COLLECTIONS / 23 VOLUMES</span></div><div class="spine-rack"><button class="collection-spine" type="button" data-open-collection="llm" data-title="Large Language Models" data-subtitle="Cathedral of Knowledge" data-description="From neural-network foundations to building and applying language models." data-href="/categories/大模型/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Large Language Models collection, 2 articles">
+          <span class="spine-object" data-collection="llm" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/llm-roadmap-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✧ COLLECTION 01</small><strong>Large Language Models</strong><span>Cathedral of Knowledge</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 01</span><span class="spine-emblem">✧</span><span class="spine-title">Large Language Models</span><span class="spine-subtitle">Cathedral of Knowledge</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">Cathedral of Knowledge<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="rl" data-title="Reinforcement Learning" data-subtitle="The Knight’s Trials" data-description="Exploring value, policy, and decision-making through actions and feedback." data-href="/categories/强化学习/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Reinforcement Learning collection, 5 articles">
+          <span class="spine-object" data-collection="rl" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/rl-foundations-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✥ COLLECTION 02</small><strong>Reinforcement Learning</strong><span>The Knight’s Trials</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 02</span><span class="spine-emblem">✥</span><span class="spine-title">Reinforcement Learning</span><span class="spine-subtitle">The Knight’s Trials</span><span class="spine-count">05<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">The Knight’s Trials<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="engineering" data-title="Engineering Projects" data-subtitle="The Engineer’s Workshop" data-description="Technology choices, implementation, debugging, and results from concrete projects." data-href="/categories/工程实践/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Engineering Projects collection, 4 articles">
+          <span class="spine-object" data-collection="engineering" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/dual-mac-inference.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>⚙ COLLECTION 03</small><strong>Engineering Projects</strong><span>The Engineer’s Workshop</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 03</span><span class="spine-emblem">⚙</span><span class="spine-title">Engineering Projects</span><span class="spine-subtitle">The Engineer’s Workshop</span><span class="spine-count">04<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">The Engineer’s Workshop<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="agents" data-title="AI Agents" data-subtitle="Clockwork and Agency" data-description="Memory, proactive behavior, and execution boundaries that make model-driven systems inspectable." data-href="/categories/智能体/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open AI Agents collection, 2 articles">
+          <span class="spine-object" data-collection="agents" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/heartbeat-agent.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>◇ COLLECTION 04</small><strong>AI Agents</strong><span>Clockwork and Agency</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 04</span><span class="spine-emblem">◇</span><span class="spine-title">AI Agents</span><span class="spine-subtitle">Clockwork and Agency</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">Clockwork and Agency<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="experience" data-title="Engineering Lessons" data-subtitle="The Craft of Evidence" data-description="Reusable approaches to measurement, debugging, structural design, and delivery." data-href="/categories/工程经验/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Engineering Lessons collection, 2 articles">
+          <span class="spine-object" data-collection="experience" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/inference-evidence.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>⌘ COLLECTION 05</small><strong>Engineering Lessons</strong><span>The Craft of Evidence</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 05</span><span class="spine-emblem">⌘</span><span class="spine-title">Engineering Lessons</span><span class="spine-subtitle">The Craft of Evidence</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">The Craft of Evidence<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="opensource" data-title="Open Source" data-subtitle="The Common Works" data-description="Reproducing, validating, and merging contributions through real issues, patches, and reviews." data-href="/categories/开源贡献/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Open Source collection, 1 article">
+          <span class="spine-object" data-collection="opensource" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/opensource-streams.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>⛉ COLLECTION 06</small><strong>Open Source</strong><span>The Common Works</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 06</span><span class="spine-emblem">⛉</span><span class="spine-title">Open Source</span><span class="spine-subtitle">The Common Works</span><span class="spine-count">01<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">The Common Works<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="infra" data-title="AI Infra" data-subtitle="Computing and Systems" data-description="Connecting GPU architecture, kernels, model structures, and inference systems while distinguishing derivations from measured evidence." data-href="/categories/AI-Infra/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open AI Infra collection, 6 articles">
+          <span class="spine-object" data-collection="infra" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/infra-topology.png" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✣ COLLECTION 07</small><strong>AI Infra</strong><span>Computing and Systems</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 07</span><span class="spine-emblem">✣</span><span class="spine-title">AI Infra</span><span class="spine-subtitle">Computing and Systems</span><span class="spine-count">06<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">Computing and Systems<span>Pick up · Browse</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="notes" data-title="Prologue" data-subtitle="The First Steps" data-description="Starting with the first post." data-href="/2025/03/30/hello-world/" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Prologue collection, 1 article">
+          <span class="spine-object" data-collection="notes" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/hello-world-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✦ COLLECTION 08</small><strong>Prologue</strong><span>The First Steps</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 08</span><span class="spine-emblem">✦</span><span class="spine-title">Prologue</span><span class="spine-subtitle">The First Steps</span><span class="spine-count">01<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">The First Steps<span>Pick up · Browse</span></span>
+        </button></div><div class="cabinet-plinth" aria-hidden="true"></div><p class="cabinet-inscription">LEVIUS’S LIBRARY <span>·</span> Between the spines</p></section>
       <section class="collection-detail" id="collection-volumes" aria-labelledby="collection-volume-title" hidden>
-      <div class="shelf-toolbar"><button class="collection-return" type="button">← 返回藏书架</button><span class="shelf-count" aria-live="polite"></span></div>
-      <div class="collection-detail-heading"><div><p class="book-series" id="collection-volume-subtitle"></p><h3 id="collection-volume-title" tabindex="-1"></h3></div><a class="collection-index-link" href="/categories/">查看合集索引 ↗</a></div>
-      <div class="book-rail" id="book-rail" role="region" aria-label="文章藏书，可左右滚动" tabindex="0"><article class="shelf-book" data-series="llm" data-book="llm-roadmap">
-          <a class="book-link" href="/2026/04/07/0-大模型学习路线图/" aria-label="阅读：大模型算法工程师 — 从零开始学习路线图"><span class="book-cover" data-collection="llm">
+      <div class="shelf-toolbar"><button class="collection-return" type="button">← Back to bookshelf</button><span class="shelf-count" aria-live="polite"></span></div>
+      <div class="collection-detail-heading"><div><p class="book-series" id="collection-volume-subtitle"></p><h3 id="collection-volume-title" tabindex="-1"></h3></div><a class="collection-index-link" href="/categories/">View collection index ↗</a></div>
+      <div class="book-rail" id="book-rail" role="region" aria-label="Article books; scroll horizontally" tabindex="0"><article class="shelf-book" data-series="llm" data-book="llm-roadmap">
+          <a class="book-link" href="/2026/04/07/0-大模型学习路线图/" aria-label="Read: Becoming an LLM Engineer: A Learning Roadmap from Scratch"><span class="book-cover" data-collection="llm">
       <img class="book-art" src="/img/books/llm-roadmap-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✧ 大模型</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>大模型</span><span>学习路线图</span></span><span class="book-cover-english">THE ASCENT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✧ Large Language Models</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>LLM</span><span>Roadmap</span></span><span class="book-cover-english">THE ASCENT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">大模型 / VOL. I</p><h3><a href="/2026/04/07/0-大模型学习路线图/">大模型算法工程师 — 从零开始学习路线图</a></h3></div>
+          <div class="book-caption"><p class="book-series">Large Language Models / VOL. I</p><h3><a href="/2026/04/07/0-大模型学习路线图/">Becoming an LLM Engineer: A Learning Roadmap from Scratch</a></h3></div>
         </article><article class="shelf-book" data-series="llm" data-book="deep-learning">
-          <a class="book-link" href="/2026/04/06/01-深度学习基础/" aria-label="阅读：深度学习基础"><span class="book-cover" data-collection="llm">
+          <a class="book-link" href="/2026/04/06/01-深度学习基础/" aria-label="Read: Deep Learning Fundamentals"><span class="book-cover" data-collection="llm">
       <img class="book-art" src="/img/books/deep-learning-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✧ 大模型</span><span>VOL. II</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>深度学习</span><span>基础</span></span><span class="book-cover-english">THE FOUNDATIONS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✧ Large Language Models</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Deep Learning</span><span>Foundations</span></span><span class="book-cover-english">THE FOUNDATIONS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">大模型 / VOL. II</p><h3><a href="/2026/04/06/01-深度学习基础/">深度学习基础</a></h3></div>
+          <div class="book-caption"><p class="book-series">Large Language Models / VOL. II</p><h3><a href="/2026/04/06/01-深度学习基础/">Deep Learning Fundamentals</a></h3></div>
         </article><article class="shelf-book" data-series="rl" data-book="rl-foundations">
-          <a class="book-link" href="/2026/04/06/1_Reinforce Learning-Basic Concepts/" aria-label="阅读：强化学习基本概念"><span class="book-cover" data-collection="rl">
+          <a class="book-link" href="/2026/04/06/1_Reinforce Learning-Basic Concepts/" aria-label="Read: Reinforcement Learning Fundamentals"><span class="book-cover" data-collection="rl">
       <img class="book-art" src="/img/books/rl-foundations-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>强化学习</span><span>基本概念</span></span><span class="book-cover-english">THE FIRST TRIAL</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✥ Reinforcement Learning</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Reinforcement</span><span>Learning Basics</span></span><span class="book-cover-english">THE FIRST TRIAL</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">强化学习 / VOL. I</p><h3><a href="/2026/04/06/1_Reinforce Learning-Basic Concepts/">强化学习基本概念</a></h3></div>
+          <div class="book-caption"><p class="book-series">Reinforcement Learning / VOL. I</p><h3><a href="/2026/04/06/1_Reinforce Learning-Basic Concepts/">Reinforcement Learning Fundamentals</a></h3></div>
         </article><article class="shelf-book" data-series="rl" data-book="value-learning">
-          <a class="book-link" href="/2026/04/06/2-Value-Based Reinforcement Learning/" aria-label="阅读：基于价值的强化学习"><span class="book-cover" data-collection="rl">
+          <a class="book-link" href="/2026/04/06/2-Value-Based Reinforcement Learning/" aria-label="Read: Value-Based Reinforcement Learning"><span class="book-cover" data-collection="rl">
       <img class="book-art" src="/img/books/value-learning-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. II</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>基于价值的</span><span>强化学习</span></span><span class="book-cover-english">THE SCALES OF VALUE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✥ Reinforcement Learning</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Value-Based</span><span>Learning</span></span><span class="book-cover-english">THE SCALES OF VALUE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">强化学习 / VOL. II</p><h3><a href="/2026/04/06/2-Value-Based Reinforcement Learning/">基于价值的强化学习</a></h3></div>
+          <div class="book-caption"><p class="book-series">Reinforcement Learning / VOL. II</p><h3><a href="/2026/04/06/2-Value-Based Reinforcement Learning/">Value-Based Reinforcement Learning</a></h3></div>
         </article><article class="shelf-book" data-series="rl" data-book="policy-learning">
-          <a class="book-link" href="/2026/04/06/3-Policy-Based Reinforcement Learning/" aria-label="阅读：基于策略的强化学习"><span class="book-cover" data-collection="rl">
+          <a class="book-link" href="/2026/04/06/3-Policy-Based Reinforcement Learning/" aria-label="Read: Policy-Based Reinforcement Learning"><span class="book-cover" data-collection="rl">
       <img class="book-art" src="/img/books/policy-learning-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. III</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>基于策略的</span><span>强化学习</span></span><span class="book-cover-english">THE CHOSEN PATH</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✥ Reinforcement Learning</span><span>VOL. III</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Policy-Based</span><span>Learning</span></span><span class="book-cover-english">THE CHOSEN PATH</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">强化学习 / VOL. III</p><h3><a href="/2026/04/06/3-Policy-Based Reinforcement Learning/">基于策略的强化学习</a></h3></div>
+          <div class="book-caption"><p class="book-series">Reinforcement Learning / VOL. III</p><h3><a href="/2026/04/06/3-Policy-Based Reinforcement Learning/">Policy-Based Reinforcement Learning</a></h3></div>
         </article><article class="shelf-book" data-series="rl" data-book="actor-critic">
-          <a class="book-link" href="/2026/04/06/4-Actor-Critic/" aria-label="阅读：Actor-Critic 方法"><span class="book-cover" data-collection="rl">
+          <a class="book-link" href="/2026/04/06/4-Actor-Critic/" aria-label="Read: Actor-Critic Methods"><span class="book-cover" data-collection="rl">
       <img class="book-art" src="/img/books/actor-critic-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. IV</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>Actor–Critic</span><span>方法</span></span><span class="book-cover-english">THE TWIN OATH</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✥ Reinforcement Learning</span><span>VOL. IV</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Actor–Critic</span><span>Methods</span></span><span class="book-cover-english">THE TWIN OATH</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">强化学习 / VOL. IV</p><h3><a href="/2026/04/06/4-Actor-Critic/">Actor-Critic 方法</a></h3></div>
+          <div class="book-caption"><p class="book-series">Reinforcement Learning / VOL. IV</p><h3><a href="/2026/04/06/4-Actor-Critic/">Actor-Critic Methods</a></h3></div>
         </article><article class="shelf-book" data-series="rl" data-book="tree-search">
-          <a class="book-link" href="/2026/04/06/5-Monte Carlo Tree Search/" aria-label="阅读：蒙特卡洛树搜索"><span class="book-cover" data-collection="rl">
+          <a class="book-link" href="/2026/04/06/5-Monte Carlo Tree Search/" aria-label="Read: Monte Carlo Tree Search"><span class="book-cover" data-collection="rl">
       <img class="book-art" src="/img/books/tree-search-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. V</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>蒙特卡洛</span><span>树搜索</span></span><span class="book-cover-english">THE TREE OF FUTURES</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>✥ Reinforcement Learning</span><span>VOL. V</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Monte Carlo</span><span>Tree Search</span></span><span class="book-cover-english">THE TREE OF FUTURES</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">强化学习 / VOL. V</p><h3><a href="/2026/04/06/5-Monte Carlo Tree Search/">蒙特卡洛树搜索</a></h3></div>
+          <div class="book-caption"><p class="book-series">Reinforcement Learning / VOL. V</p><h3><a href="/2026/04/06/5-Monte Carlo Tree Search/">Monte Carlo Tree Search</a></h3></div>
         </article><article class="shelf-book" data-series="engineering" data-book="dual-mac-inference">
-          <a class="book-link" href="/2026/10/02/dual-mac-inference/" aria-label="阅读：两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度"><span class="book-cover" data-collection="engineering">
+          <a class="book-link" href="/2026/10/02/dual-mac-inference/" aria-label="Read: Running Qwen3-32B on Two 16GB Macs: Pipelines, Weight Sharding, and Submission Granularity"><span class="book-cover" data-collection="engineering">
       <img class="book-art" src="/img/books/dual-mac-inference.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⚙ 工程实践</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>双 Mac</span><span>模型推理</span></span><span class="book-cover-english">THE TWIN TOWERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⚙ Engineering Projects</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Dual-Mac</span><span>Inference</span></span><span class="book-cover-english">THE TWIN TOWERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">工程实践 / VOL. I</p><h3><a href="/2026/10/02/dual-mac-inference/">两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</a></h3></div>
+          <div class="book-caption"><p class="book-series">Engineering Projects / VOL. I</p><h3><a href="/2026/10/02/dual-mac-inference/">Running Qwen3-32B on Two 16GB Macs: Pipelines, Weight Sharding, and Submission Granularity</a></h3></div>
         </article><article class="shelf-book" data-series="engineering" data-book="gr308-language">
-          <a class="book-link" href="/2026/10/02/gr308-language/" aria-label="阅读：GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收"><span class="book-cover" data-collection="engineering">
+          <a class="book-link" href="/2026/10/02/gr308-language/" aria-label="Read: Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests"><span class="book-cover" data-collection="engineering">
       <img class="book-art" src="/img/books/gr308-language.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⚙ 工程实践</span><span>VOL. II</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>语言模型</span></span><span class="book-cover-english">THE CALIBRATION</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⚙ Engineering Projects</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>Language Models</span></span><span class="book-cover-english">THE CALIBRATION</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">工程实践 / VOL. II</p><h3><a href="/2026/10/02/gr308-language/">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</a></h3></div>
+          <div class="book-caption"><p class="book-series">Engineering Projects / VOL. II</p><h3><a href="/2026/10/02/gr308-language/">Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</a></h3></div>
         </article><article class="shelf-book" data-series="engineering" data-book="gr308-image">
-          <a class="book-link" href="/2026/10/02/gr308-image/" aria-label="阅读：Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE"><span class="book-cover" data-collection="engineering">
+          <a class="book-link" href="/2026/10/02/gr308-image/" aria-label="Read: Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE"><span class="book-cover" data-collection="engineering">
       <img class="book-art" src="/img/books/gr308-image.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⚙ 工程实践</span><span>VOL. III</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>图像生成</span></span><span class="book-cover-english">THE MOSAIC ENGINE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⚙ Engineering Projects</span><span>VOL. III</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>Image Generation</span></span><span class="book-cover-english">THE MOSAIC ENGINE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">工程实践 / VOL. III</p><h3><a href="/2026/10/02/gr308-image/">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</a></h3></div>
+          <div class="book-caption"><p class="book-series">Engineering Projects / VOL. III</p><h3><a href="/2026/10/02/gr308-image/">Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE</a></h3></div>
         </article><article class="shelf-book" data-series="engineering" data-book="gr308-video">
-          <a class="book-link" href="/2026/10/02/gr308-video/" aria-label="阅读：GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门"><span class="book-cover" data-collection="engineering">
+          <a class="book-link" href="/2026/10/02/gr308-video/" aria-label="Read: Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks"><span class="book-cover" data-collection="engineering">
       <img class="book-art" src="/img/books/gr308-video.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⚙ 工程实践</span><span>VOL. IV</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>视频调优</span></span><span class="book-cover-english">THE MOVING LANTERN</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⚙ Engineering Projects</span><span>VOL. IV</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>GR308</span><span>Video Tuning</span></span><span class="book-cover-english">THE MOVING LANTERN</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">工程实践 / VOL. IV</p><h3><a href="/2026/10/02/gr308-video/">GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门</a></h3></div>
+          <div class="book-caption"><p class="book-series">Engineering Projects / VOL. IV</p><h3><a href="/2026/10/02/gr308-video/">Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks</a></h3></div>
         </article><article class="shelf-book" data-series="agents" data-book="heartbeat-agent">
-          <a class="book-link" href="/2026/10/02/heartbeat-agent/" aria-label="阅读：Heartbeat 的工程拆解：主动触发、分层记忆与工具边界"><span class="book-cover" data-collection="agents">
+          <a class="book-link" href="/2026/10/02/heartbeat-agent/" aria-label="Read: Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries"><span class="book-cover" data-collection="agents">
       <img class="book-art" src="/img/books/heartbeat-agent.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>◇ 智能体</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>主动 Agent</span><span>分层记忆</span></span><span class="book-cover-english">THE QUIET CLOCK</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>◇ AI Agents</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Proactive Agents</span><span>Layered Memory</span></span><span class="book-cover-english">THE QUIET CLOCK</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">智能体 / VOL. I</p><h3><a href="/2026/10/02/heartbeat-agent/">Heartbeat 的工程拆解：主动触发、分层记忆与工具边界</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Agents / VOL. I</p><h3><a href="/2026/10/02/heartbeat-agent/">Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries</a></h3></div>
         </article><article class="shelf-book" data-series="agents" data-book="safe-motion">
-          <a class="book-link" href="/2026/10/02/safe-motion/" aria-label="阅读：从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么"><span class="book-cover" data-collection="agents">
+          <a class="book-link" href="/2026/10/02/safe-motion/" aria-label="Read: From VLA Actions to Robot Trajectories: Validating an Execution Layer"><span class="book-cover" data-collection="agents">
       <img class="book-art" src="/img/books/safe-motion.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>◇ 智能体</span><span>VOL. II</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>机械臂</span><span>轨迹执行</span></span><span class="book-cover-english">THE GUARDED HAND</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>◇ AI Agents</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Robot Arms</span><span>Trajectory Execution</span></span><span class="book-cover-english">THE GUARDED HAND</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">智能体 / VOL. II</p><h3><a href="/2026/10/02/safe-motion/">从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Agents / VOL. II</p><h3><a href="/2026/10/02/safe-motion/">From VLA Actions to Robot Trajectories: Validating an Execution Layer</a></h3></div>
         </article><article class="shelf-book" data-series="experience" data-book="inference-evidence">
-          <a class="book-link" href="/2026/10/02/inference-evidence/" aria-label="阅读：推理优化怎样形成可信结论：从算子实验到服务验收"><span class="book-cover" data-collection="experience">
+          <a class="book-link" href="/2026/10/02/inference-evidence/" aria-label="Read: Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance"><span class="book-cover" data-collection="experience">
       <img class="book-art" src="/img/books/inference-evidence.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⌘ 工程经验</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>推理优化</span><span>实验与证据</span></span><span class="book-cover-english">THE MEASURE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⌘ Engineering Lessons</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Inference</span><span>Evidence</span></span><span class="book-cover-english">THE MEASURE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">工程经验 / VOL. I</p><h3><a href="/2026/10/02/inference-evidence/">推理优化怎样形成可信结论：从算子实验到服务验收</a></h3></div>
+          <div class="book-caption"><p class="book-series">Engineering Lessons / VOL. I</p><h3><a href="/2026/10/02/inference-evidence/">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</a></h3></div>
         </article><article class="shelf-book" data-series="experience" data-book="markdown-word">
-          <a class="book-link" href="/2026/10/02/markdown-word/" aria-label="阅读：Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失"><span class="book-cover" data-collection="experience">
+          <a class="book-link" href="/2026/10/02/markdown-word/" aria-label="Read: Designing a Markdown-to-Word Converter: Structure, Styles, and Lost Formatting"><span class="book-cover" data-collection="experience">
       <img class="book-art" src="/img/books/markdown-word.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⌘ 工程经验</span><span>VOL. II</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>文档转换</span><span>结构与样式</span></span><span class="book-cover-english">THE SCRIPTORIUM</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⌘ Engineering Lessons</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Document Conversion</span><span>Structure &amp; Styles</span></span><span class="book-cover-english">THE SCRIPTORIUM</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">工程经验 / VOL. II</p><h3><a href="/2026/10/02/markdown-word/">Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失</a></h3></div>
+          <div class="book-caption"><p class="book-series">Engineering Lessons / VOL. II</p><h3><a href="/2026/10/02/markdown-word/">Designing a Markdown-to-Word Converter: Structure, Styles, and Lost Formatting</a></h3></div>
         </article><article class="shelf-book" data-series="opensource" data-book="opensource-streams">
-          <a class="book-link" href="/2026/10/02/opensource-streams/" aria-label="阅读：两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败"><span class="book-cover" data-collection="opensource">
+          <a class="book-link" href="/2026/10/02/opensource-streams/" aria-label="Read: Two vLLM-Omni PRs: Recording Streaming Failures Correctly"><span class="book-cover" data-collection="opensource">
       <img class="book-art" src="/img/books/opensource-streams.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>⛉ 开源贡献</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>开源贡献</span><span>流式错误</span></span><span class="book-cover-english">THE VERIFIED STREAM</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-edition"><span>⛉ Open Source</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Open Source</span><span>Stream Errors</span></span><span class="book-cover-english">THE VERIFIED STREAM</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">开源贡献 / VOL. I</p><h3><a href="/2026/10/02/opensource-streams/">两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败</a></h3></div>
+          <div class="book-caption"><p class="book-series">Open Source / VOL. I</p><h3><a href="/2026/10/02/opensource-streams/">Two vLLM-Omni PRs: Recording Streaming Failures Correctly</a></h3></div>
         </article><article class="shelf-book" data-series="infra" data-book="infra-topology">
-          <a class="book-link" href="/2026/10/02/infra-topology/" aria-label="阅读：八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态"><span class="book-cover" data-collection="infra">
+          <a class="book-link" href="/2026/10/02/infra-topology/" aria-label="Read: Eight-GPU Inference Systems: Qwen Topologies and GLM Hybrid State"><span class="book-cover" data-collection="infra">
       <img class="book-art" src="/img/books/infra-topology.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
       <span class="book-edition"><span>✣ AI Infra</span><span>VOL. I</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>八卡推理</span><span>拓扑与状态</span></span><span class="book-cover-english">THE EIGHT TOWERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Eight-GPU Inference</span><span>Topology &amp; State</span></span><span class="book-cover-english">THE EIGHT TOWERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">AI Infra / VOL. I</p><h3><a href="/2026/10/02/infra-topology/">八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Infra / VOL. I</p><h3><a href="/2026/10/02/infra-topology/">Eight-GPU Inference Systems: Qwen Topologies and GLM Hybrid State</a></h3></div>
         </article><article class="shelf-book" data-series="infra" data-book="infra-operators">
-          <a class="book-link" href="/2026/10/02/infra-operators/" aria-label="阅读：AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证"><span class="book-cover" data-collection="infra">
+          <a class="book-link" href="/2026/10/02/infra-operators/" aria-label="Read: AI Infra Kernel Notes: Dual-Stream Scheduling, QKV/RoPE Fusion, and Speculative Verification"><span class="book-cover" data-collection="infra">
       <img class="book-art" src="/img/books/infra-operators.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
       <span class="book-edition"><span>✣ AI Infra</span><span>VOL. II</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>算子学习</span><span>依赖与契约</span></span><span class="book-cover-english">THE THREE MECHANISMS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>GPU Kernels</span><span>Dependencies &amp; Contracts</span></span><span class="book-cover-english">THE THREE MECHANISMS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">AI Infra / VOL. II</p><h3><a href="/2026/10/02/infra-operators/">AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Infra / VOL. II</p><h3><a href="/2026/10/02/infra-operators/">AI Infra Kernel Notes: Dual-Stream Scheduling, QKV/RoPE Fusion, and Speculative Verification</a></h3></div>
         </article><article class="shelf-book" data-series="infra" data-book="amd-architecture">
-          <a class="book-link" href="/2026/10/02/amd-architecture/" aria-label="阅读：AMD GPU 架构笔记：从 Wavefront 到大模型性能分析"><span class="book-cover" data-collection="infra">
+          <a class="book-link" href="/2026/10/02/amd-architecture/" aria-label="Read: AMD GPU Architecture: From Wavefronts to LLM Performance Analysis"><span class="book-cover" data-collection="infra">
       <img class="book-art" src="/img/books/amd-architecture.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
       <span class="book-edition"><span>✣ AI Infra</span><span>VOL. III</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>AMD GPU</span><span>架构基础</span></span><span class="book-cover-english">THE COMPUTE CHAMBER</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>AMD GPU</span><span>Architecture</span></span><span class="book-cover-english">THE COMPUTE CHAMBER</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">AI Infra / VOL. III</p><h3><a href="/2026/10/02/amd-architecture/">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Infra / VOL. III</p><h3><a href="/2026/10/02/amd-architecture/">AMD GPU Architecture: From Wavefronts to LLM Performance Analysis</a></h3></div>
         </article><article class="shelf-book" data-series="infra" data-book="gpu-attention">
-          <a class="book-link" href="/2026/10/02/gpu-attention/" aria-label="阅读：FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线"><span class="book-cover" data-collection="infra">
+          <a class="book-link" href="/2026/10/02/gpu-attention/" aria-label="Read: Reading FlashAttention-4: Non-Matmul Bottlenecks, Online Softmax, and Pipelines"><span class="book-cover" data-collection="infra">
       <img class="book-art" src="/img/books/gpu-attention.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
       <span class="book-edition"><span>✣ AI Infra</span><span>VOL. IV</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>FlashAttention</span><span>流水线设计</span></span><span class="book-cover-english">THE ASYMMETRIC ENGINE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>FlashAttention</span><span>Pipeline Design</span></span><span class="book-cover-english">THE ASYMMETRIC ENGINE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">AI Infra / VOL. IV</p><h3><a href="/2026/10/02/gpu-attention/">FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Infra / VOL. IV</p><h3><a href="/2026/10/02/gpu-attention/">Reading FlashAttention-4: Non-Matmul Bottlenecks, Online Softmax, and Pipelines</a></h3></div>
         </article><article class="shelf-book" data-series="infra" data-book="kimi-architecture">
-          <a class="book-link" href="/2026/10/02/kimi-architecture/" aria-label="阅读：Kimi K3 架构笔记：KDA、深度残差与稀疏专家"><span class="book-cover" data-collection="infra">
+          <a class="book-link" href="/2026/10/02/kimi-architecture/" aria-label="Read: Kimi K3 Architecture: KDA, Depth Residuals, and Sparse Experts"><span class="book-cover" data-collection="infra">
       <img class="book-art" src="/img/books/kimi-architecture.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
       <span class="book-edition"><span>✣ AI Infra</span><span>VOL. V</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>Kimi K3</span><span>模型架构</span></span><span class="book-cover-english">THE THREE RIVERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Kimi K3</span><span>Model Architecture</span></span><span class="book-cover-english">THE THREE RIVERS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">AI Infra / VOL. V</p><h3><a href="/2026/10/02/kimi-architecture/">Kimi K3 架构笔记：KDA、深度残差与稀疏专家</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Infra / VOL. V</p><h3><a href="/2026/10/02/kimi-architecture/">Kimi K3 Architecture: KDA, Depth Residuals, and Sparse Experts</a></h3></div>
         </article><article class="shelf-book" data-series="infra" data-book="kimi-systems">
-          <a class="book-link" href="/2026/10/02/kimi-systems/" aria-label="阅读：Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存"><span class="book-cover" data-collection="infra">
+          <a class="book-link" href="/2026/10/02/kimi-systems/" aria-label="Read: Kimi K3 Systems: Long-Context Training, Expert Scheduling, and Hybrid Caches"><span class="book-cover" data-collection="infra">
       <img class="book-art" src="/img/books/kimi-systems.png" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
       <span class="book-edition"><span>✣ AI Infra</span><span>VOL. VI</span></span>
-      <span class="book-cover-type"><span class="book-cover-title"><span>Kimi K3</span><span>训练与部署</span></span><span class="book-cover-english">THE MEMORY OBSERVATORY</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Kimi K3</span><span>Training &amp; Deployment</span></span><span class="book-cover-english">THE MEMORY OBSERVATORY</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">AI Infra / VOL. VI</p><h3><a href="/2026/10/02/kimi-systems/">Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存</a></h3></div>
+          <div class="book-caption"><p class="book-series">AI Infra / VOL. VI</p><h3><a href="/2026/10/02/kimi-systems/">Kimi K3 Systems: Long-Context Training, Expert Scheduling, and Hybrid Caches</a></h3></div>
         </article><article class="shelf-book" data-series="notes" data-book="hello-world">
-          <a class="book-link" href="/2025/03/30/hello-world/" aria-label="阅读：Hello World"><span class="book-cover" data-collection="notes">
+          <a class="book-link" href="/2025/03/30/hello-world/" aria-label="Read: Hello World"><span class="book-cover" data-collection="notes">
       <img class="book-art" src="/img/books/hello-world-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
       <span class="book-foil" aria-hidden="true"></span>
-      <span class="book-edition"><span>✦ 序章</span><span>VOL. 0</span></span>
+      <span class="book-edition"><span>✦ Prologue</span><span>VOL. 0</span></span>
       <span class="book-cover-type"><span class="book-cover-title"><span>Hello</span><span>World</span></span><span class="book-cover-english">THE FIRST LIGHT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
     </span></a>
-          <div class="book-caption"><p class="book-series">序章 / VOL. 0</p><h3><a href="/2025/03/30/hello-world/">Hello World</a></h3></div>
+          <div class="book-caption"><p class="book-series">Prologue / VOL. 0</p><h3><a href="/2025/03/30/hello-world/">Hello World</a></h3></div>
         </article></div>
-      <div class="shelf-bottom"><span class="collection-description-line"></span><div class="shelf-controls"><button type="button" data-shelf-step="-1" aria-controls="book-rail" aria-label="上一组书籍">←</button><button type="button" data-shelf-step="1" aria-controls="book-rail" aria-label="下一组书籍">→</button></div></div>
-      </section><script type="application/json" id="collection-reader-data">{"collections": [{"id": "llm", "title": "大模型", "subtitle": "知识圣殿", "english": "CATHEDRAL OF KNOWLEDGE", "mark": "✧", "href": "/categories/大模型/", "description": "从神经网络的基石，走向语言模型的构建与应用。", "branch": {"title": "深度学习基础", "href": "/categories/大模型/深度学习基础/", "description": "基础分卷 · 神经网络、优化与训练"}}, {"id": "rl", "title": "强化学习", "subtitle": "骑士试炼", "english": "THE KNIGHT’S TRIALS", "mark": "✥", "href": "/categories/强化学习/", "description": "在行动与反馈之间，探索价值、策略与决策。"}, {"id": "engineering", "title": "工程实践", "subtitle": "工匠手记", "english": "THE ENGINEER’S WORKSHOP", "mark": "⚙", "href": "/categories/工程实践/", "description": "记录具体项目的技术选型、实现过程、故障定位与最终效果。", "sequence": "双机推理 · GR308 模型调优 · 多模态移植"}, {"id": "agents", "title": "智能体", "subtitle": "时钟与行动", "english": "CLOCKWORK AND AGENCY", "mark": "◇", "href": "/categories/智能体/", "description": "研究记忆、主动行为与执行边界，让模型输出进入可检查的系统。", "sequence": "主动触发 · 分层记忆 · 轨迹执行"}, {"id": "experience", "title": "工程经验", "subtitle": "度量与方法", "english": "THE CRAFT OF EVIDENCE", "mark": "⌘", "href": "/categories/工程经验/", "description": "沉淀跨项目可复用的测量、调试、结构设计与交付方法。", "sequence": "实验设计 · 文档结构 · 验收方法"}, {"id": "opensource", "title": "开源贡献", "subtitle": "共同修筑", "english": "THE COMMON WORKS", "mark": "⛉", "href": "/categories/开源贡献/", "description": "从真实问题、补丁与评审出发，记录贡献如何被复现、验证和合并。", "sequence": "问题复现 · 补丁实现 · 评审验证"}, {"id": "infra", "title": "AI Infra", "subtitle": "计算与系统", "english": "THE COMPUTING VAULT", "mark": "✣", "href": "/categories/AI-Infra/", "description": "连接 GPU 架构、算子、模型结构与推理系统，区分学习推导和实测证据。", "sequence": "硬件基础 · 算子机制 · 模型与服务"}, {"id": "notes", "title": "序章", "subtitle": "旅途之始", "english": "PROLOGUE", "mark": "✦", "href": "/2025/03/30/hello-world/", "description": "从第一篇文章开始。"}], "books": [{"id": "llm-roadmap", "collection": "llm", "volume": "I", "title": "大模型算法工程师 — 从零开始学习路线图", "coverTitle": ["大模型", "学习路线图"], "english": "THE ASCENT", "path": "/2026/04/07/0-大模型学习路线图/", "date": "2026-04-07", "summary": "保留基础课程路线，补充从推理基线、算子分析到服务测量、CUDA Graph 与开源贡献的实践路径。", "art": "/img/books/llm-roadmap-color.webp"}, {"id": "deep-learning", "collection": "llm", "volume": "II", "branch": "深度学习基础", "title": "深度学习基础", "coverTitle": ["深度学习", "基础"], "english": "THE FOUNDATIONS", "path": "/2026/04/06/01-深度学习基础/", "date": "2026-04-06", "summary": "梳理神经网络、反向传播、损失函数与优化器，理解深度模型如何完成训练。", "art": "/img/books/deep-learning-color.webp"}, {"id": "rl-foundations", "collection": "rl", "volume": "I", "title": "强化学习基本概念", "coverTitle": ["强化学习", "基本概念"], "english": "THE FIRST TRIAL", "path": "/2026/04/06/1_Reinforce Learning-Basic Concepts/", "date": "2026-04-06", "summary": "从状态、动作与奖励出发，理解智能体和环境的交互，以及策略与价值函数。", "art": "/img/books/rl-foundations-color.webp"}, {"id": "value-learning", "collection": "rl", "volume": "II", "title": "基于价值的强化学习", "coverTitle": ["基于价值的", "强化学习"], "english": "THE SCALES OF VALUE", "path": "/2026/04/06/2-Value-Based Reinforcement Learning/", "date": "2026-04-06", "summary": "用 Q 函数评估行动价值，沿着 DQN 与时序差分学习理解价值网络的训练过程。", "art": "/img/books/value-learning-color.webp"}, {"id": "policy-learning", "collection": "rl", "volume": "III", "title": "基于策略的强化学习", "coverTitle": ["基于策略的", "强化学习"], "english": "THE CHOSEN PATH", "path": "/2026/04/06/3-Policy-Based Reinforcement Learning/", "date": "2026-04-06", "summary": "直接学习动作的概率分布，通过策略梯度优化离散与连续动作下的决策。", "art": "/img/books/policy-learning-color.webp"}, {"id": "actor-critic", "collection": "rl", "volume": "IV", "title": "Actor-Critic 方法", "coverTitle": ["Actor–Critic", "方法"], "english": "THE TWIN OATH", "path": "/2026/04/06/4-Actor-Critic/", "date": "2026-04-06", "summary": "理解 Actor 与 Critic 的协作，区分 Q 值训练残差、状态基线与优势估计，掌握一致的更新方向。", "art": "/img/books/actor-critic-color.webp"}, {"id": "tree-search", "collection": "rl", "volume": "V", "title": "蒙特卡洛树搜索", "coverTitle": ["蒙特卡洛", "树搜索"], "english": "THE TREE OF FUTURES", "path": "/2026/04/06/5-Monte Carlo Tree Search/", "date": "2026-04-06", "summary": "梳理 MCTS 的选择、扩展、评估与回传，区分策略先验、环境转移和价值估计。", "art": "/img/books/tree-search-color.webp"}, {"id": "dual-mac-inference", "collection": "engineering", "volume": "I", "title": "两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度", "coverTitle": ["双 Mac", "模型推理"], "english": "THE TWIN TOWERS", "path": "/2026/10/02/dual-mac-inference/", "date": "2026-10-02", "summary": "从两台 16GB Mac 的公开实验出发，解释流水线切层、权重打包、懒执行与上下文验证的边界。", "art": "/img/books/dual-mac-inference.png", "source": "content/posts/dual-mac-inference.md", "tags": ["大模型", "MLX", "分布式推理"]}, {"id": "gr308-language", "collection": "engineering", "volume": "II", "title": "GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收", "coverTitle": ["GR308", "语言模型"], "english": "THE CALIBRATION", "path": "/2026/10/02/gr308-language/", "date": "2026-10-02", "summary": "覆盖 Qwen、DeepSeek 等模型的并行拓扑、MTP、Graph 与量化分支，保留正式测试、短测及失败边界。", "art": "/img/books/gr308-language.png", "source": "content/posts/gr308-language.md", "tags": ["GR308", "大模型", "性能测量"]}, {"id": "gr308-image", "collection": "engineering", "volume": "III", "title": "Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE", "coverTitle": ["GR308", "图像生成"], "english": "THE MOSAIC ENGINE", "path": "/2026/10/02/gr308-image/", "date": "2026-10-02", "summary": "从 Qwen Image 单卡出图、分块 VAE 到 TP2 DiT，追踪实现细节、数值差异与尚未完成的验收。", "art": "/img/books/gr308-image.png", "source": "content/posts/gr308-image.md", "tags": ["GR308", "多模态", "分布式推理"]}, {"id": "gr308-video", "collection": "engineering", "volume": "IV", "title": "GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门", "coverTitle": ["GR308", "视频调优"], "english": "THE MOVING LANTERN", "path": "/2026/10/02/gr308-video/", "date": "2026-10-02", "summary": "记录 Wan2.2 混合精度路径与 H3 解码权重缓存，分别解释有效收益、质量门和长视频阻塞。", "art": "/img/books/gr308-video.png", "source": "content/posts/gr308-video.md", "tags": ["GR308", "多模态", "性能测量"]}, {"id": "heartbeat-agent", "collection": "agents", "volume": "I", "title": "Heartbeat 的工程拆解：主动触发、分层记忆与工具边界", "coverTitle": ["主动 Agent", "分层记忆"], "english": "THE QUIET CLOCK", "path": "/2026/10/02/heartbeat-agent/", "date": "2026-10-02", "summary": "拆解 Heartbeat 的候选触发、状态与冷却、分层记忆、云端请求边界和工具授权。", "art": "/img/books/heartbeat-agent.png", "source": "content/posts/heartbeat-agent.md", "tags": ["Agent", "记忆系统"]}, {"id": "safe-motion", "collection": "agents", "volume": "II", "title": "从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么", "coverTitle": ["机械臂", "轨迹执行"], "english": "THE GUARDED HAND", "path": "/2026/10/02/safe-motion/", "date": "2026-10-02", "summary": "用软件机械臂回放解释动作语义、全身几何检查、速度缩放及离散验证的适用范围。", "art": "/img/books/safe-motion.png", "source": "content/posts/safe-motion.md", "tags": ["机器人", "安全执行"]}, {"id": "inference-evidence", "collection": "experience", "volume": "I", "title": "推理优化怎样形成可信结论：从算子实验到服务验收", "coverTitle": ["推理优化", "实验与证据"], "english": "THE MEASURE", "path": "/2026/10/02/inference-evidence/", "date": "2026-10-02", "summary": "从算子契约到服务请求，建立对照实验、正确性门槛、失败语义与版本证据的完整记录。", "art": "/img/books/inference-evidence.png", "source": "content/posts/inference-evidence.md", "tags": ["大模型", "性能测量"]}, {"id": "markdown-word", "collection": "experience", "volume": "II", "title": "Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失", "coverTitle": ["文档转换", "结构与样式"], "english": "THE SCRIPTORIUM", "path": "/2026/10/02/markdown-word/", "date": "2026-10-02", "summary": "以 Markdown 转 Word 工具为例，分析语义保存、样式设计、格式丢失和转换验收。", "art": "/img/books/markdown-word.png", "source": "content/posts/markdown-word.md", "tags": ["文档工程", "Markdown"]}, {"id": "opensource-streams", "collection": "opensource", "volume": "I", "title": "两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败", "coverTitle": ["开源贡献", "流式错误"], "english": "THE VERIFIED STREAM", "path": "/2026/10/02/opensource-streams/", "date": "2026-10-02", "summary": "复盘 vLLM-Omni 两个已合并 PR：从 SSE 错误复现到聊天与图像编辑客户端的终态修复。", "art": "/img/books/opensource-streams.png", "source": "content/posts/opensource-streams.md", "tags": ["开源贡献", "vLLM-Omni", "性能测量"]}, {"id": "infra-topology", "collection": "infra", "volume": "I", "title": "八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态", "coverTitle": ["八卡推理", "拓扑与状态"], "english": "THE EIGHT TOWERS", "path": "/2026/10/02/infra-topology/", "date": "2026-10-02", "summary": "从八卡学习包理解 Qwen、GLM 的部署选择、Graph、混合状态和联合实验的边界。", "art": "/img/books/infra-topology.png", "source": "content/posts/infra-topology.md", "tags": ["AI Infra", "分布式推理", "性能测量"]}, {"id": "infra-operators", "collection": "infra", "volume": "II", "title": "AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证", "coverTitle": ["算子学习", "依赖与契约"], "english": "THE THREE MECHANISMS", "path": "/2026/10/02/infra-operators/", "date": "2026-10-02", "summary": "完整拆解 MoE 双流、视觉 QKV/RoPE 融合与投机验证的契约、代码和回归门。", "art": "/img/books/infra-operators.png", "source": "content/posts/infra-operators.md", "tags": ["AI Infra", "算子优化", "投机解码"]}, {"id": "amd-architecture", "collection": "infra", "volume": "III", "title": "AMD GPU 架构笔记：从 Wavefront 到大模型性能分析", "coverTitle": ["AMD GPU", "架构基础"], "english": "THE COMPUTE CHAMBER", "path": "/2026/10/02/amd-architecture/", "date": "2026-10-02", "summary": "从 HIP 线程层次、CU 与内存出发，理解 occupancy、数据布局、架构差异及 LLM 性能分析。", "art": "/img/books/amd-architecture.png", "source": "content/posts/amd-architecture.md", "tags": ["AI Infra", "GPU架构"]}, {"id": "gpu-attention", "collection": "infra", "volume": "IV", "title": "FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线", "coverTitle": ["FlashAttention", "流水线设计"], "english": "THE ASYMMETRIC ENGINE", "path": "/2026/10/02/gpu-attention/", "date": "2026-10-02", "summary": "保留 FlashAttention-4 的在线 Softmax 推导、七张技术图与前后向流水线分析，明确论文实验范围。", "art": "/img/books/gpu-attention.png", "source": "content/posts/gpu-attention.md", "tags": ["AI Infra", "Attention", "算子优化"]}, {"id": "kimi-architecture", "collection": "infra", "volume": "V", "title": "Kimi K3 架构笔记：KDA、深度残差与稀疏专家", "coverTitle": ["Kimi K3", "模型架构"], "english": "THE THREE RIVERS", "path": "/2026/10/02/kimi-architecture/", "date": "2026-10-02", "summary": "沿序列、深度与专家三个方向拆解 KDA、MLA、AttnRes 与 Stable LatentMoE。", "art": "/img/books/kimi-architecture.png", "source": "content/posts/kimi-architecture.md", "tags": ["AI Infra", "模型架构", "MoE"]}, {"id": "kimi-systems", "collection": "infra", "volume": "VI", "title": "Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存", "coverTitle": ["Kimi K3", "训练与部署"], "english": "THE MEMORY OBSERVATORY", "path": "/2026/10/02/kimi-systems/", "date": "2026-10-02", "summary": "解释长上下文训练、Agent RL、KCP、MoonEP、混合缓存及部署感知量化之间的联系。", "art": "/img/books/kimi-systems.png", "source": "content/posts/kimi-systems.md", "tags": ["AI Infra", "模型架构", "分布式推理"]}, {"id": "hello-world", "collection": "notes", "volume": "0", "title": "Hello World", "coverTitle": ["Hello", "World"], "english": "THE FIRST LIGHT", "path": "/2025/03/30/hello-world/", "date": "2025-03-30", "summary": "博客的第一篇文章：用 Hexo 创建文章、启动预览，并生成和发布静态站点。", "art": "/img/books/hello-world-color.webp"}]}</script><noscript><p><a href="/categories/">浏览全部合集与文章 ↗</a></p></noscript>
+      <div class="shelf-bottom"><span class="collection-description-line"></span><div class="shelf-controls"><button type="button" data-shelf-step="-1" aria-controls="book-rail" aria-label="Previous books">←</button><button type="button" data-shelf-step="1" aria-controls="book-rail" aria-label="Next books">→</button></div></div>
+      </section><script type="application/json" id="collection-reader-data">{"collections": [{"id": "llm", "title": "Large Language Models", "subtitle": "Cathedral of Knowledge", "english": "CATHEDRAL OF KNOWLEDGE", "mark": "✧", "href": "/categories/大模型/", "description": "From neural-network foundations to building and applying language models.", "branch": {"title": "Deep Learning Fundamentals", "href": "/categories/大模型/深度学习基础/", "description": "Foundations · Neural networks, optimization, and training"}}, {"id": "rl", "title": "Reinforcement Learning", "subtitle": "The Knight’s Trials", "english": "THE KNIGHT’S TRIALS", "mark": "✥", "href": "/categories/强化学习/", "description": "Exploring value, policy, and decision-making through actions and feedback."}, {"id": "engineering", "title": "Engineering Projects", "subtitle": "The Engineer’s Workshop", "english": "THE ENGINEER’S WORKSHOP", "mark": "⚙", "href": "/categories/工程实践/", "description": "Technology choices, implementation, debugging, and results from concrete projects.", "sequence": "Dual-Mac inference · GR308 tuning · Multimodal ports"}, {"id": "agents", "title": "AI Agents", "subtitle": "Clockwork and Agency", "english": "CLOCKWORK AND AGENCY", "mark": "◇", "href": "/categories/智能体/", "description": "Memory, proactive behavior, and execution boundaries that make model-driven systems inspectable.", "sequence": "Proactive triggers · Layered memory · Trajectory execution"}, {"id": "experience", "title": "Engineering Lessons", "subtitle": "The Craft of Evidence", "english": "THE CRAFT OF EVIDENCE", "mark": "⌘", "href": "/categories/工程经验/", "description": "Reusable approaches to measurement, debugging, structural design, and delivery.", "sequence": "Experimental design · Document structure · Acceptance testing"}, {"id": "opensource", "title": "Open Source", "subtitle": "The Common Works", "english": "THE COMMON WORKS", "mark": "⛉", "href": "/categories/开源贡献/", "description": "Reproducing, validating, and merging contributions through real issues, patches, and reviews.", "sequence": "Issue reproduction · Patch implementation · Review and validation"}, {"id": "infra", "title": "AI Infra", "subtitle": "Computing and Systems", "english": "THE COMPUTING VAULT", "mark": "✣", "href": "/categories/AI-Infra/", "description": "Connecting GPU architecture, kernels, model structures, and inference systems while distinguishing derivations from measured evidence.", "sequence": "Hardware foundations · Kernel mechanics · Models and services"}, {"id": "notes", "title": "Prologue", "subtitle": "The First Steps", "english": "PROLOGUE", "mark": "✦", "href": "/2025/03/30/hello-world/", "description": "Starting with the first post."}], "books": [{"id": "llm-roadmap", "collection": "llm", "volume": "I", "title": "Becoming an LLM Engineer: A Learning Roadmap from Scratch", "coverTitle": ["LLM", "Roadmap"], "english": "THE ASCENT", "path": "/2026/04/07/0-大模型学习路线图/", "date": "2026-04-07", "summary": "A foundational curriculum extended with practical work on inference baselines, kernel analysis, service measurement, CUDA Graphs, and open-source contributions.", "art": "/img/books/llm-roadmap-color.webp", "tags": ["Learning Roadmap", "Large Language Models"]}, {"id": "deep-learning", "collection": "llm", "volume": "II", "branch": "Deep Learning Fundamentals", "title": "Deep Learning Fundamentals", "coverTitle": ["Deep Learning", "Foundations"], "english": "THE FOUNDATIONS", "path": "/2026/04/06/01-深度学习基础/", "date": "2026-04-06", "summary": "Neural networks, backpropagation, loss functions, and optimizers: how deep models are trained.", "art": "/img/books/deep-learning-color.webp", "tags": ["Deep Learning", "Activation Functions", "Optimizers", "Regularization", "Normalization", "Loss Functions"]}, {"id": "rl-foundations", "collection": "rl", "volume": "I", "title": "Reinforcement Learning Fundamentals", "coverTitle": ["Reinforcement", "Learning Basics"], "english": "THE FIRST TRIAL", "path": "/2026/04/06/1_Reinforce Learning-Basic Concepts/", "date": "2026-04-06", "summary": "States, actions, rewards, policies, and value functions, starting with the interaction between an agent and its environment.", "art": "/img/books/rl-foundations-color.webp", "tags": ["Reinforcement Learning", "Machine Learning"]}, {"id": "value-learning", "collection": "rl", "volume": "II", "title": "Value-Based Reinforcement Learning", "coverTitle": ["Value-Based", "Learning"], "english": "THE SCALES OF VALUE", "path": "/2026/04/06/2-Value-Based Reinforcement Learning/", "date": "2026-04-06", "summary": "Evaluating actions with Q-functions and training value networks through DQN and temporal-difference learning.", "art": "/img/books/value-learning-color.webp", "tags": ["Deep Learning", "Reinforcement Learning", "DQN"]}, {"id": "policy-learning", "collection": "rl", "volume": "III", "title": "Policy-Based Reinforcement Learning", "coverTitle": ["Policy-Based", "Learning"], "english": "THE CHOSEN PATH", "path": "/2026/04/06/3-Policy-Based Reinforcement Learning/", "date": "2026-04-06", "summary": "Learning action distributions directly and optimizing discrete and continuous decisions with policy gradients.", "art": "/img/books/policy-learning-color.webp", "tags": ["Reinforcement Learning", "Policy Gradients"]}, {"id": "actor-critic", "collection": "rl", "volume": "IV", "title": "Actor-Critic Methods", "coverTitle": ["Actor–Critic", "Methods"], "english": "THE TWIN OATH", "path": "/2026/04/06/4-Actor-Critic/", "date": "2026-04-06", "summary": "How actors and critics work together: Q-value residuals, state baselines, advantage estimates, and consistent update directions.", "art": "/img/books/actor-critic-color.webp", "tags": ["Reinforcement Learning", "Actor-Critic"]}, {"id": "tree-search", "collection": "rl", "volume": "V", "title": "Monte Carlo Tree Search", "coverTitle": ["Monte Carlo", "Tree Search"], "english": "THE TREE OF FUTURES", "path": "/2026/04/06/5-Monte Carlo Tree Search/", "date": "2026-04-06", "summary": "Selection, expansion, evaluation, and backup in MCTS, with distinctions between policy priors, environment transitions, and value estimates.", "art": "/img/books/tree-search-color.webp", "tags": ["Reinforcement Learning", "MCTS"]}, {"id": "dual-mac-inference", "collection": "engineering", "volume": "I", "title": "Running Qwen3-32B on Two 16GB Macs: Pipelines, Weight Sharding, and Submission Granularity", "coverTitle": ["Dual-Mac", "Inference"], "english": "THE TWIN TOWERS", "path": "/2026/10/02/dual-mac-inference/", "date": "2026-10-02", "summary": "A public two-Mac experiment explained through pipeline partitioning, weight packing, lazy execution, and the limits of context-length validation.", "art": "/img/books/dual-mac-inference.png", "source": "content/posts/dual-mac-inference.md", "tags": ["Large Language Models", "MLX", "Distributed Inference"]}, {"id": "gr308-language", "collection": "engineering", "volume": "II", "title": "Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests", "coverTitle": ["GR308", "Language Models"], "english": "THE CALIBRATION", "path": "/2026/10/02/gr308-language/", "date": "2026-10-02", "summary": "Parallel topologies, MTP, graphs, and quantization for Qwen and DeepSeek, distinguishing full tests, short runs, and failure boundaries.", "art": "/img/books/gr308-language.png", "source": "content/posts/gr308-language.md", "tags": ["GR308", "Large Language Models", "Performance Measurement"]}, {"id": "gr308-image", "collection": "engineering", "volume": "III", "title": "Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE", "coverTitle": ["GR308", "Image Generation"], "english": "THE MOSAIC ENGINE", "path": "/2026/10/02/gr308-image/", "date": "2026-10-02", "summary": "From single-GPU Qwen Image generation and tiled VAE to TP2 DiT: implementation details, numerical differences, and outstanding acceptance tests.", "art": "/img/books/gr308-image.png", "source": "content/posts/gr308-image.md", "tags": ["GR308", "Multimodal", "Distributed Inference"]}, {"id": "gr308-video", "collection": "engineering", "volume": "IV", "title": "Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks", "coverTitle": ["GR308", "Video Tuning"], "english": "THE MOVING LANTERN", "path": "/2026/10/02/gr308-video/", "date": "2026-10-02", "summary": "Wan2.2 mixed-precision paths and H3 decoder weight caching, including measured gains, quality checks, and long-video blockers.", "art": "/img/books/gr308-video.png", "source": "content/posts/gr308-video.md", "tags": ["GR308", "Multimodal", "Performance Measurement"]}, {"id": "heartbeat-agent", "collection": "agents", "volume": "I", "title": "Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries", "coverTitle": ["Proactive Agents", "Layered Memory"], "english": "THE QUIET CLOCK", "path": "/2026/10/02/heartbeat-agent/", "date": "2026-10-02", "summary": "Candidate triggers, state and cooldowns, layered memory, cloud request boundaries, and tool authorization in Heartbeat.", "art": "/img/books/heartbeat-agent.png", "source": "content/posts/heartbeat-agent.md", "tags": ["Agent", "Memory Systems"]}, {"id": "safe-motion", "collection": "agents", "volume": "II", "title": "From VLA Actions to Robot Trajectories: Validating an Execution Layer", "coverTitle": ["Robot Arms", "Trajectory Execution"], "english": "THE GUARDED HAND", "path": "/2026/10/02/safe-motion/", "date": "2026-10-02", "summary": "Software robot-arm replay as a guide to action semantics, whole-body geometry checks, speed scaling, and the limits of discrete validation.", "art": "/img/books/safe-motion.png", "source": "content/posts/safe-motion.md", "tags": ["Robotics", "Safe Execution"]}, {"id": "inference-evidence", "collection": "experience", "volume": "I", "title": "Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance", "coverTitle": ["Inference", "Evidence"], "english": "THE MEASURE", "path": "/2026/10/02/inference-evidence/", "date": "2026-10-02", "summary": "Building controlled experiments, correctness thresholds, failure semantics, and versioned evidence from kernel contracts to service requests.", "art": "/img/books/inference-evidence.png", "source": "content/posts/inference-evidence.md", "tags": ["Large Language Models", "Performance Measurement"]}, {"id": "markdown-word", "collection": "experience", "volume": "II", "title": "Designing a Markdown-to-Word Converter: Structure, Styles, and Lost Formatting", "coverTitle": ["Document Conversion", "Structure & Styles"], "english": "THE SCRIPTORIUM", "path": "/2026/10/02/markdown-word/", "date": "2026-10-02", "summary": "Semantic preservation, style design, formatting loss, and acceptance checks in a Markdown-to-Word conversion tool.", "art": "/img/books/markdown-word.png", "source": "content/posts/markdown-word.md", "tags": ["Document Engineering", "Markdown"]}, {"id": "opensource-streams", "collection": "opensource", "volume": "I", "title": "Two vLLM-Omni PRs: Recording Streaming Failures Correctly", "coverTitle": ["Open Source", "Stream Errors"], "english": "THE VERIFIED STREAM", "path": "/2026/10/02/opensource-streams/", "date": "2026-10-02", "summary": "Two merged vLLM-Omni PRs, from reproducing SSE errors to fixing terminal states in chat and image-editing benchmark clients.", "art": "/img/books/opensource-streams.png", "source": "content/posts/opensource-streams.md", "tags": ["Open Source", "vLLM-Omni", "Performance Measurement"]}, {"id": "infra-topology", "collection": "infra", "volume": "I", "title": "Eight-GPU Inference Systems: Qwen Topologies and GLM Hybrid State", "coverTitle": ["Eight-GPU Inference", "Topology & State"], "english": "THE EIGHT TOWERS", "path": "/2026/10/02/infra-topology/", "date": "2026-10-02", "summary": "Deployment choices, graphs, hybrid state, and the limits of combined experiments, based on an eight-GPU Qwen and GLM study.", "art": "/img/books/infra-topology.png", "source": "content/posts/infra-topology.md", "tags": ["AI Infra", "Distributed Inference", "Performance Measurement"]}, {"id": "infra-operators", "collection": "infra", "volume": "II", "title": "AI Infra Kernel Notes: Dual-Stream Scheduling, QKV/RoPE Fusion, and Speculative Verification", "coverTitle": ["GPU Kernels", "Dependencies & Contracts"], "english": "THE THREE MECHANISMS", "path": "/2026/10/02/infra-operators/", "date": "2026-10-02", "summary": "Contracts, implementation, and regression checks for dual-stream MoE, vision QKV/RoPE fusion, and speculative verification.", "art": "/img/books/infra-operators.png", "source": "content/posts/infra-operators.md", "tags": ["AI Infra", "Kernel Optimization", "Speculative Decoding"]}, {"id": "amd-architecture", "collection": "infra", "volume": "III", "title": "AMD GPU Architecture: From Wavefronts to LLM Performance Analysis", "coverTitle": ["AMD GPU", "Architecture"], "english": "THE COMPUTE CHAMBER", "path": "/2026/10/02/amd-architecture/", "date": "2026-10-02", "summary": "HIP thread hierarchies, compute units, and memory as a foundation for occupancy, data layout, architecture differences, and LLM performance analysis.", "art": "/img/books/amd-architecture.png", "source": "content/posts/amd-architecture.md", "tags": ["AI Infra", "GPU Architecture"]}, {"id": "gpu-attention", "collection": "infra", "volume": "IV", "title": "Reading FlashAttention-4: Non-Matmul Bottlenecks, Online Softmax, and Pipelines", "coverTitle": ["FlashAttention", "Pipeline Design"], "english": "THE ASYMMETRIC ENGINE", "path": "/2026/10/02/gpu-attention/", "date": "2026-10-02", "summary": "Online Softmax derivations, seven technical figures, and forward/backward pipeline analysis, with explicit boundaries on the paper’s experimental claims.", "art": "/img/books/gpu-attention.png", "source": "content/posts/gpu-attention.md", "tags": ["AI Infra", "Attention", "Kernel Optimization"]}, {"id": "kimi-architecture", "collection": "infra", "volume": "V", "title": "Kimi K3 Architecture: KDA, Depth Residuals, and Sparse Experts", "coverTitle": ["Kimi K3", "Model Architecture"], "english": "THE THREE RIVERS", "path": "/2026/10/02/kimi-architecture/", "date": "2026-10-02", "summary": "KDA, MLA, AttnRes, and Stable LatentMoE examined along the sequence, depth, and expert dimensions.", "art": "/img/books/kimi-architecture.png", "source": "content/posts/kimi-architecture.md", "tags": ["AI Infra", "Model Architecture", "MoE"]}, {"id": "kimi-systems", "collection": "infra", "volume": "VI", "title": "Kimi K3 Systems: Long-Context Training, Expert Scheduling, and Hybrid Caches", "coverTitle": ["Kimi K3", "Training & Deployment"], "english": "THE MEMORY OBSERVATORY", "path": "/2026/10/02/kimi-systems/", "date": "2026-10-02", "summary": "Connections between long-context training, agent RL, KCP, MoonEP, hybrid caches, and deployment-aware quantization.", "art": "/img/books/kimi-systems.png", "source": "content/posts/kimi-systems.md", "tags": ["AI Infra", "Model Architecture", "Distributed Inference"]}, {"id": "hello-world", "collection": "notes", "volume": "0", "title": "Hello World", "coverTitle": ["Hello", "World"], "english": "THE FIRST LIGHT", "path": "/2025/03/30/hello-world/", "date": "2025-03-30", "summary": "The first post: creating a Hexo article, running a preview, and generating and publishing a static site.", "art": "/img/books/hello-world-color.webp", "tags": []}]}</script><noscript><p><a href="/categories/">Browse all collections and articles ↗</a></p></noscript>
     </div>
 </section>
       </main>
       <footer class="site-footer">
         <p>
           <a href="/">L_F's Blog</a
-          ><span class="footer-divider"></span>把想法写进代码。
+          ><span class="footer-divider"></span>Learning, experimenting, taking notes.
         </p>
         <div class="footer-links">
-          <a href="/archives/">全部文章</a
+          <a href="/archives/">All articles</a
           ><a
             href="https://github.com/Levius-Fubuki"
             target="_blank"
@@ -480,8 +482,8 @@
     </div>
     <dialog id="search-dialog" aria-labelledby="search-title">
       <div class="search-header">
-        <h2 id="search-title">搜索文章</h2>
-        <button class="search-close" aria-label="关闭搜索">
+        <h2 id="search-title">Search articles</h2>
+        <button class="search-close" aria-label="Close search">
           <img src="/img/redesign/icons/x.svg" alt="" width="24" height="24" />
         </button>
       </div>
@@ -490,19 +492,19 @@
           src="/img/redesign/icons/magnifying-glass.svg"
           alt=""
           width="22"
-          height="22" /><span class="sr-only">文章关键词</span
+          height="22" /><span class="sr-only">Article keywords</span
         ><input
           id="search-input"
           type="search"
-          placeholder="搜索标题或正文，例如 Actor-Critic"
+          placeholder="Search titles or content, e.g. Actor-Critic"
           autocomplete="off"
       /></label>
       <p id="search-status" role="status" aria-live="polite">
-        输入关键词，查找学习笔记。
+        Enter keywords to find notes.
       </p>
-      <ul id="search-results" aria-label="搜索结果"></ul>
+      <ul id="search-results" aria-label="Search results"></ul>
       <div class="search-footer">
-        <span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+        <span>Search all articles</span><span><kbd>Esc</kbd> Close</span>
       </div>
     </dialog>
   </body>

@@ -95,7 +95,7 @@
     running = allowed && inView && !document.hidden && !dialog?.open;
     root.classList.toggle("motion-running", running);
     toggle.setAttribute("aria-pressed", String(allowed));
-    toggle.textContent = reduced.matches ? "动效：随系统关闭" : `环境动效：${enabled ? "开" : "关"}`;
+    toggle.textContent = reduced.matches ? "Motion: off (system)" : `Ambient motion: ${enabled ? "on" : "off"}`;
     toggle.disabled = reduced.matches;
     cancelAnimationFrame(frame);
     frame = 0;

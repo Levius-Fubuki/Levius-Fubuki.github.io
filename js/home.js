@@ -22,13 +22,13 @@
     if (!nav || !menuButton) return;
     nav.classList.remove("is-open");
     menuButton.setAttribute("aria-expanded", "false");
-    menuButton.setAttribute("aria-label", "展开导航");
+    menuButton.setAttribute("aria-label", "Open navigation");
   }
   menuButton?.addEventListener("click", () => {
     const open = !nav.classList.contains("is-open");
     nav.classList.toggle("is-open", open);
     menuButton.setAttribute("aria-expanded", String(open));
-    menuButton.setAttribute("aria-label", open ? "收起导航" : "展开导航");
+    menuButton.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
   });
   nav
     ?.querySelectorAll("a")
@@ -37,7 +37,7 @@
   async function loadIndex() {
     if (index) return index;
     if (!pendingIndex) {
-      pendingIndex = fetch("/js/search-index.json")
+      pendingIndex = fetch("/js/search-index.json?v=b5a2e58074a8")
         .then((response) => {
           if (!response.ok) throw new Error("Search index unavailable");
           return response.json();
@@ -69,10 +69,10 @@
     const query = input.value.trim().toLocaleLowerCase();
     results.replaceChildren();
     if (!query) {
-      status.textContent = "输入关键词，查找学习笔记。";
+      status.textContent = "Enter keywords to search the notes.";
       return;
     }
-    status.textContent = "正在搜索…";
+    status.textContent = "Searching…";
     try {
       const articles = await loadIndex();
       if (input.value.trim().toLocaleLowerCase() !== query || !dialog.open)
@@ -89,8 +89,8 @@
             Number(a.title.toLocaleLowerCase().includes(query)),
         );
       status.textContent = matches.length
-        ? `找到 ${matches.length} 篇文章`
-        : "没有找到相关文章，试试「强化学习」或「深度学习」。";
+        ? `${matches.length} articles found`
+        : "No matching articles. Try “reinforcement learning” or “deep learning”.";
       const fragment = document.createDocumentFragment();
       for (const item of matches) {
         const li = document.createElement("li");
@@ -111,7 +111,7 @@
     } catch {
       if (input.value.trim().toLocaleLowerCase() === query)
         status.textContent =
-          "搜索暂时无法加载，请重新输入重试，或前往归档浏览。";
+          "Search is unavailable. Try again or browse the archives.";
     }
   }
 

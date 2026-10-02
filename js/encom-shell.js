@@ -68,18 +68,18 @@
     content.replaceChildren();
     const text = (tag,value) => {const node=document.createElement(tag);node.textContent=value;return node};
     if(type==='about'){
-      content.append(text('h4',"Levius / L_F's Blog"),text('p','把想法写进代码。关注 AI Infra、多模态推理与 AI Agent，分享工程实践和学习笔记。'));
+      content.append(text('h4',"Levius / L_F's Blog"),text('p',"I'm Levius, currently focused on AI Infra and the systems behind modern AI."));
       const link=text('a','GitHub / Levius-Fubuki ↗');link.href='https://github.com/Levius-Fubuki';link.target='_blank';link.rel='noopener noreferrer';content.append(link);return;
     }
-    content.append(text('p','正在读取文章索引…'));
+    content.append(text('p','Loading the article index…'));
     try {
       const articles=await window.LeviusBlog.loadIndex();
-      const list=type==='reinforcement'?articles.filter(a=>/强化学习|基于价值|基于策略|Actor-Critic|蒙特卡洛/.test(a.title)):type==='deep-learning'?articles.filter(a=>/深度学习/.test(a.title)):articles;
-      content.replaceChildren(text('p',`${list.length} 篇文章 / ${labels[type]}`));
+      const list=type==='reinforcement'?articles.filter(a=>/Reinforcement Learning|Value-Based|Policy-Based|Actor-Critic|Monte Carlo|强化学习|基于价值|基于策略|蒙特卡洛/i.test(a.title)):type==='deep-learning'?articles.filter(a=>/Deep Learning|深度学习/i.test(a.title)):articles;
+      content.replaceChildren(text('p',`${list.length} articles / ${labels[type]}`));
       list.forEach(a=>{const row=text('article','');row.className='program-article';const link=text('a',`${String(articles.indexOf(a)+1).padStart(2,'0')} / ${a.title}`);link.href=a.url;row.append(link,text('p',a.text.slice(0,110)+'…'));content.append(row)});
     } catch {
-      content.replaceChildren(text('p','文章索引加载失败。'));
-      const retry=text('button','重试');retry.type='button';retry.addEventListener('click',()=>fillProgram(type));content.append(retry);
+      content.replaceChildren(text('p','The article index could not be loaded.'));
+      const retry=text('button','Retry');retry.type='button';retry.addEventListener('click',()=>fillProgram(type));content.append(retry);
     }
   }
   async function launch(type='articles') {

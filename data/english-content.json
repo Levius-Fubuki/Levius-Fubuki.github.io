@@ -1,0 +1,239 @@
+{
+  "books": {
+    "llm-roadmap": {
+      "title": "Becoming an LLM Engineer: A Learning Roadmap from Scratch",
+      "coverTitle": [
+        "LLM",
+        "Roadmap"
+      ],
+      "summary": "A foundational curriculum extended with practical work on inference baselines, kernel analysis, service measurement, CUDA Graphs, and open-source contributions."
+    },
+    "deep-learning": {
+      "title": "Deep Learning Fundamentals",
+      "coverTitle": [
+        "Deep Learning",
+        "Foundations"
+      ],
+      "summary": "Neural networks, backpropagation, loss functions, and optimizers: how deep models are trained."
+    },
+    "rl-foundations": {
+      "title": "Reinforcement Learning Fundamentals",
+      "coverTitle": [
+        "Reinforcement",
+        "Learning Basics"
+      ],
+      "summary": "States, actions, rewards, policies, and value functions, starting with the interaction between an agent and its environment."
+    },
+    "value-learning": {
+      "title": "Value-Based Reinforcement Learning",
+      "coverTitle": [
+        "Value-Based",
+        "Learning"
+      ],
+      "summary": "Evaluating actions with Q-functions and training value networks through DQN and temporal-difference learning."
+    },
+    "policy-learning": {
+      "title": "Policy-Based Reinforcement Learning",
+      "coverTitle": [
+        "Policy-Based",
+        "Learning"
+      ],
+      "summary": "Learning action distributions directly and optimizing discrete and continuous decisions with policy gradients."
+    },
+    "actor-critic": {
+      "title": "Actor-Critic Methods",
+      "coverTitle": [
+        "Actor–Critic",
+        "Methods"
+      ],
+      "summary": "How actors and critics work together: Q-value residuals, state baselines, advantage estimates, and consistent update directions."
+    },
+    "tree-search": {
+      "title": "Monte Carlo Tree Search",
+      "coverTitle": [
+        "Monte Carlo",
+        "Tree Search"
+      ],
+      "summary": "Selection, expansion, evaluation, and backup in MCTS, with distinctions between policy priors, environment transitions, and value estimates."
+    },
+    "dual-mac-inference": {
+      "title": "Running Qwen3-32B on Two 16GB Macs: Pipelines, Weight Sharding, and Submission Granularity",
+      "coverTitle": [
+        "Dual-Mac",
+        "Inference"
+      ],
+      "summary": "A public two-Mac experiment explained through pipeline partitioning, weight packing, lazy execution, and the limits of context-length validation."
+    },
+    "gr308-language": {
+      "title": "Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests",
+      "coverTitle": [
+        "GR308",
+        "Language Models"
+      ],
+      "summary": "Parallel topologies, MTP, graphs, and quantization for Qwen and DeepSeek, distinguishing full tests, short runs, and failure boundaries."
+    },
+    "gr308-image": {
+      "title": "Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE",
+      "coverTitle": [
+        "GR308",
+        "Image Generation"
+      ],
+      "summary": "From single-GPU Qwen Image generation and tiled VAE to TP2 DiT: implementation details, numerical differences, and outstanding acceptance tests."
+    },
+    "gr308-video": {
+      "title": "Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks",
+      "coverTitle": [
+        "GR308",
+        "Video Tuning"
+      ],
+      "summary": "Wan2.2 mixed-precision paths and H3 decoder weight caching, including measured gains, quality checks, and long-video blockers."
+    },
+    "heartbeat-agent": {
+      "title": "Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries",
+      "coverTitle": [
+        "Proactive Agents",
+        "Layered Memory"
+      ],
+      "summary": "Candidate triggers, state and cooldowns, layered memory, cloud request boundaries, and tool authorization in Heartbeat."
+    },
+    "safe-motion": {
+      "title": "From VLA Actions to Robot Trajectories: Validating an Execution Layer",
+      "coverTitle": [
+        "Robot Arms",
+        "Trajectory Execution"
+      ],
+      "summary": "Software robot-arm replay as a guide to action semantics, whole-body geometry checks, speed scaling, and the limits of discrete validation."
+    },
+    "inference-evidence": {
+      "title": "Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance",
+      "coverTitle": [
+        "Inference",
+        "Evidence"
+      ],
+      "summary": "Building controlled experiments, correctness thresholds, failure semantics, and versioned evidence from kernel contracts to service requests."
+    },
+    "markdown-word": {
+      "title": "Designing a Markdown-to-Word Converter: Structure, Styles, and Lost Formatting",
+      "coverTitle": [
+        "Document Conversion",
+        "Structure & Styles"
+      ],
+      "summary": "Semantic preservation, style design, formatting loss, and acceptance checks in a Markdown-to-Word conversion tool."
+    },
+    "opensource-streams": {
+      "title": "Two vLLM-Omni PRs: Recording Streaming Failures Correctly",
+      "coverTitle": [
+        "Open Source",
+        "Stream Errors"
+      ],
+      "summary": "Two merged vLLM-Omni PRs, from reproducing SSE errors to fixing terminal states in chat and image-editing benchmark clients."
+    },
+    "infra-topology": {
+      "title": "Eight-GPU Inference Systems: Qwen Topologies and GLM Hybrid State",
+      "coverTitle": [
+        "Eight-GPU Inference",
+        "Topology & State"
+      ],
+      "summary": "Deployment choices, graphs, hybrid state, and the limits of combined experiments, based on an eight-GPU Qwen and GLM study."
+    },
+    "infra-operators": {
+      "title": "AI Infra Kernel Notes: Dual-Stream Scheduling, QKV/RoPE Fusion, and Speculative Verification",
+      "coverTitle": [
+        "GPU Kernels",
+        "Dependencies & Contracts"
+      ],
+      "summary": "Contracts, implementation, and regression checks for dual-stream MoE, vision QKV/RoPE fusion, and speculative verification."
+    },
+    "amd-architecture": {
+      "title": "AMD GPU Architecture: From Wavefronts to LLM Performance Analysis",
+      "coverTitle": [
+        "AMD GPU",
+        "Architecture"
+      ],
+      "summary": "HIP thread hierarchies, compute units, and memory as a foundation for occupancy, data layout, architecture differences, and LLM performance analysis."
+    },
+    "gpu-attention": {
+      "title": "Reading FlashAttention-4: Non-Matmul Bottlenecks, Online Softmax, and Pipelines",
+      "coverTitle": [
+        "FlashAttention",
+        "Pipeline Design"
+      ],
+      "summary": "Online Softmax derivations, seven technical figures, and forward/backward pipeline analysis, with explicit boundaries on the paper’s experimental claims."
+    },
+    "kimi-architecture": {
+      "title": "Kimi K3 Architecture: KDA, Depth Residuals, and Sparse Experts",
+      "coverTitle": [
+        "Kimi K3",
+        "Model Architecture"
+      ],
+      "summary": "KDA, MLA, AttnRes, and Stable LatentMoE examined along the sequence, depth, and expert dimensions."
+    },
+    "kimi-systems": {
+      "title": "Kimi K3 Systems: Long-Context Training, Expert Scheduling, and Hybrid Caches",
+      "coverTitle": [
+        "Kimi K3",
+        "Training & Deployment"
+      ],
+      "summary": "Connections between long-context training, agent RL, KCP, MoonEP, hybrid caches, and deployment-aware quantization."
+    },
+    "hello-world": {
+      "title": "Hello World",
+      "coverTitle": [
+        "Hello",
+        "World"
+      ],
+      "summary": "The first post: creating a Hexo article, running a preview, and generating and publishing a static site."
+    }
+  },
+  "collections": {
+    "llm": {
+      "title": "Large Language Models",
+      "subtitle": "Cathedral of Knowledge",
+      "description": "From neural-network foundations to building and applying language models.",
+      "branch": {
+        "title": "Deep Learning Fundamentals",
+        "description": "Foundations · Neural networks, optimization, and training"
+      }
+    },
+    "rl": {
+      "title": "Reinforcement Learning",
+      "subtitle": "The Knight’s Trials",
+      "description": "Exploring value, policy, and decision-making through actions and feedback."
+    },
+    "engineering": {
+      "title": "Engineering Projects",
+      "subtitle": "The Engineer’s Workshop",
+      "description": "Technology choices, implementation, debugging, and results from concrete projects.",
+      "sequence": "Dual-Mac inference · GR308 tuning · Multimodal ports"
+    },
+    "agents": {
+      "title": "AI Agents",
+      "subtitle": "Clockwork and Agency",
+      "description": "Memory, proactive behavior, and execution boundaries that make model-driven systems inspectable.",
+      "sequence": "Proactive triggers · Layered memory · Trajectory execution"
+    },
+    "experience": {
+      "title": "Engineering Lessons",
+      "subtitle": "The Craft of Evidence",
+      "description": "Reusable approaches to measurement, debugging, structural design, and delivery.",
+      "sequence": "Experimental design · Document structure · Acceptance testing"
+    },
+    "opensource": {
+      "title": "Open Source",
+      "subtitle": "The Common Works",
+      "description": "Reproducing, validating, and merging contributions through real issues, patches, and reviews.",
+      "sequence": "Issue reproduction · Patch implementation · Review and validation"
+    },
+    "infra": {
+      "title": "AI Infra",
+      "subtitle": "Computing and Systems",
+      "description": "Connecting GPU architecture, kernels, model structures, and inference systems while distinguishing derivations from measured evidence.",
+      "sequence": "Hardware foundations · Kernel mechanics · Models and services"
+    },
+    "notes": {
+      "title": "Prologue",
+      "subtitle": "The First Steps",
+      "description": "Starting with the first post."
+    }
+  }
+}

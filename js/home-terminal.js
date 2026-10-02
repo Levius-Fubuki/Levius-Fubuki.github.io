@@ -46,7 +46,7 @@
   }
   async function loadArticles() {
     if (records) return records;
-    indexState.textContent = "加载中…";
+    indexState.textContent = "Loading…";
     try {
       const articles = await window.LeviusBlog.loadIndex();
       records = articles.map((item, index) => ({ ...item, id: index + 1 }));
@@ -54,8 +54,8 @@
       document.querySelector(".terminal-count").textContent = String(records.length).padStart(2, "0");
       return records;
     } catch {
-      indexState.textContent = "加载失败";
-      throw new Error("文章索引暂时无法加载，请重新执行命令重试，或通过归档浏览。");
+      indexState.textContent = "Load failed";
+      throw new Error("The article index is unavailable. Run the command again or browse the archives.");
     }
   }
   function resolvePath(value) {
@@ -77,7 +77,7 @@
       else if (/\s/.test(char)) { if (started) tokens.push(word); word = ""; started = false; }
       else { word += char; started = true; }
     }
-    if (quote) throw new Error("引号没有闭合，请补全后再执行。");
+    if (quote) throw new Error("Unclosed quote. Close it before running the command.");
     if (started) tokens.push(word);
     return tokens;
   }
@@ -94,30 +94,30 @@
       }
       row.append(content); target.append(row);
     }
-    write(target, "cat <编号> 预览正文 · open <编号> 打开文章", "terminal-dim");
+    write(target, "cat <id> to preview · open <id> to read", "terminal-dim");
   }
   function about(target) {
     write(target, "Levius / L_F's Blog");
-    write(target, "把想法写进代码。关注 AI Infra、多模态推理与 AI Agent，分享工程实践和学习笔记。");
+    write(target, "I'm Levius, currently focused on AI Infra and the systems behind modern AI.");
     link(target, "GitHub / Levius-Fubuki ↗", routes.github);
   }
   function help(target) {
     const rows = [
-      ["ls [articles]", "列出当前目录或全部文章"],
-      ["cd articles | cd /", "切换文章目录或根目录；支持 .."],
-      ["pwd", "查看当前路径"],
-      ["search <关键词>", "搜索标题和正文，支持多个关键词"],
-      ["cat <编号>", "阅读正文预览，编号在搜索前后保持一致"],
-      ["open <编号>", "在当前页面打开文章"],
-      ["run articles.exe", "在终端内启动文章视图"],
-      ["open archives | gallery | github", "打开归档、画廊或 GitHub"],
-      ["about | cat /about.txt", "查看博客介绍"],
-      ["motion on | off", "切换首页环境动效"],
-      ["history | clear", "查看本次会话命令或清空输出"],
-      ["help", "显示这份说明"],
+      ["ls [articles]", "List the current directory or all articles"],
+      ["cd articles | cd /", "Change to the article or root directory; supports .."],
+      ["pwd", "Show the current path"],
+      ["search <keywords>", "Search titles and article text using one or more keywords"],
+      ["cat <id>", "Preview article text; IDs stay the same after searching"],
+      ["open <id>", "Open an article in this tab"],
+      ["run articles.exe", "Launch the article view in the terminal"],
+      ["open archives | gallery | github", "Open archives, gallery, or GitHub"],
+      ["about | cat /about.txt", "Show the blog introduction"],
+      ["motion on | off", "Toggle ambient motion on the homepage"],
+      ["history | clear", "Show session history or clear the output"],
+      ["help", "Show this help"],
     ];
     rows.forEach(([command, description]) => write(target, `${command}\n  ${description}`));
-    write(target, "↑ ↓ 历史 · Tab 补全 · Esc 清空输入 · Ctrl+L 清屏 · Ctrl+C 中止响应", "terminal-dim");
+    write(target, "↑ ↓ History · Tab Complete · Esc Clear input · Ctrl+L Clear output · Ctrl+C Cancel", "terminal-dim");
   }
   async function dispatch(command, args, target, ticket) {
     const argument = args.join(" ");
@@ -130,28 +130,28 @@
       case "history": history.forEach((item, i) => write(target, `${String(i + 1).padStart(2, "0")}  ${item}`)); break;
       case "cd": {
         const next = resolvePath(argument || "/");
-        if (!directories.includes(next)) throw new Error(`没有这个目录：${argument}。可用目录：${directories.join("、")}。`);
-        cwd = next; updatePath(); write(target, `当前目录：${cwd}`);
+        if (!directories.includes(next)) throw new Error(`Directory not found: ${argument}. Available: ${directories.join(", ")}.`);
+        cwd = next; updatePath(); write(target, `Current directory: ${cwd}`);
         break;
       }
       case "ls": {
         const path = resolvePath(argument || ".");
         if (path === "/") { write(target, "articles/  reinforcement/  deep-learning/  archives/  about/\nabout.txt"); break; }
-        if (!directories.includes(path)) throw new Error(`没有这个目录：${argument}。试试 ls /articles。`);
+        if (!directories.includes(path)) throw new Error(`Directory not found: ${argument}. Try ls /articles.`);
         if (path === "/about") { write(target, "about.txt  about.exe"); break; }
         const articles = await loadArticles();
-        const selection = path === "/reinforcement" ? articles.filter(a => /强化学习|基于价值|基于策略|Actor-Critic|蒙特卡洛/.test(a.title)) : path === "/deep-learning" ? articles.filter(a => /深度学习/.test(a.title)) : articles;
-        if (current()) { write(target, `${path.slice(1)}.exe · ${selection.length} 篇文章`); articleResults(target, selection); }
+        const selection = path === "/reinforcement" ? articles.filter(a => /Reinforcement Learning|Value-Based|Policy-Based|Actor-Critic|Monte Carlo|强化学习|基于价值|基于策略|蒙特卡洛/i.test(a.title)) : path === "/deep-learning" ? articles.filter(a => /Deep Learning|深度学习/i.test(a.title)) : articles;
+        if (current()) { write(target, `${path.slice(1)}.exe · ${selection.length} articles`); articleResults(target, selection); }
         break;
       }
       case "search": {
-        if (!argument.trim()) throw new Error("用法：search <关键词>，例如 search 强化学习。");
+        if (!argument.trim()) throw new Error("Usage: search <keywords>, for example search reinforcement learning.");
         const articles = await loadArticles();
         if (!current()) break;
         const terms = argument.toLocaleLowerCase().trim().split(/\s+/);
         const matches = articles.filter(item => terms.every(term => `${item.title} ${item.text}`.toLocaleLowerCase().includes(term)))
           .sort((a, b) => Number(b.title.toLocaleLowerCase().includes(argument.toLocaleLowerCase())) - Number(a.title.toLocaleLowerCase().includes(argument.toLocaleLowerCase())));
-        write(target, matches.length ? `找到 ${matches.length} 篇文章 · ${argument}` : `没有找到「${argument}」。试试 强化学习 或 深度学习。`);
+        write(target, matches.length ? `${matches.length} articles found · ${argument}` : `No results for “${argument}”. Try reinforcement learning or deep learning.`);
         if (matches.length) articleResults(target, matches, terms);
         break;
       }
@@ -159,40 +159,40 @@
       case "open": {
         if (command === "cat" && resolvePath(argument) === "/about.txt") { about(target); break; }
         if (command === "open" && Object.hasOwn(routes, argument)) { await window.LeviusScene.navigate(routes[argument], argument); break; }
-        if (!/^\d+$/.test(argument)) throw new Error(`用法：${command} <文章编号>。先输入 ls articles 查看编号。`);
+        if (!/^\d+$/.test(argument)) throw new Error(`Usage: ${command} <article id>. Run ls articles to see the IDs.`);
         const articles = await loadArticles();
         if (!current()) break;
         const article = articles.find(item => item.id === Number(argument));
-        if (!article) throw new Error(`未找到编号 ${argument}。输入 ls articles 查看有效编号。`);
+        if (!article) throw new Error(`Article ${argument} not found. Run ls articles to see valid IDs.`);
         if (command === "open") { await window.LeviusScene.navigate(article.url, "ARTICLE"); break; }
         write(target, `${String(article.id).padStart(2, "0")} / ${article.title}`);
-        write(target, "正文预览", "terminal-dim");
+        write(target, "Article preview", "terminal-dim");
         write(target, article.text.slice(0, 1200) + (article.text.length > 1200 ? "…" : ""));
-        link(target, "打开完整文章 ↗", article.url);
+        link(target, "Read full article ↗", article.url);
         break;
       }
       case "motion": {
-        if (!window.LeviusMotion) throw new Error("环境动效暂不可用。");
-        if (argument && !["on", "off"].includes(argument)) throw new Error("用法：motion on 或 motion off。");
+        if (!window.LeviusMotion) throw new Error("Ambient motion is unavailable.");
+        if (argument && !["on", "off"].includes(argument)) throw new Error("Usage: motion on or motion off.");
         if (argument) window.LeviusMotion.setEnabled(argument === "on");
         const state = window.LeviusMotion.getState();
-        write(target, state.reduced ? "系统已开启「减少动态效果」，环境保持静止。" : `环境动效已${state.enabled ? "开启" : "关闭"}。`);
+        write(target, state.reduced ? "Reduced motion is enabled in your system settings. Ambient motion is off." : `Ambient motion is ${state.enabled ? "on" : "off"}.`);
         break;
       }
       case "run": {
         const program = argument.replace(/\.exe$/i, "");
-        if (!["articles", "reinforcement", "deep-learning", "archives", "about"].includes(program)) throw new Error("用法：run articles.exe，可启动文章视图。");
+        if (!["articles", "reinforcement", "deep-learning", "archives", "about"].includes(program)) throw new Error("Usage: run articles.exe to launch the article view.");
         await window.LeviusScene.launch(program);
         break;
       }
-      default: throw new Error(`未知命令：${command}。输入 help 查看站内支持的命令。`);
+      default: throw new Error(`Unknown command: ${command}. Type help to see available commands.`);
     }
   }
   function clear() {
     generation++;
     setBusy(false);
     output.replaceChildren();
-    announcement.textContent = "终端输出已清空。";
+    announcement.textContent = "Terminal output cleared.";
   }
   async function execute(raw) {
     const value = raw.trim().slice(0, 500);
@@ -211,14 +211,14 @@
     setBusy(true); scrollOutput();
     try {
       const [command, ...args] = parse(value);
-      if (!command) throw new Error("请输入命令，例如 help。");
+      if (!command) throw new Error("Enter a command, such as help.");
       await dispatch(command.toLocaleLowerCase(), args, response, ticket);
     } catch (error) {
       if (ticket === generation) write(response, error.message, "terminal-error");
     } finally {
       if (ticket === generation) {
         setBusy(false); scrollOutput();
-        announcement.textContent = `${value} 执行完毕。${response.querySelectorAll('.terminal-result').length ? `找到 ${response.querySelectorAll('.terminal-result').length} 篇文章。` : response.textContent.slice(0, 100)}`;
+        announcement.textContent = `${value} completed. ${response.querySelectorAll('.terminal-result').length ? `${response.querySelectorAll('.terminal-result').length} articles found.` : response.textContent.slice(0, 100)}`;
       }
     }
   }
@@ -238,14 +238,14 @@
     const words = matches.filter(option => !option.includes(" "));
     const candidates = words.length ? words : matches;
     if (candidates.length === 1) { input.value = `${candidates[0]} `; return true; }
-    if (candidates.length > 1) announcement.textContent = `可用补全：${candidates.join("、")}`;
+    if (candidates.length > 1) announcement.textContent = `Available completions: ${candidates.join(", ")}`;
     return false;
   }
   function cancel() {
     generation++; setBusy(false); input.value = "";
     const last = output.querySelector(".terminal-record:last-child .terminal-response");
-    if (last && !last.textContent) write(last, "^C 已中止响应。", "terminal-dim");
-    announcement.textContent = "输入已取消。";
+    if (last && !last.textContent) write(last, "^C Response cancelled.", "terminal-dim");
+    announcement.textContent = "Input cancelled.";
   }
   form.addEventListener("submit", event => { event.preventDefault(); if (!composing) execute(input.value); });
   input.addEventListener("compositionstart", () => { composing = true; });
@@ -286,7 +286,7 @@
     for (const key of keys) {
       const button = element("button", labels[key] || key.toUpperCase());
       button.type = "button"; button.dataset.terminalKey = key;
-      button.setAttribute("aria-label", key === " " ? "空格" : key === "Backspace" ? "退格" : labels[key] || key);
+      button.setAttribute("aria-label", key === " " ? "Space" : key === "Backspace" ? "Backspace" : labels[key] || key);
       // Preserve the native input's caret and selection when using the keyboard.
       button.addEventListener("pointerdown", event => { if (event.pointerType === "mouse") event.preventDefault(); });
       button.addEventListener("click", () => {
@@ -312,7 +312,7 @@
   keyboardToggle.addEventListener("click", () => {
     keyboard.hidden = !keyboard.hidden;
     keyboardToggle.setAttribute("aria-expanded", String(!keyboard.hidden));
-    keyboardToggle.textContent = keyboard.hidden ? "屏幕键盘 +" : "收起键盘 −";
+    keyboardToggle.textContent = keyboard.hidden ? "On-screen keyboard +" : "Hide keyboard −";
   });
   let launching = false;
   document.querySelectorAll("[data-launch]").forEach(button => button.addEventListener("click", async () => {

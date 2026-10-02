@@ -1,6 +1,6 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs');
-const data=JSON.parse(fs.readFileSync('data/book-library.json','utf8'));
+const data=JSON.parse(fs.readFileSync('data/book-library.en.json','utf8'));
 const out='docs/design/codrops-books',base='http://127.0.0.1:4173';
 (async()=>{
  const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
@@ -27,7 +27,7 @@ const out='docs/design/codrops-books',base='http://127.0.0.1:4173';
   check('focus moves into readable contents',await page.locator('.reader-page-title').evaluate(n=>n===document.activeElement));
   await shot('contents-desktop');
   await page.locator('.reader-index-entry').nth(1).click();await page.waitForFunction(()=>document.querySelector('.reader-page-number').textContent==='03 / 03');await page.waitForTimeout(220);
-  check('contents opens matching volume preview',await page.locator('.reader-page-title').innerText()==='深度学习基础'&&await page.locator('.reader-synopsis').innerText()===data.books[1].summary);
+  check('contents opens matching volume preview',await page.locator('.reader-page-title').innerText()==='Deep Learning Fundamentals'&&await page.locator('.reader-synopsis').innerText()===data.books[1].summary);
   check('last page cannot advance beyond the collection',await page.locator('[data-reader-step="1"]').isDisabled());
   await shot('preview-desktop');
   await page.keyboard.press('ArrowLeft');await page.waitForFunction(()=>document.querySelector('.reader-page-number').textContent==='02 / 03');await page.waitForTimeout(220);

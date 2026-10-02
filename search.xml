@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
-<entry><title>两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</title><link href="/2026/10/02/dual-mac-inference/"/><url>/2026/10/02/dual-mac-inference/</url><content type="html"><![CDATA[<h1 id="dual-mac-inference">两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</h1>
+<entry><title>Running Qwen3-32B on Two 16GB Macs: Pipelines, Weight Sharding, and Submission Granularity</title><link href="/2026/10/02/dual-mac-inference/"/><url>/2026/10/02/dual-mac-inference/</url><content type="html"><![CDATA[<h1 id="dual-mac-inference">两台 16GB Mac 如何跑起 Qwen3-32B：流水线、权重分片与提交粒度</h1>
 <p>把两台各有 16GB 内存的 Mac 连起来，最容易产生的期待是得到一台“32GB 的机器”。做完 Qwen3-32B 的双机实验后，我更愿意先画两张内存账单：每台机器各自装入多少权重，留多少空间给 KV cache、临时张量和系统，再看哪些张量需要跨机器传递。模型总量放得下，只是开始。</p>
 <p>这篇文章整理我的 <a href="https://github.com/Levius-Fubuki/qwen3-32b-dual-mac-mlx">双 Mac MLX 项目</a>，以公开提交 <code>9208788769</code> 为核验快照，核验日期为 2026-10-02。硬件是 16GB M3 MacBook Air 与 16GB M4 Mac mini，实验使用 MLX 0.32.2、mlx-lm 0.31.3。最终留下两份不同用途的配置：4-bit 的 2K 记录，以及 3-bit 的一次 8K 可行性记录。下面重点解释这些选择怎样形成，以及结果能支持什么判断。</p>
 <h2 id="先把-跑起来-拆成几个问题">先把“跑起来”拆成几个问题</h2>
@@ -87,8 +87,8 @@
 <p>下一次搭建类似系统，我会先保存一份完整的运行描述：模型及 tokenizer 修订、两端配置、层分配、通信后端、cache 类型、提交边界、输入输出预算和日志位置。把这份描述与产物 manifest 放在一起，才能知道重现失败时究竟缺了什么。</p>
 <p>验证顺序则从小到大：单机 tiny model 数值对照、两 rank 短 forward、连续 cache 更新、短生成、长 prompt、长 decode，再到真实服务入口。每一层都补充新的故障面。模型列表接口只能证明进程响应了请求，长生成才会暴露另一部分问题。</p>
 <p>这项实验留下的价值，是一条从错误日志到架构与执行粒度的可解释路径：用独立节点预算确定权重分配，用阶段边界控制通信频率，用实际求值边界限制提交规模，最后用有范围的请求记录定义成功。后续若要服务化，仍需补足重启后的复验、质量测试、长生成与运维恢复；这些可以沿着现有证据继续做，而不用重新猜测之前的选择。</p>
-]]></content><categories><category>工程实践</category></categories><tags><tag>大模型</tag><tag>MLX</tag><tag>分布式推理</tag></tags></entry>
-<entry><title>GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</title><link href="/2026/10/02/gr308-language/"/><url>/2026/10/02/gr308-language/</url><content type="html"><![CDATA[<h1 id="gr308-language">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</h1>
+]]></content><categories><category>Engineering Projects</category></categories><tags><tag>Large Language Models</tag><tag>MLX</tag><tag>Distributed Inference</tag></tags></entry>
+<entry><title>Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</title><link href="/2026/10/02/gr308-language/"/><url>/2026/10/02/gr308-language/</url><content type="html"><![CDATA[<h1 id="gr308-language">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</h1>
 <p>同样是把模型放到 GR308 上，9B 模型适合把两个逻辑芯片拆成独立副本，30B MoE 在测试中关闭专家并行反而更快，80B 模型则需要四路张量并行。27B 的一次大幅加速，后来又被冷启动对照修正了归因。调优最有价值的部分，正是这些选择怎样被实验逐步筛出来。</p>
 <p>本文整理 2026 年 9 月的本地报告、指标 CSV 与对应 Codex 工作区记录。10 月 2 日进行的是证据整理，没有重新运行设备实验。型号沿用各报告的模型标识；不同 checkpoint、驱动、容器与请求长度各自成组，不把它们拼成硬件排行榜。多模态分支另见 <a href="/2026/10/02/gr308-image/">Qwen Image 实现复盘</a> 和 <a href="/2026/10/02/gr308-video/">Wan / H3 报告</a>。</p>
 <h2 id="先定义一张卡-一个副本与一个成绩">先定义一张卡、一个副本与一个成绩</h2>
@@ -243,8 +243,8 @@
 <p>Graph 也必须检查实际捕获与命中。不同 batch bucket 占用额外内存，不能只在命令里添加更大的尺寸就认为所有请求都会更快。状态索引不连续、后端静默回退或启动申请失败，会让一个表面相同的配置走到不同执行路径。文章保留这些失败，是为了让后来读者知道应该在哪里确认真实行为。</p>
 <p>最终，配置记录应与模型修订、软件栈、请求长度和测量窗口共同保存。只留下启动参数，无法解释某个开关为何被选中；只留下最高吞吐，无法知道付出了多少首 token 延迟或稳定性代价。本文的表格与失败矩阵正是同一份结果的两面，后续新增实验也应沿这些条件更新。</p>
 <p>相关 GRServe 工作区另有“可移植核心与 Fant 首个后端”的设计规格，讨论 Backend ABI、能力协商、执行计划、兼容与原生两条路径。这一部分目前属于设计证据，不能把计划中的 KV、TP、Graph 或跨厂商性能目标算进上述已经取得的模型结果。后续若形成真实实现和同口径验收，应以独立工程文章记录，而不是借用现有 vLLM 基线替它证明完成。</p>
-]]></content><categories><category>工程实践</category></categories><tags><tag>GR308</tag><tag>大模型</tag><tag>性能测量</tag></tags></entry>
-<entry><title>Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</title><link href="/2026/10/02/gr308-image/"/><url>/2026/10/02/gr308-image/</url><content type="html"><![CDATA[<h1 id="gr308-image">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</h1>
+]]></content><categories><category>Engineering Projects</category></categories><tags><tag>GR308</tag><tag>Large Language Models</tag><tag>Performance Measurement</tag></tags></entry>
+<entry><title>Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE</title><link href="/2026/10/02/gr308-image/"/><url>/2026/10/02/gr308-image/</url><content type="html"><![CDATA[<h1 id="gr308-image">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</h1>
 <p>Qwen Image 2.1 的 GR308 实验经历了三次目标变化：先让完整链路真正生成图片，再把解码阶段压下来，最后把 DiT 的计算拆到两个逻辑芯片。三步分别解决兼容性、阶段瓶颈和计算并行，不能用一个总加速比抹平中间发生的变化。</p>
 <p>本文以 2026-09-21 主目录测试记录和 09-22 独立工作树报告为依据，补充对应 Codex 工作区最后的算子定位。10 月 2 日只整理既有证据，没有重跑 GPU 实验。最新工作区仍在探索原生 SDPA，没有完成新的融合注意力验收。</p>
 <h2 id="第一阶段-把模型框架与设备后端接起来">第一阶段：把模型框架与设备后端接起来</h2>
@@ -368,8 +368,8 @@
 <p>当前最值得继续验证的是 TP2 完整 40 步出图，以及原生 SDPA 是否能在固定 shape、正确性和数值门下胜过通用分解。已有记录足以说明实现过程和短测效果，却还不支持把全部候选默认打开并称为稳定服务。</p>
 <p>资料来自《Qwen Image 2.1 GR308 Test》（2026-09-21）、独立工作树《Qwen Image 2.1 Omni FANT Test》（09-22）与对应算子调查工作区。公开的模型框架入口可参考 <a href="https://github.com/huggingface/diffusers">Diffusers</a>。本文所有 GR308 数值均来自本地历史实验，不代表 Diffusers 上游的性能声明。</p>
 <p>继续实验时还需固定计时是否包含首次缓存建立。首次执行可能分配缓冲区、构建位置编码或初始化通信；稳定步骤则复用这些状态。若一个候选记录首轮、另一个只记录暖运行，比较就会把生命周期成本误归给计算实现。当前文章保持每份报告原有的阶段范围，没有把这些未对齐成本强行补成统一总延迟。</p>
-]]></content><categories><category>工程实践</category></categories><tags><tag>GR308</tag><tag>多模态</tag><tag>分布式推理</tag></tags></entry>
-<entry><title>GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门</title><link href="/2026/10/02/gr308-video/"/><url>/2026/10/02/gr308-video/</url><content type="html"><![CDATA[<h1 id="gr308-video">GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门</h1>
+]]></content><categories><category>Engineering Projects</category></categories><tags><tag>GR308</tag><tag>Multimodal</tag><tag>Distributed Inference</tag></tags></entry>
+<entry><title>Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks</title><link href="/2026/10/02/gr308-video/"/><url>/2026/10/02/gr308-video/</url><content type="html"><![CDATA[<h1 id="gr308-video">GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门</h1>
 <p>视频模型移植最容易出现的误判，是把“某一层跑完”“某个短样本生成成功”和“完整模型达到交付标准”当作一件事。Wan2.2 与 MiniMax-H3 两条 GR308 分支恰好走到了不同阶段：前者有短视频和混合精度结果，完整长视频仍受阻；后者优化了固定输入 DiT 的权重处理，但音频数值门没有通过，尚无视频成品。</p>
 <p>本文根据 2026 年 9 月的实验报告及对应工作树、Codex 工作区整理，保留有效改进，也保留失败。10 月 2 日没有重跑设备。两组实验采用不同的模型、输入、并行方式与计时边界，所有秒数都在各自实验内部解释。</p>
 <h2 id="wan-先把目标和短测条件分清">Wan：先把目标和短测条件分清</h2>
@@ -507,8 +507,8 @@
 <p>如果以后要继续这两条支线，最有价值的新增材料也很明确：Wan 需要完整帧数和多样本的时序质量，H3 需要音频误差根因、合格的完整 DiT 与实际媒体输出。无需再次用下载完成、HTTP 成功或单层正确去代替这些缺口。</p>
 <p>本文依据《风华 GR308 Wan2.2 视频生成性能测试与调优报告》（2026-09-18）、H3 独立工作树诊断报告与《部署 MiniMax H3 性能测试》《wan2.2》工作区后续记录。所有运行时、精度和形状条件按各自记录保留；本轮没有启动远端实验，也没有把未完成方案计为交付成果。</p>
 <p>结果文件也应保留对应参数和参考身份。相同文件名如果被后续实验覆盖，就可能把新候选的图片与旧基线的指标错误配对。报告中的阶段时间、精度矩阵与质量对照应作为同一次运行的证据共同读取，而不是从不同目录各取一个最优数字重新拼表。</p>
-]]></content><categories><category>工程实践</category></categories><tags><tag>GR308</tag><tag>多模态</tag><tag>性能测量</tag></tags></entry>
-<entry><title>Heartbeat 的工程拆解：主动触发、分层记忆与工具边界</title><link href="/2026/10/02/heartbeat-agent/"/><url>/2026/10/02/heartbeat-agent/</url><content type="html"><![CDATA[<h1 id="heartbeat-agent">Heartbeat 的工程拆解：主动触发、分层记忆与工具边界</h1>
+]]></content><categories><category>Engineering Projects</category></categories><tags><tag>GR308</tag><tag>Multimodal</tag><tag>Performance Measurement</tag></tags></entry>
+<entry><title>Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries</title><link href="/2026/10/02/heartbeat-agent/"/><url>/2026/10/02/heartbeat-agent/</url><content type="html"><![CDATA[<h1 id="heartbeat-agent">Heartbeat 的工程拆解：主动触发、分层记忆与工具边界</h1>
 <p>一个桌面 Agent 如果只能等用户输入，它的控制流通常很清楚：收到消息，构造上下文，调用模型，返回结果。让它主动开口之后，问题变多了。什么时候值得调用模型？一次观察要保存多久？同一件事怎样避免反复提醒？切换人格时，哪些信息可以共享？</p>
 <p><a href="https://github.com/Levius-Fubuki/heartbeat">Heartbeat</a> 是我围绕这些问题做的 macOS 桌面实验。本文依据公开提交 <code>ac661f4747</code> 的代码整理，核验于 2026-10-02。它仍是开发中的项目，下面把已实现的路径和进一步需要补齐的设计分开说明。文章讨论的是软件机制，不采用 README 中的竞品优劣比较，也不以一次演示推断长期陪伴效果。</p>
 <h2 id="把感知-判断和表达拆开">把感知、判断和表达拆开</h2>
@@ -595,8 +595,8 @@
 <p>流式界面也要处理结束路径。代码在生成结束或异常清理时收回 thinking 状态，并保存已经产生的文本；这样的 finally 路径能避免桌宠永久停在思考动画。但显示了部分文本不等于整次任务成功，工具调用是否完成仍要根据它自己的结果判断。</p>
 <p>我会把诊断面板组织成事件时间线：观察、候选、冷却、判断、工具请求、授权、执行和回复，使用关联 ID 串起来。普通用户只看简洁状态，调试时才展开必要信息。记录应尽量使用脱敏字段，不为追踪行为而复制完整私密内容。</p>
 <p>Heartbeat 让我更明确地把“智能”拆到几个可检查的地方：模型负责需要语义判断的部分，状态机负责交互顺序，存储层保存来源与时间，工具层执行明确授权的动作。一个主动 Agent 是否值得持续使用，还要靠真实反馈检验；上述结构至少让问题出现时，有地方可以准确地查和改。</p>
-]]></content><categories><category>智能体</category></categories><tags><tag>Agent</tag><tag>记忆系统</tag></tags></entry>
-<entry><title>从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么</title><link href="/2026/10/02/safe-motion/"/><url>/2026/10/02/safe-motion/</url><content type="html"><![CDATA[<h1 id="safe-motion">从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么</h1>
+]]></content><categories><category>AI Agents</category></categories><tags><tag>Agent</tag><tag>Memory Systems</tag></tags></entry>
+<entry><title>From VLA Actions to Robot Trajectories: Validating an Execution Layer</title><link href="/2026/10/02/safe-motion/"/><url>/2026/10/02/safe-motion/</url><content type="html"><![CDATA[<h1 id="safe-motion">从 VLA 动作到实际轨迹：一个机械臂执行层需要验证什么</h1>
 <p>模型输出一段关节轨迹之后，离“机械臂可以照着走”还有一段距离。动作数组的单位可能解释错，目标点可能越界，末端执行器看起来在工作空间内，中间连杆却可能穿过边界。即使过滤器给出成功标志，真正执行出来的状态也未必等于它预测的状态。</p>
 <p>我在 <a href="https://github.com/Levius-Fubuki/vla-robotic-arm-safety-actuator">SafeMotion 项目</a> 中做了一个纯软件执行层，输入是六关节、50 点的目标轨迹，执行对象是确定性的 MockRobot。本文依据公开提交 <code>0d4c2703b3</code>，核验于 2026-10-02。它适合讨论接口、几何检查和回放验证；真实硬件的延迟、动力学、制动与功能安全不在这个模型内。</p>
 <h2 id="动作数组必须先有语义">动作数组必须先有语义</h2>
@@ -660,8 +660,8 @@ q_next = q_actual + v_safe × dt
 <p>如果更换机器人，首先校验运动学约定、关节方向、工具偏置和控制接口，已有的 UR5 测试不能自动继承。若改变动作形式，例如使用末端位姿或增量动作，则应在明确的位置完成变换，把得到的关节目标交给下游，并单独验证该变换的失败方式。</p>
 <p>如果上游模型可以感知过滤结果，可以返回结构化反馈：哪些约束触发、实际执行多少、从哪里开始偏离目标。它可能帮助上游重规划，但不能让模型自己取消执行层的约束。权限和约束仍应由确定的控制路径维护。</p>
 <p>这个项目最终形成了一个清楚的分工：上游提出目标，执行层根据约定的模型检查下一步，回放器记录真正发生的状态，测试用反例审查每一条保证。把这些边界说清楚，才有可能逐步扩大模型和硬件范围，同时知道新增能力需要补什么证据。</p>
-]]></content><categories><category>智能体</category></categories><tags><tag>机器人</tag><tag>安全执行</tag></tags></entry>
-<entry><title>推理优化怎样形成可信结论：从算子实验到服务验收</title><link href="/2026/10/02/inference-evidence/"/><url>/2026/10/02/inference-evidence/</url><content type="html"><![CDATA[<h1 id="inference-evidence">推理优化怎样形成可信结论：从算子实验到服务验收</h1>
+]]></content><categories><category>AI Agents</category></categories><tags><tag>Robotics</tag><tag>Safe Execution</tag></tags></entry>
+<entry><title>Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</title><link href="/2026/10/02/inference-evidence/"/><url>/2026/10/02/inference-evidence/</url><content type="html"><![CDATA[<h1 id="inference-evidence">推理优化怎样形成可信结论：从算子实验到服务验收</h1>
 <p>推理优化最容易留下的是一张速度表，最容易丢失的是这张表成立的条件。模型版本、输入长度、缓存是否预热、失败请求怎样计数，只要其中一项变了，两个数字就可能已经不在回答同一个问题。</p>
 <p>这篇文章把算子学习、推理实验和公开开源贡献中反复出现的问题，整理成一套可以落实到文件与请求记录的工作方法。公开案例包括我参与的 vLLM-Omni 基准客户端修复和 System1-Omni Graph 实验，状态核验于 2026-10-02。文中的小规模算例是教学示例；项目效果只引用已公开且说明范围的证据。</p>
 <h2 id="一条性能结论至少包含什么">一条性能结论至少包含什么</h2>
@@ -728,8 +728,8 @@ q_next = q_actual + v_safe × dt
 <p>一份可维护证据包可以包含运行清单、原始输出、分析脚本、结果摘要和结论状态。摘要引用原始文件，原始文件引用配置和代码 SHA；如果结果更新，保留旧快照，再写明新证据替代了哪些结论。这样后续博客更新也能按证据增量进行。</p>
 <p>归档时还要考虑公开范围。凭据、私有数据和内部机器信息不应进入公开正文；可以用公开贡献说明实现机制，再用清楚标注的教学算例讲计算方式。删去敏感细节后若已无法支持原效果结论，就应撤下数字，而不是让读者根据残缺条件自行猜测。</p>
 <p>最后交付的最好是一组可以复核的判断：哪些配置通过了哪些门，哪些失败，哪些尚未验证，各自在什么负载下适用。这比单独保留一个最快的吞吐数字更能帮助后续决策，也能让优化工作在换模型、换设备或换版本时继续积累。</p>
-]]></content><categories><category>工程经验</category></categories><tags><tag>大模型</tag><tag>性能测量</tag></tags></entry>
-<entry><title>Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失</title><link href="/2026/10/02/markdown-word/"/><url>/2026/10/02/markdown-word/</url><content type="html"><![CDATA[<h1 id="markdown-word">Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失</h1>
+]]></content><categories><category>Engineering Lessons</category></categories><tags><tag>Large Language Models</tag><tag>Performance Measurement</tag></tags></entry>
+<entry><title>Designing a Markdown-to-Word Converter: Structure, Styles, and Lost Formatting</title><link href="/2026/10/02/markdown-word/"/><url>/2026/10/02/markdown-word/</url><content type="html"><![CDATA[<h1 id="markdown-word">Markdown 转 Word 的设计复盘：结构、样式与一次格式丢失</h1>
 <p>把 Markdown 转成 Word，很容易从一个简单需求开始：标题套上字号，正文加首行缩进，再放一个页码。真正遇到长文时，问题会落到结构上：一个段落里的粗体还在不在？标题只是看起来大，还是具有 Word 的标题语义？输入中的数字方括号究竟是文献标记，还是普通数据？</p>
 <p>我的 <a href="https://github.com/Levius-Fubuki/md2docx_skill">md2docx 工具</a> 采用 JavaScript 和 docx 库，把一个有限 Markdown 子集转换为中文文档。本文以公开提交 <code>3448b828a5</code> 为分析对象，核验于 2026-10-02。重新检查代码时，我发现正文处理顺序会先删除粗体、斜体标记，再尝试识别它们。这个小问题正好说明：转换器需要先保存语义，再处理外观。</p>
 <h2 id="首先声明输入语言的范围">首先声明输入语言的范围</h2>
@@ -797,8 +797,8 @@ q_next = q_actual + v_safe × dt
 <p>我会把文档转换器交付为四部分：输入语法约定、样式配置、转换实现和验收样本。模板修改先作用于统一配置，再用同一组样本检查结构与渲染，避免每次文档都临时补丁式调整。</p>
 <p>对当前项目，可以先修复正文强调的数据流，再为未支持语法增加可见警告，最后逐步引入结构化解析。这样的顺序保留了小工具的简单性，同时把功能承诺拉回可验证的范围。工具依赖的 API 应以 <a href="https://docx.js.org/">docx 官方文档</a> 与锁定版本为准。</p>
 <p>这次复盘使我更看重转换链里的信息保存：标题层级、强调、引用和空白都应在合适的阶段处理。只要前面没有丢掉语义，后面就可以换模板、换字体、换渲染器；若过早把它们清成纯文本，再精细的排版参数也无法可靠恢复作者原本的意思。</p>
-]]></content><categories><category>工程经验</category></categories><tags><tag>文档工程</tag><tag>Markdown</tag></tags></entry>
-<entry><title>两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败</title><link href="/2026/10/02/opensource-streams/"/><url>/2026/10/02/opensource-streams/</url><content type="html"><![CDATA[<h1 id="opensource-streams">两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败</h1>
+]]></content><categories><category>Engineering Lessons</category></categories><tags><tag>Document Engineering</tag><tag>Markdown</tag></tags></entry>
+<entry><title>Two vLLM-Omni PRs: Recording Streaming Failures Correctly</title><link href="/2026/10/02/opensource-streams/"/><url>/2026/10/02/opensource-streams/</url><content type="html"><![CDATA[<h1 id="opensource-streams">两个 vLLM-Omni PR 的复盘：让流式基准正确记录失败</h1>
 <p>一次推理请求收到 HTTP 200，已经输出部分文字，随后服务端又发送 error 事件。这次请求应该算成功还是失败？对流式接口而言，连接建立时的 HTTP 状态只说明传输开始，生成任务的最终结果还在后续事件中。</p>
 <p>我提交的 <a href="https://github.com/vllm-project/vllm-omni/pull/8000">vLLM-Omni PR #8000</a> 和 <a href="https://github.com/vllm-project/vllm-omni/pull/8015">#8015</a> 处理的就是这个问题，分别覆盖聊天与图像编辑基准客户端。两者均于 2026-09-22 合并；状态在 10 月 2 日重新通过 GitHub 核查。这是测量正确性修复，没有声称模型吞吐获得提升。</p>
 <p>这篇文章按问题出现、代码定位、补丁设计、回归验证和评审扩展的顺序记录实现。Codex 参与了根因分析、编码和验证，两个 PR 的说明中也披露了这点。下面的历史测试成绩引用当时的记录，本轮博客整理没有重跑模型服务。</p>
@@ -890,8 +890,8 @@ output.success = not streaming_error_received
 <h2 id="公开证据与后续阅读">公开证据与后续阅读</h2>
 <p>公开记录中，#8000 的提交为 <code>94a1ab3d6f25…</code>，#8015 为 <code>6a3d35327f15…</code>；两者修改同一客户端模块，并分别增加针对性的回归测试。代码、测试、评审及合并状态可从 <a href="https://github.com/vllm-project/vllm-omni/pull/8000/files">聊天流修复</a> 和 <a href="https://github.com/vllm-project/vllm-omni/pull/8015/files">图像编辑流修复</a> 直接核查。</p>
 <p>这类文章与一般“工程经验”的区别，是每个判断都能回到具体触发序列、实现位置和验证结果。可迁移的方法另见 <a href="/2026/10/02/inference-evidence/">推理优化怎样形成可信结论</a>；这里保留的是一次贡献如何从可复现问题走到两个合并补丁的完整过程。</p>
-]]></content><categories><category>开源贡献</category></categories><tags><tag>开源贡献</tag><tag>vLLM-Omni</tag><tag>性能测量</tag></tags></entry>
-<entry><title>八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态</title><link href="/2026/10/02/infra-topology/"/><url>/2026/10/02/infra-topology/</url><content type="html"><![CDATA[<h1 id="infra-topology">八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态</h1>
+]]></content><categories><category>Open Source</category></categories><tags><tag>Open Source</tag><tag>vLLM-Omni</tag><tag>Performance Measurement</tag></tags></entry>
+<entry><title>Eight-GPU Inference Systems: Qwen Topologies and GLM Hybrid State</title><link href="/2026/10/02/infra-topology/"/><url>/2026/10/02/infra-topology/</url><content type="html"><![CDATA[<h1 id="infra-topology">八卡推理系统学习笔记：从 Qwen 拓扑选择到 GLM 混合状态</h1>
 <p>八张 GPU 并不对应唯一的部署方式。同一模型可以横向切成 TP8，也可以部署四个 TP2 副本；视觉编码器还可以独立做数据并行，专家层可以使用另一种并行组。每一种选择都同时改变计算粒度、通信、内存和服务排队。</p>
 <p>这篇笔记整理本地 8×RTX 5090 学习包、其中的实验报告和代码，以及 GLM-5.3 参考包与对应学习工作区。它是一篇基于材料的系统学习笔记，不把整套参考包的实现都归为我的原创项目。下文数字是材料中的历史测量，本轮没有在八卡机器上复现；它们也不是 GR308 的成绩。</p>
 <h2 id="用四个问题阅读一份部署报告">用四个问题阅读一份部署报告</h2>
@@ -1021,8 +1021,8 @@ output.success = not streaming_error_received
 <p>这组材料形成的学习路线是：先认清模型与状态，画出数据和通信，再建立强部署基线，最后读局部优化和回归门。具体算子拆解另见 <a href="/2026/10/02/infra-operators/">双流、RoPE 与投机验证</a>，硬件术语可从 <a href="/2026/10/02/amd-architecture/">AMD GPU 架构笔记</a> 开始。</p>
 <p>资料主要为本地《8×RTX 5090：通信 × 算子联合全模型 E2E 收口》（2026-08-26）、Qwen 学习包内源码与实验汇总、《GLM-5.3 官方 MTP：EP8 / TP4×DP2 / TP8 实机 A/B》（08-28）及 P/D 状态记录。公开框架入口为 <a href="https://github.com/sgl-project/sglang">SGLang</a> 与 <a href="https://github.com/llm-d/llm-d">llm-d</a>。它们用于理解实现语境；本文历史指标不代表这些上游项目对任意设备的性能承诺。</p>
 <p>阅读学习包中的历史配置时，应保留实验日期和适用环境；后来框架默认值改变，不会自动追溯修正这些历史成绩。</p>
-]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>分布式推理</tag><tag>性能测量</tag></tags></entry>
-<entry><title>AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</title><link href="/2026/10/02/infra-operators/"/><url>/2026/10/02/infra-operators/</url><content type="html"><![CDATA[<h1 id="infra-operators">AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</h1>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Distributed Inference</tag><tag>Performance Measurement</tag></tags></entry>
+<entry><title>AI Infra Kernel Notes: Dual-Stream Scheduling, QKV/RoPE Fusion, and Speculative Verification</title><link href="/2026/10/02/infra-operators/"/><url>/2026/10/02/infra-operators/</url><content type="html"><![CDATA[<h1 id="infra-operators">AI Infra 算子笔记：双流调度、QKV/RoPE 融合与投机验证</h1>
 <p>这篇笔记沿着三种不同优化阅读源码：双流调整执行依赖，RoPE 融合减少中间数据物化，投机解码改变一次验证后可以提交的 token 数。材料来自 8×RTX 5090 学习包和对应 Codex 逐算子学习记录；以下历史实验由参考材料提供，不将整包实现归为我的原创，也不把它们写成 GR308 成绩。</p>
 <p>学习时应先固定张量契约，再画依赖，最后看候选在真实服务路径上是否通过验收。三个主题因此保留各自的输入形状、测量口径与拒绝条件。QKV/RoPE 的 kernel 实现体未随学习包提供，文中融合内部数据流是依据调用契约的推断，不能当作逐行源码复现。</p>
 <h2 id="qwen3-6-moe-router-first-dual-stream-学习笔记">Qwen3.6 MoE Router-First Dual Stream 学习笔记</h2>
@@ -1480,8 +1480,8 @@ greedy 与 stochastic sampling 的不同合同
 <p>这里的 clone 也不是免费操作。它增加内存读写，却可以隔离潜在原地写入或别名关系。是否能安全去掉，要检查真实子函数的写行为、生命周期与图捕获约束，不能因为数学上两条分支独立就直接删除。调度优化最终仍受共享执行资源约束：两条流表示允许并发，不保证硬件一定同时执行。</p>
 <p>投机验证再增加了序列契约。假设草稿提出三个 token，前两个与 target 一致，第三个不一致，本轮只能提交前两个和 target 在第三个位置的纠正结果。被拒绝位置之后的候选既不能出现在输出里，也不能残留为下一轮可见缓存。若全接受，额外 token 则来自 target 对下一位置的预测，不能把两种情况混成同一个数组索引。</p>
 <p>这三种合同分别落在空间、时间和序列上。优化代码有时只改几行，却可能破坏其中任意一层。阅读源码时，先找输入何时有效、输出采用什么布局、哪些状态允许提交，再去看计时结果，可以更快理解为什么某个候选必须受精确 shape 或并发条件限制。</p>
-]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>算子优化</tag><tag>投机解码</tag></tags></entry>
-<entry><title>AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</title><link href="/2026/10/02/amd-architecture/"/><url>/2026/10/02/amd-architecture/</url><content type="html"><![CDATA[<h1 id="amd-architecture">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</h1>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Kernel Optimization</tag><tag>Speculative Decoding</tag></tags></entry>
+<entry><title>AMD GPU Architecture: From Wavefronts to LLM Performance Analysis</title><link href="/2026/10/02/amd-architecture/"/><url>/2026/10/02/amd-architecture/</url><content type="html"><![CDATA[<h1 id="amd-architecture">AMD GPU 架构笔记：从 Wavefront 到大模型性能分析</h1>
 <p>这篇长文由 AMD 架构课程的五份中文学习材料整理而成，依次连接编程模型、CU 资源、内存、架构家族与 LLM 工作负载。材料来源为 AMD 官方文档，采集于 2026-09-05；这里不把教学关系图当成特定芯片实测，也不将 AMD 术语直接套用到 GR308。</p>
 <p>阅读顺序是先区分软件线程组织与硬件资源，再看数据如何移动，最后讨论推理阶段的瓶颈。每节保留“来源直接说明”和“教学推导”的区别；产品特定参数仍需对照实际 gfx 目标。</p>
 <h2 id="amd-gpu-基础-从-cpu-到-hip-执行层次">AMD GPU 基础：从 CPU 到 HIP 执行层次</h2>
@@ -1756,8 +1756,8 @@ greedy 与 stochastic sampling 的不同合同
 <p>例如计算 <code>output[i] = input[i] * 2 + 1</code>，输入为十、二十、三十、四十，输出应为二十一、四十一、六十一、八十一。图中只画四行寄存器值，是省略了无效位置，不是在宣布真实 wave 大小为四。VGPR 编号对应一组逐 lane 的值，也不是每条向量指令临时创建一个四元素寄存器数组。</p>
 <p>同样，一百个 work-item 在假设的 Wave32 模式下需要四个 wave，最后一个只有四个有效位置。这种尾部利用率损失与分支分歧有所区别：前者来自工作量未填满，后者来自有效工作在执行时走向不同控制路径。理解这点之后，才能正确阅读线程块大小、掩码与占用率之间的关系。</p>
 <p>工作区还讨论了部署配方与硬件说明的分工。框架启动参数可以说明如何调用某个后端，但不能仅从 HIP 兼容接口或 <code>torch.cuda</code> 这个上层名字，推断底层设备就是某种 NVIDIA 或 AMD 微架构。底层资源与编译目标仍需查对应实现；本文保留 AMD 文档自身的适用边界。</p>
-]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>GPU架构</tag></tags></entry>
-<entry><title>FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</title><link href="/2026/10/02/gpu-attention/"/><url>/2026/10/02/gpu-attention/</url><content type="html"><![CDATA[<h1 id="gpu-attention">FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</h1>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>GPU Architecture</tag></tags></entry>
+<entry><title>Reading FlashAttention-4: Non-Matmul Bottlenecks, Online Softmax, and Pipelines</title><link href="/2026/10/02/gpu-attention/"/><url>/2026/10/02/gpu-attention/</url><content type="html"><![CDATA[<h1 id="gpu-attention">FlashAttention-4 深读：非矩阵瓶颈、在线 Softmax 与流水线</h1>
 <p>本文由既有深读笔记整理入博客，并核对了对应 Codex 学习工作区。内容区分论文事实、教学推导与实验边界；论文中的性能与规模数据属于作者报告，不是我在本地复现的成绩。原笔记的公式、示例和推导在此保留。</p>
 <div class="study-note">
 <section class="article-section" id="summary">
@@ -2236,8 +2236,8 @@ greedy 与 stochastic sampling 的不同合同
 <p class="source-note"><span class="evidence limit">局限</span>链接指向会演进的 main 分支；复现实验时应记录具体 commit。页面可离线阅读，但点击引用需要联网。</p>
 </section>
 </div>
-]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Attention</tag><tag>算子优化</tag></tags></entry>
-<entry><title>Kimi K3 架构笔记：KDA、深度残差与稀疏专家</title><link href="/2026/10/02/kimi-architecture/"/><url>/2026/10/02/kimi-architecture/</url><content type="html"><![CDATA[<h1 id="kimi-architecture">Kimi K3 架构笔记：KDA、深度残差与稀疏专家</h1>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Attention</tag><tag>Kernel Optimization</tag></tags></entry>
+<entry><title>Kimi K3 Architecture: KDA, Depth Residuals, and Sparse Experts</title><link href="/2026/10/02/kimi-architecture/"/><url>/2026/10/02/kimi-architecture/</url><content type="html"><![CDATA[<h1 id="kimi-architecture">Kimi K3 架构笔记：KDA、深度残差与稀疏专家</h1>
 <p>本文由既有深读笔记整理入博客，并核对了对应 Codex 学习工作区。内容区分论文事实、教学推导与实验边界；论文中的性能与规模数据属于作者报告，不是我在本地复现的成绩。原笔记的公式、示例和推导在此保留。</p>
 <div class="study-note">
 <p class="lead">把 2.78T 参数、百万 Token、原生视觉放在一起并不是简单堆规模。K3 分别沿着序列、深度和通道三个方向设计信息通路，再用系统优化让这些结构真的跑得起来。</p>
@@ -2405,8 +2405,8 @@ y = Σⱼ₌₁² Eⱼˢʰᵃʳᵉᵈ(x) + W↑ RMSNorm(u)</div>
 <h2 id="阅读架构与阅读实现的边界">阅读架构与阅读实现的边界</h2>
 <p>公式描述的是模型允许怎样处理信息，真实实现还需要决定张量布局、精度、分块和通信。这里保留论文的结构与教学例子，但不从总参数或激活参数推算某台机器的实际吞吐。专家虽然稀疏激活，全部权重仍需有存储位置；递归状态虽然不随序列线性增长，仍要为每个活跃请求保存。把容量与计算分开，才能把这篇结构笔记连接到下一篇系统笔记。</p>
 <p>此外，路由偏置控制专家选择，混合权重控制已选专家的输出组合，物理调度则决定专家在哪里执行。三者可以共同影响负载，却分别属于模型定义、数值计算和运行系统。学习时应分别标注，避免把一种负载均衡机制误认成另一种实现。</p>
-]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>模型架构</tag><tag>MoE</tag></tags></entry>
-<entry><title>Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存</title><link href="/2026/10/02/kimi-systems/"/><url>/2026/10/02/kimi-systems/</url><content type="html"><![CDATA[<h1 id="kimi-systems">Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存</h1>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Model Architecture</tag><tag>MoE</tag></tags></entry>
+<entry><title>Kimi K3 Systems: Long-Context Training, Expert Scheduling, and Hybrid Caches</title><link href="/2026/10/02/kimi-systems/"/><url>/2026/10/02/kimi-systems/</url><content type="html"><![CDATA[<h1 id="kimi-systems">Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存</h1>
 <p>本文由既有深读笔记整理入博客，并核对了对应 Codex 学习工作区。内容区分论文事实、教学推导与实验边界；论文中的性能与规模数据属于作者报告，不是我在本地复现的成绩。原笔记的公式、示例和推导在此保留。</p>
 <div class="study-note">
 <p class="lead">模型公式只是起点。要让 3T 级 MoE 在百万上下文上完成数百次工具调用，还需要长上下文课程、可恢复 RL、五种并行方式、动态专家复制、分层缓存和部署感知后训练。</p>
@@ -2545,9 +2545,9 @@ L_LK = −log acceptance</div>
 </section>
 <footer class="footer"><p><strong>主要来源：</strong><a href="https://arxiv.org/html/2607.24653v2">Kimi K3: Open Frontier Intelligence（HTML）</a> · <a href="https://arxiv.org/pdf/2607.24653v2">PDF</a> · <a href="https://github.com/MoonshotAI/MoonEP">MoonEP</a> · <a href="https://github.com/kvcache-ai/AgentENV">AgentENV</a> · <a href="https://github.com/fla-org/flash-linear-attention">Flash Linear Attention</a>。</p><p>论文事实、本文推导和教学示例已分别标记；侧边聊天只用于补充 GPU/下一 Token 等基础概念，没有被当作 K3 实现证据。</p></footer>
 </div>
-]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>模型架构</tag><tag>分布式推理</tag></tags></entry>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Model Architecture</tag><tag>Distributed Inference</tag></tags></entry>
 <entry>
-      <title>大模型算法工程师 — 从零开始学习路线图</title>
+      <title>Becoming an LLM Engineer: A Learning Roadmap from Scratch</title>
       <link href="/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/"/>
       <url>/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/</url>
       
@@ -2969,16 +2969,16 @@ L_LK = −log acceptance</div>
       
       <categories>
           
-          <category> 大模型 </category>
+          <category> Large Language Models </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 学习路线 </tag>
+            <tag> Learning Roadmap </tag>
             
-            <tag> 大模型 </tag>
+            <tag> Large Language Models </tag>
             
         </tags>
       
@@ -2987,7 +2987,7 @@ L_LK = −log acceptance</div>
     
     
     <entry>
-      <title>深度学习基础</title>
+      <title>Deep Learning Fundamentals</title>
       <link href="/2026/04/06/01-%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/"/>
       <url>/2026/04/06/01-%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/</url>
       
@@ -2996,26 +2996,26 @@ L_LK = −log acceptance</div>
       
       <categories>
           
-          <category> 大模型 </category>
+          <category> Large Language Models </category>
           
-          <category> 深度学习基础 </category>
+          <category> Deep Learning Fundamentals </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 深度学习 </tag>
+            <tag> Deep Learning </tag>
             
-            <tag> 激活函数 </tag>
+            <tag> Activation Functions </tag>
             
-            <tag> 优化器 </tag>
+            <tag> Optimizers </tag>
             
-            <tag> 正则化 </tag>
+            <tag> Regularization </tag>
             
-            <tag> 归一化 </tag>
+            <tag> Normalization </tag>
             
-            <tag> 损失函数 </tag>
+            <tag> Loss Functions </tag>
             
         </tags>
       
@@ -3024,7 +3024,7 @@ L_LK = −log acceptance</div>
     
     
     <entry>
-      <title>强化学习基本概念</title>
+      <title>Reinforcement Learning Fundamentals</title>
       <link href="/2026/04/06/1_Reinforce%20Learning-Basic%20Concepts/"/>
       <url>/2026/04/06/1_Reinforce%20Learning-Basic%20Concepts/</url>
       
@@ -3033,16 +3033,16 @@ L_LK = −log acceptance</div>
       
       <categories>
           
-          <category> 强化学习 </category>
+          <category> Reinforcement Learning </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 强化学习 </tag>
+            <tag> Reinforcement Learning </tag>
             
-            <tag> 机器学习 </tag>
+            <tag> Machine Learning </tag>
             
         </tags>
       
@@ -3051,7 +3051,7 @@ L_LK = −log acceptance</div>
     
     
     <entry>
-      <title>基于价值的强化学习</title>
+      <title>Value-Based Reinforcement Learning</title>
       <link href="/2026/04/06/2-Value-Based%20Reinforcement%20Learning/"/>
       <url>/2026/04/06/2-Value-Based%20Reinforcement%20Learning/</url>
       
@@ -3060,16 +3060,16 @@ L_LK = −log acceptance</div>
       
       <categories>
           
-          <category> 强化学习 </category>
+          <category> Reinforcement Learning </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 深度学习 </tag>
+            <tag> Deep Learning </tag>
             
-            <tag> 强化学习 </tag>
+            <tag> Reinforcement Learning </tag>
             
             <tag> DQN </tag>
             
@@ -3080,7 +3080,7 @@ L_LK = −log acceptance</div>
     
     
     <entry>
-      <title>Actor-Critic 方法</title>
+      <title>Actor-Critic Methods</title>
       <link href="/2026/04/06/4-Actor-Critic/"/>
       <url>/2026/04/06/4-Actor-Critic/</url>
       
@@ -3439,14 +3439,14 @@ Actor：   θ ← θ + β stop_gradient(δV) ∇θ log πθ(a|s)
       
       <categories>
           
-          <category> 强化学习 </category>
+          <category> Reinforcement Learning </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 强化学习 </tag>
+            <tag> Reinforcement Learning </tag>
             
             <tag> Actor-Critic </tag>
             
@@ -3457,7 +3457,7 @@ Actor：   θ ← θ + β stop_gradient(δV) ∇θ log πθ(a|s)
     
     
     <entry>
-      <title>基于策略的强化学习</title>
+      <title>Policy-Based Reinforcement Learning</title>
       <link href="/2026/04/06/3-Policy-Based%20Reinforcement%20Learning/"/>
       <url>/2026/04/06/3-Policy-Based%20Reinforcement%20Learning/</url>
       
@@ -3466,16 +3466,16 @@ Actor：   θ ← θ + β stop_gradient(δV) ∇θ log πθ(a|s)
       
       <categories>
           
-          <category> 强化学习 </category>
+          <category> Reinforcement Learning </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 强化学习 </tag>
+            <tag> Reinforcement Learning </tag>
             
-            <tag> 策略梯度 </tag>
+            <tag> Policy Gradients </tag>
             
         </tags>
       
@@ -3484,7 +3484,7 @@ Actor：   θ ← θ + β stop_gradient(δV) ∇θ log πθ(a|s)
     
     
     <entry>
-      <title>蒙特卡洛树搜索</title>
+      <title>Monte Carlo Tree Search</title>
       <link href="/2026/04/06/5-Monte%20Carlo%20Tree%20Search/"/>
       <url>/2026/04/06/5-Monte%20Carlo%20Tree%20Search/</url>
       
@@ -3854,14 +3854,14 @@ c100.7 8.3 195.3 44 280 108 55.3 42 101.7 93 139 153l9 14c2.7-4 5.7-8.7 9-14
       
       <categories>
           
-          <category> 强化学习 </category>
+          <category> Reinforcement Learning </category>
           
       </categories>
       
       
         <tags>
             
-            <tag> 强化学习 </tag>
+            <tag> Reinforcement Learning </tag>
             
             <tag> MCTS </tag>
             

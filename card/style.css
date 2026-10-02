@@ -799,7 +799,7 @@ dialog dd {
   /* The depth switch turned .finish-cluster into the grid item, so the cluster — not
      .finish-control — has to own the second row on a phone. Without this the auto
      column claimed ~316px, squeezed the 1fr title column past the bar and wrapped
-     景深调整 one glyph per line (~114px of horizontal overflow at 390px). */
+     Depth controls one glyph per line (~114px of horizontal overflow at 390px). */
   .finish-cluster {
     grid-column: 1/-1;
     width: 100%;

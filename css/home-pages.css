@@ -58,3 +58,8 @@ html.paged-home,html.paged-home body{height:100%;overflow:hidden;scroll-behavior
 .paged-home body:not([data-page="profile"]) .site-header{visibility:hidden;pointer-events:none}
 .paged-home .hero-topics{font-family:Inconsolata,var(--body),monospace;font-size:clamp(15px,1.6vw,23px);letter-spacing:0;line-height:1.7}
 @media(max-width:760px){.paged-home .hero-topics{font-size:14px}}
+
+/* Let the English profile copy wrap within the card at every viewport size. */
+.hero-intro[lang="en"]{white-space:normal;letter-spacing:0;line-height:1.45;font-size:clamp(20px,2vw,28px)}
+.hero-topics[lang="en"]{white-space:normal}
+.paged-home .hero-topics[lang="en"]{font-size:clamp(14px,1.2vw,18px)}

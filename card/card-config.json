@@ -1,16 +1,16 @@
 {
-  "title": "双面 · 银箔闪卡",
+  "title": "Two Sides · Silver Foil",
   "subtitle": "",
   "technique": "",
   "tagline": "",
   "edition": "",
   "collection": "",
-  "description": "正面 · 格斯与白焰 / 背面 · 星环与光晕",
+  "description": "Front · Guts and white flames / Back · Celestial rings and halos",
   "assets": {
     "model": "./assets/card.4817c38f9d25.glb",
     "subject": "./assets/subject.b301dd5e9f98.webp",
     "background": "./assets/background.cfc36b735065.webp",
-    "text": "./assets/front-text.c5a6158c4de4.webp",
+    "text": "./assets/front-text.0cd8d6768d2f.webp",
     "lineart": "./assets/lineart.f8ce69dd6786.webp",
     "effects": "./assets/effects.2ca51d3da8cb.webp",
     "flames": "./assets/flames.2ac00679bd1f.webp"
@@ -35,7 +35,7 @@
     "background": "#101010",
     "finish": "silver"
   },
-  "notes": "Independent two-sided identity-card preview. Front: Sun Yunfei, HIT Information Security. Back: Levius-Fubuki, AI Infra and open-source contributions. Not integrated into the blog.",
+  "notes": "Two-sided identity card. Front: Sun Yunfei, HIT Information Security, AI Infra. Back: Levius-Fubuki, AI Infra and open-source contributions.",
   "sourceMode": "relief",
   "layers": {
     "subject": {
@@ -93,7 +93,7 @@
       "background": "./assets/back-background.3496fdc95c81.webp",
       "lineart": "./assets/back-lineart.a827e8c06bfc.webp",
       "standing": "./assets/back-standing.5c884024e342.webp",
-      "text": "./assets/back-text.4e2f6d09ae22.webp"
+      "text": "./assets/back-text.76fc9d4cec06.webp"
     },
     "portrait": {
       "width": 5.4,
@@ -991,9 +991,9 @@
   "lettering": {
     "front": {
       "name": "Sun Yunfei",
-      "identity": "哈尔滨工业大学",
-      "direction": "信息安全",
-      "keywords": "多模态学习 · 强化学习",
+      "identity": "Harbin Institute of Technology",
+      "direction": "Information Security",
+      "keywords": "AI Infra · Multimodal Learning · RL",
       "footer": "HIT · 2023—2027",
       "edge": "INFORMATION SECURITY"
     },
@@ -1001,7 +1001,7 @@
       "name": "Levius-Fubuki",
       "identity": "GitHub · Open Source",
       "direction": "AI Infra",
-      "keywords": "推理优化 · GPU 算子",
+      "keywords": "Inference Optimization · GPU Kernels",
       "footer": "github.com/Levius-Fubuki",
       "edge": "INFERENCE · KERNELS"
     }

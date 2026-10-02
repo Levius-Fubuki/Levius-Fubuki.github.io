@@ -1,6 +1,9 @@
 """Publish the card runtime with immutable URLs and resilient delivery."""
 from pathlib import Path
-import json, shutil, subprocess, hashlib, re
+import argparse, json, shutil, subprocess, hashlib, re
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--skip-home',action='store_true',help='Publish card files without updating the homepage iframe revision')
+args=parser.parse_args()
 root=Path(__file__).resolve().parents[1]
 source=root/'card-studio/levius-id/web';dest=root/'card'
 dest.mkdir(exist_ok=True);(dest/'assets').mkdir(exist_ok=True)
@@ -28,6 +31,13 @@ for group in [config['assets'],config['back']['assets']]:
 config_json=json.dumps(config,ensure_ascii=False,indent=2)+'\n'
 (dest/'card-config.json').write_text(config_json)
 index=(source/'index.html').read_text()
+# Keep the loading artwork in sync without reusing a cached older card face.
+preview_source=source/'assets/card-preview.webp'
+preview=dest/'assets/card-preview.webp'
+if preview_source.exists():
+ shutil.copy2(preview_source,preview)
+if preview.exists():
+ index=index.replace('./assets/card-preview.webp',versioned_copy(preview))
 index=re.sub(r'\s*<script type="module"[^>]*src="\./app.bundle.js[^>]*></script>', '',index)
 # Blocking CSS must not prevent the recovery bootstrap from executing.
 # All card styles/font data are local and small enough to ship with the document.
@@ -40,6 +50,8 @@ bootstrap=(root/'scripts/card-runtime/asset-loader.mjs').read_text().replace('ex
 index=index.replace('</body>', '<script id="card-runtime-config" type="application/json">'+config_json.replace('<','\\u003c')+'</script>\n<script type="module" data-card-module="'+module+'">\n'+bootstrap+'\n</script>\n</body>')
 (dest/'index.html').write_text(index)
 home=root/'index.html';revision=hashlib.sha256(index.encode()).hexdigest()[:12]
-home.write_text(re.sub(r'src="/card/\?embed=1(?:&(?:amp;)?v=[^"]*)?"', 'src="/card/?embed=1&amp;v='+revision+'"',home.read_text()))
+if not args.skip_home:
+ home.write_text(re.sub(r'src="/card/\?embed=1(?:&(?:amp;)?v=[^"]*)?"', 'src="/card/?embed=1&amp;v='+revision+'"',home.read_text()))
 print('Published immutable card runtime:', module)
 print('Runtime assets:',len(seen))
+print('Homepage iframe revision:',revision)

@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#fafafa" />
     <link rel="icon" href="data:," />
-    <title>Levius · 卡片预览</title>
+    <title>Levius · Card Preview</title>
     <script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('is-embedded');</script>
     <style data-card-style="style.css">@font-face {
   font-family: Atelier;
@@ -808,7 +808,7 @@ dialog dd {
   /* The depth switch turned .finish-cluster into the grid item, so the cluster — not
      .finish-control — has to own the second row on a phone. Without this the auto
      column claimed ~316px, squeezed the 1fr title column past the bar and wrapped
-     景深调整 one glyph per line (~114px of horizontal overflow at 390px). */
+     Depth controls one glyph per line (~114px of horizontal overflow at 390px). */
   .finish-cluster {
     grid-column: 1/-1;
     width: 100%;
@@ -938,19 +938,19 @@ button:focus-visible{outline-color:#fff}
   </head>
   <body>
     <header class="masthead">
-      <a class="wordmark" href="./" aria-label="卡片预览首页"
-        ><span class="wordmark-cn">卡片预览<span class="brand-dot"></span></span
+      <a class="wordmark" href="./" aria-label="Card preview home"
+        ><span class="wordmark-cn">Card Preview<span class="brand-dot"></span></span
         ><span class="wordmark-en">LEVIUS / CARD STUDY</span></a
       >
       <span class="collection-label"
-        >个人典藏 <span>/</span> <span id="edition">STUDY 001</span></span
+        >Personal Collection <span>/</span> <span id="edition">STUDY 001</span></span
       >
       <div class="header-actions">
         <button
           class="icon-button"
           id="info"
-          aria-label="作品信息"
-          title="作品信息"
+          aria-label="Artwork information"
+          title="Artwork information"
           disabled
         >
           <i data-lucide="info"></i>
@@ -958,8 +958,8 @@ button:focus-visible{outline-color:#fff}
         <button
           class="icon-button save-button"
           id="save"
-          aria-label="保存卡片图片"
-          title="保存卡片图片"
+          aria-label="Save card image"
+          title="Save card image"
           disabled
         >
           <i data-lucide="download"></i>
@@ -967,56 +967,56 @@ button:focus-visible{outline-color:#fff}
       </div>
     </header>
     <main>
-      <section class="gallery" aria-label="卡片展台">
+      <section class="gallery" aria-label="Card display">
         <div
           class="stage"
           id="stage"
           tabindex="0"
           role="group"
-          aria-label="可旋转的全息卡片"
+          aria-label="Rotatable holographic card"
         >
           <div id="loading" class="loading" role="status">
-            <img class="card-loading-preview" src="./assets/card-preview.webp" alt="Sun Yunfei 与 Levius-Fubuki 的身份卡预览" width="600" height="550" fetchpriority="high" />
-            <div class="card-loading-status"><span class="loading-line"></span><span data-card-status>正在加载互动卡片…</span><button data-card-retry type="button" onclick="location.reload()">重新加载</button></div>
+            <img class="card-loading-preview" src="./assets/card-preview.ccd11844279a.webp" alt="Identity card preview for Sun Yunfei and Levius-Fubuki" width="600" height="550" fetchpriority="high" />
+            <div class="card-loading-status"><span class="loading-line"></span><span data-card-status>Loading interactive card…</span><button data-card-retry type="button" onclick="location.reload()">Reload</button></div>
           </div>
         </div>
-        <div class="preview-controls"><button id="auto" type="button" aria-label="暂停旋转" title="暂停旋转"><i data-lucide="pause"></i></button><button id="reset-card" type="button">复位</button></div>
+        <div class="preview-controls"><button id="auto" type="button" aria-label="Pause rotation" title="Pause rotation"><i data-lucide="pause"></i></button><button id="reset-card" type="button">Reset</button></div>
         <div class="stage-note" aria-hidden="true">
           <span>ART STUDY</span><span id="view-label">01 / FRONT</span>
         </div>
         <div class="parameter-panel" id="parameter-panel">
           <div class="panel-heading">
-            <span>景深与构图</span>
+            <span>Depth and composition</span>
           </div>
           <label class="range-row" for="scale"
-            ><span>画面比例</span><output id="scale-value"></output
+            ><span>Image scale</span><output id="scale-value"></output
             ><input id="scale" type="range" min="0.95" max="1.35" step="0.01"
           /></label>
           <label class="range-row" for="depth"
-            ><span>人物景深</span><output id="depth-value"></output
+            ><span>Portrait depth</span><output id="depth-value"></output
             ><input id="depth" type="range" min="-0.45" max="0.45" step="0.01"
           /></label>
           <label class="range-row" for="fx-depth"
-            ><span>持剑人物景深</span><output id="fx-depth-value"></output
+            ><span>Warrior depth</span><output id="fx-depth-value"></output
             ><input id="fx-depth" type="range" min="-0.3" max="0.9" step="0.01"
           /></label>
           <label class="range-row" for="bg-depth"
-            ><span>后景视差</span><output id="bg-depth-value"></output
+            ><span>Background parallax</span><output id="bg-depth-value"></output
             ><input id="bg-depth" type="range" min="-0.4" max="0.4" step="0.01"
           /></label>
         </div>
       </section>
-      <section class="artwork-bar" aria-label="作品与材质">
+      <section class="artwork-bar" aria-label="Artwork and finish">
         <div class="artwork-title">
           <div class="title-line">
             <h1 id="card-title">BOND</h1>
-            <span id="subtitle">共生</span>
+            <span id="subtitle">BOND</span>
           </div>
-          <p id="description">光与影，彼此相依。</p>
+          <p id="description">Light and shadow, bound together.</p>
         </div>
-        <div class="face-picker" role="group" aria-label="卡片朝向">
-          <button id="front" aria-pressed="true" disabled>正面</button
-          ><button id="back" aria-pressed="false" disabled>背面</button>
+        <div class="face-picker" role="group" aria-label="Card orientation">
+          <button id="front" aria-pressed="true" disabled>Front</button
+          ><button id="back" aria-pressed="false" disabled>Back</button>
         </div>
         <div class="finish-cluster">
           <button
@@ -1025,52 +1025,52 @@ button:focus-visible{outline-color:#fff}
             type="button"
             aria-controls="parameter-panel"
             aria-expanded="true"
-            aria-label="显示或隐藏景深调整"
-            title="显示或隐藏景深调整"
+            aria-label="Show or hide depth controls"
+            title="Show or hide depth controls"
           >
-            <i data-lucide="sliders-horizontal"></i><span>景深调整</span>
+            <i data-lucide="sliders-horizontal"></i><span>Depth controls</span>
           </button>
           <div class="finish-control">
           <div class="finish-heading">
-            <span>卡面质感</span>
-            <div class="swatches" role="group" aria-label="卡面材质">
+            <span>Card finish</span>
+            <div class="swatches" role="group" aria-label="Card material">
               <button
                 class="swatch pearl"
                 data-finish="pearl"
                 aria-pressed="true"
-                aria-label="珠光"
-                title="珠光"
+                aria-label="Pearl"
+                title="Pearl"
                 disabled
               ></button
               ><button
                 class="swatch silver"
                 data-finish="silver"
                 aria-pressed="false"
-                aria-label="银箔"
-                title="银箔"
+                aria-label="Silver foil"
+                title="Silver foil"
                 disabled
               ></button
               ><button
                 class="swatch gold"
                 data-finish="gold"
                 aria-pressed="true"
-                aria-label="烫金"
-                title="烫金"
+                aria-label="Gold foil"
+                title="Gold foil"
                 disabled
               ></button
               ><button
                 class="swatch original"
                 data-finish="original"
                 aria-pressed="false"
-                aria-label="原画"
-                title="原画"
+                aria-label="Original"
+                title="Original"
                 disabled
               ></button>
             </div>
-            <span id="finish-name">烫金</span>
+            <span id="finish-name">Gold foil</span>
           </div>
           <label class="foil-row" for="foil"
-            ><span>光泽</span
+            ><span>Gloss</span
             ><input
               id="foil"
               type="range"
@@ -1086,49 +1086,49 @@ button:focus-visible{outline-color:#fff}
       </section>
     </main>
     <footer class="footer">
-      <span>拖动旋转 · 滚轮缩放 · F 翻面 · R 复位</span><span>Sun Yunfei / Levius-Fubuki</span>
+      <span>Drag to rotate · Scroll to zoom · F to flip · R to reset</span><span>Sun Yunfei / Levius-Fubuki</span>
     </footer>
     <dialog id="about" aria-labelledby="about-title">
       <button
         id="close-about"
         class="icon-button modal-close"
-        aria-label="关闭作品信息"
-        title="关闭作品信息"
+        aria-label="Close artwork information"
+        title="Close artwork information"
       >
         <i data-lucide="x"></i>
       </button>
       <p class="dialog-mark">Levius</p>
-      <h2 id="about-title">共生 / BOND</h2>
+      <h2 id="about-title">BOND</h2>
       <p id="about-description"></p>
       <dl>
         <div>
-          <dt>来源</dt>
-          <dd>原创几何徽记与分层素材</dd>
+          <dt>Source</dt>
+          <dd>Original geometric marks and layered artwork</dd>
         </div>
         <div>
-          <dt>呈现</dt>
-          <dd>个人艺术卡片习作</dd>
+          <dt>Presentation</dt>
+          <dd>Personal art card study</dd>
         </div>
         <div>
-          <dt>编号</dt>
+          <dt>Edition</dt>
           <dd id="about-edition">STUDY 001</dd>
         </div>
       </dl>
     </dialog>
     <div id="notice" role="status" class="notice" hidden></div>
   <script id="card-runtime-config" type="application/json">{
-  "title": "双面 · 银箔闪卡",
+  "title": "Two Sides · Silver Foil",
   "subtitle": "",
   "technique": "",
   "tagline": "",
   "edition": "",
   "collection": "",
-  "description": "正面 · 格斯与白焰 / 背面 · 星环与光晕",
+  "description": "Front · Guts and white flames / Back · Celestial rings and halos",
   "assets": {
     "model": "./assets/card.4817c38f9d25.glb",
     "subject": "./assets/subject.b301dd5e9f98.webp",
     "background": "./assets/background.cfc36b735065.webp",
-    "text": "./assets/front-text.c5a6158c4de4.webp",
+    "text": "./assets/front-text.0cd8d6768d2f.webp",
     "lineart": "./assets/lineart.f8ce69dd6786.webp",
     "effects": "./assets/effects.2ca51d3da8cb.webp",
     "flames": "./assets/flames.2ac00679bd1f.webp"
@@ -1153,7 +1153,7 @@ button:focus-visible{outline-color:#fff}
     "background": "#101010",
     "finish": "silver"
   },
-  "notes": "Independent two-sided identity-card preview. Front: Sun Yunfei, HIT Information Security. Back: Levius-Fubuki, AI Infra and open-source contributions. Not integrated into the blog.",
+  "notes": "Two-sided identity card. Front: Sun Yunfei, HIT Information Security, AI Infra. Back: Levius-Fubuki, AI Infra and open-source contributions.",
   "sourceMode": "relief",
   "layers": {
     "subject": {
@@ -1211,7 +1211,7 @@ button:focus-visible{outline-color:#fff}
       "background": "./assets/back-background.3496fdc95c81.webp",
       "lineart": "./assets/back-lineart.a827e8c06bfc.webp",
       "standing": "./assets/back-standing.5c884024e342.webp",
-      "text": "./assets/back-text.4e2f6d09ae22.webp"
+      "text": "./assets/back-text.76fc9d4cec06.webp"
     },
     "portrait": {
       "width": 5.4,
@@ -2109,9 +2109,9 @@ button:focus-visible{outline-color:#fff}
   "lettering": {
     "front": {
       "name": "Sun Yunfei",
-      "identity": "哈尔滨工业大学",
-      "direction": "信息安全",
-      "keywords": "多模态学习 · 强化学习",
+      "identity": "Harbin Institute of Technology",
+      "direction": "Information Security",
+      "keywords": "AI Infra · Multimodal Learning · RL",
       "footer": "HIT · 2023—2027",
       "edge": "INFORMATION SECURITY"
     },
@@ -2119,14 +2119,14 @@ button:focus-visible{outline-color:#fff}
       "name": "Levius-Fubuki",
       "identity": "GitHub · Open Source",
       "direction": "AI Infra",
-      "keywords": "推理优化 · GPU 算子",
+      "keywords": "Inference Optimization · GPU Kernels",
       "footer": "github.com/Levius-Fubuki",
       "edge": "INFERENCE · KERNELS"
     }
   }
 }
 </script>
-<script type="module" data-card-module="./app.bundle.59c6e463c09f.js">
+<script type="module" data-card-module="./app.bundle.d81cd4667251.js">
 // Hedge slow custom-domain requests against the same public repository bytes.
 // Complete bodies race, not just headers; cancel the losing transfer.
 async function fetchCardResource(path, {timeout = 4000, hedgeDelay = 500, onSource = () => {}} = {}) {
@@ -2168,7 +2168,7 @@ async function fetchCardResource(path, {timeout = 4000, hedgeDelay = 500, onSour
     } catch (error) { cause = error; }
     finally { retry.abort(); }
   }
-  throw new Error(`${local.pathname.split('/').pop()} 加载失败，请点击重试`, {cause});
+  throw new Error(`${local.pathname.split('/').pop()} could not load. Please try again.`, {cause});
 }
 
 async function prepareCardAssets(config, progress = () => {}) {
@@ -2199,7 +2199,7 @@ async function prepareCardAssets(config, progress = () => {}) {
     console.error('[card] Runtime unavailable:', error);
     document.querySelector('#loading')?.classList.add('error');
     const status = document.querySelector('[data-card-status]');
-    if (status) status.textContent = '互动卡片资源暂时无法连接，请点击重新加载';
+    if (status) status.textContent = 'Card resources are unavailable. Select Reload to try again.';
   } finally {
     if (objectURL) URL.revokeObjectURL(objectURL);
   }

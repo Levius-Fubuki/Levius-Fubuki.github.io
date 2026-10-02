@@ -22,12 +22,12 @@ const path = require('node:path');
     check('change directory',(await run('cd articles')).includes('/articles'));
     check('all eight articles listed',(await run('ls')).includes('Hello World'));
     await page.locator('.terminal-shortcuts [data-terminal-command="ls /articles"]').click();await page.waitForFunction(()=>document.querySelector('#terminal-form').dataset.busy==='false');check('article shortcut works from article directory',(await page.locator('.terminal-response').last().innerText()).includes('Hello World'));
-    check('Chinese search returns real content',(await run('search 强化学习')).includes('强化学习基本概念'));
+    check('Chinese search returns real content',(await run('search 强化学习')).includes('Reinforcement Learning'));
     check('search IDs remain canonical',(await run('search "Actor-Critic"')).includes('05'));
     check('cat reads article',(await run('cat 5')).includes('Actor-Critic'));
-    check('invalid article is explained',(await run('open 999')).includes('未找到'));
-    check('unclosed quotes are explained',(await run('search \"unfinished')).includes('引号'));
-    check('empty search is explained',(await run('search')).includes('search <关键词>'));
+    check('invalid article is explained',(await run('open 999')).includes('not found'));
+    check('unclosed quotes are explained',(await run('search \"unfinished')).includes('Unclosed quote'));
+    check('empty search is explained',(await run('search')).includes('search <keywords>'));
     check('unknown command has guidance',(await run('sudo rm -rf /')).includes('help'));
     await run('search <img src=x onerror=alert(1)>');
     check('input rendered as text',await page.locator('#terminal-output img').count()===0);
@@ -42,9 +42,9 @@ const path = require('node:path');
     await input.fill('open 5');await input.press('Enter');await page.waitForURL('**/4-Actor-Critic/',{waitUntil:'domcontentloaded'});check('open navigates to actual article',page.url().includes('/4-Actor-Critic/'));
     await page.goto(base,{waitUntil:'networkidle'});
     for(const width of [390,320]){await page.setViewportSize({width,height:844});await page.locator('#terminal').scrollIntoViewIfNeeded();check(width+'px no overflow',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await run('search 强化学习');const ib=await input.boundingBox(),bb=await page.locator('#terminal-form button').boundingBox();check(width+'px submit shares input row',Math.abs(ib.y-bb.y)<10);await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await page.waitForTimeout(800);await page.screenshot({path:out+'/mobile-'+width+'.png',fullPage:true});}
-    await page.emulateMedia({reducedMotion:'reduce'});check('reduced motion command explains state',(await run('motion on')).includes('系统'));
+    await page.emulateMedia({reducedMotion:'reduce'});check('reduced motion command explains state',(await run('motion on')).includes('system settings'));
     await run('CLEAR');check('uppercase clear removes previous output',await page.locator('#terminal-output').innerText()==='');
-    const failure=await browser.newPage();await failure.route('**/js/search-index.json',route=>route.fulfill({status:503,body:'unavailable'}));await failure.goto(base,{waitUntil:'networkidle'});await failure.locator('#terminal-input').fill('search test');await failure.locator('#terminal-input').press('Enter');await failure.waitForFunction(()=>document.querySelector('#terminal-form').dataset.busy==='false');check('data error is visible',(await failure.locator('.terminal-response').last().innerText()).includes('重试'));await failure.unroute('**/js/search-index.json');await failure.locator('#terminal-input').fill('ls articles');await failure.locator('#terminal-input').press('Enter');await failure.waitForFunction(()=>document.querySelector('#terminal-form').dataset.busy==='false');check('failed data fetch retries',(await failure.locator('.terminal-response').last().innerText()).includes('Hello World'));await failure.close();
+    const failure=await browser.newPage();await failure.route('**/js/search-index.json',route=>route.fulfill({status:503,body:'unavailable'}));await failure.goto(base,{waitUntil:'networkidle'});await failure.locator('#terminal-input').fill('search test');await failure.locator('#terminal-input').press('Enter');await failure.waitForFunction(()=>document.querySelector('#terminal-form').dataset.busy==='false');check('data error is visible',(await failure.locator('.terminal-response').last().innerText()).includes('Run the command again'));await failure.unroute('**/js/search-index.json');await failure.locator('#terminal-input').fill('ls articles');await failure.locator('#terminal-input').press('Enter');await failure.waitForFunction(()=>document.querySelector('#terminal-form').dataset.busy==='false');check('failed data fetch retries',(await failure.locator('.terminal-response').last().innerText()).includes('Hello World'));await failure.close();
     check('no page errors',errors.length===0);
   } finally { writeFileSync(out+'/report.json',JSON.stringify({checks,errors},null,2));await browser.close(); }
   console.log(JSON.stringify({checks,errors},null,2));

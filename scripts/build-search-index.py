@@ -35,3 +35,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# Keep regenerated public UI and metadata in English.
+import subprocess as _localize_subprocess
+_localize_subprocess.run(["python3", str(ROOT / "scripts/localize-english.py")], check=True)

@@ -12,7 +12,7 @@
     console.error('[card] Runtime unavailable:', error);
     document.querySelector('#loading')?.classList.add('error');
     const status = document.querySelector('[data-card-status]');
-    if (status) status.textContent = '互动卡片资源暂时无法连接，请点击重新加载';
+    if (status) status.textContent = 'Card resources are unavailable. Select Reload to try again.';
   } finally {
     if (objectURL) URL.revokeObjectURL(objectURL);
   }

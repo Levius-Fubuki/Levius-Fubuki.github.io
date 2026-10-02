@@ -171,3 +171,7 @@ write('sitemap.xml',text)
 text=(ROOT/'sitemap.txt').read_text();existing={unquote(u).removesuffix('index.html') for u in text.splitlines()}
 write('sitemap.txt',text.rstrip()+'\n'+''.join(u+'\n' for u in sorted(newurls) if unquote(u).removesuffix('index.html') not in existing))
 print(json.dumps({'authored_posts':len(AUTHORED),'books':len(BOOKS),'collections':len(COLLECTIONS),'tags':len(tags),'written_files':len(changed)},ensure_ascii=False))
+
+# Keep regenerated public UI and metadata in English.
+import subprocess as _localize_subprocess
+_localize_subprocess.run(["python3", str(ROOT / "scripts/localize-english.py")], check=True)

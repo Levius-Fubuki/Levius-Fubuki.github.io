@@ -10,7 +10,7 @@
       if(!node.isConnected){active.delete(node);return}
       const progress=Math.min(1,Math.max(0,(now-item.start)/660)),settled=Math.floor(progress*item.chars.length);
       if(progress===1){node.nodeValue=item.original;active.delete(node);return}
-      node.nodeValue=item.chars.map((c,i)=>{if(i<settled||/\s/.test(c))return c;const glyphs=/[\u3400-\u9fff]/.test(c)?'零壹数码解析':'01_/:[]';return glyphs[(Math.floor(now/55)+i*3)%glyphs.length]}).join('');
+      node.nodeValue=item.chars.map((c,i)=>{if(i<settled||/\s/.test(c))return c;const glyphs='01_/:[]';return glyphs[(Math.floor(now/55)+i*3)%glyphs.length]}).join('');
     })}
     if(active.size)frame=requestAnimationFrame(tick);
   }
@@ -44,33 +44,33 @@
   addEventListener('scroll',()=>{if(!scrollFrame)scrollFrame=requestAnimationFrame(onScroll)},{passive:true});onScroll();
   topButton.addEventListener('click',()=>scrollTo({top:0,behavior:reduced.matches?'instant':'smooth'}));
   const reading=document.querySelector('.reading-width');
-  reading?.addEventListener('click',()=>{const enabled=document.body.classList.toggle('reading-wide');reading.setAttribute('aria-pressed',String(enabled));reading.textContent=enabled?'退出专注':'专注阅读'});
+  reading?.addEventListener('click',()=>{const enabled=document.body.classList.toggle('reading-wide');reading.setAttribute('aria-pressed',String(enabled));reading.textContent=enabled?'Exit focus mode':'Focus reading'});
 
   async function copy(text,button){
     const label=button.textContent;
-    try{await navigator.clipboard.writeText(text);button.textContent='已复制';status.textContent='已复制到剪贴板。'}
-    catch{button.textContent='复制失败';status.textContent='无法访问剪贴板，请选中文本手动复制。'}
+    try{await navigator.clipboard.writeText(text);button.textContent='Copied';status.textContent='Copied to clipboard.'}
+    catch{button.textContent='Copy failed';status.textContent='Clipboard unavailable. Select the text and copy it manually.'}
     setTimeout(()=>{button.textContent=label},1800);
   }
   document.querySelector('.copy-page')?.addEventListener('click',event=>copy(document.querySelector('link[rel=canonical]')?.href||location.href,event.currentTarget));
   document.querySelectorAll('#article-container figure.highlight').forEach(figure=>{
     figure.dataset.language=[...figure.classList].find(c=>c!=='highlight')||'code';
-    const button=document.createElement('button');button.type='button';button.className='code-copy';button.textContent='复制';button.setAttribute('aria-label','复制代码');
+    const button=document.createElement('button');button.type='button';button.className='code-copy';button.textContent='Copy';button.setAttribute('aria-label','Copy code');
     button.addEventListener('click',()=>copy(figure.querySelector('.code pre')?.innerText||figure.querySelector('pre')?.innerText||'',button));figure.prepend(button);
   });
   document.querySelectorAll('#article-container table').forEach(table=>{
     if(table.closest('figure.highlight,.katex,.table-scroll'))return;
-    const wrap=document.createElement('div');wrap.className='table-scroll';wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','可横向滚动的数据表格');table.before(wrap);wrap.append(table);
+    const wrap=document.createElement('div');wrap.className='table-scroll';wrap.tabIndex=0;wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Horizontally scrollable data table');table.before(wrap);wrap.append(table);
   });
   const images=[...document.querySelectorAll('#article-container img')];
   if(images.length){
-    const dialog=document.createElement('dialog');dialog.className='image-dialog';dialog.setAttribute('aria-label','文章配图预览');
-    const close=document.createElement('button');close.type='button';close.textContent='关闭 ×';const preview=document.createElement('img');dialog.append(close,preview);document.body.append(dialog);
+    const dialog=document.createElement('dialog');dialog.className='image-dialog';dialog.setAttribute('aria-label','Article image preview');
+    const close=document.createElement('button');close.type='button';close.textContent='Close ×';const preview=document.createElement('img');dialog.append(close,preview);document.body.append(dialog);
     close.addEventListener('click',()=>dialog.close());dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
     images.forEach(img=>{
       if(img.closest('a'))return;
-      img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',`放大配图：${img.alt||'文章配图'}`);
-      const open=()=>{preview.src=img.currentSrc||img.src;preview.alt=img.alt||'文章配图';dialog.showModal()};
+      img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',`Enlarge image: ${img.alt||'Article image'}`);
+      const open=()=>{preview.src=img.currentSrc||img.src;preview.alt=img.alt||'Article image';dialog.showModal()};
       img.addEventListener('click',open);img.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open()}});
     });
   }

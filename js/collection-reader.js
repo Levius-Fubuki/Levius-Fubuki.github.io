@@ -55,7 +55,7 @@
     content.replaceChildren(); content.scrollTop=0;
     const heading=node('h2','reader-page-title');heading.tabIndex=-1;
     if(state.page===0) {
-      content.append(node('p','reader-eyebrow','CONTENTS / 合集目录'));
+      content.append(node('p','reader-eyebrow','TABLE OF CONTENTS'));
       heading.textContent=state.collection.title;content.append(heading);
       content.append(node('p','reader-page-description',state.collection.description));
       const list=node('ol','reader-index');
@@ -68,14 +68,14 @@
       const book=state.books[state.page-1];
       content.append(node('p','reader-eyebrow',`VOL. ${book.volume} / ${book.date.replaceAll('-','.')}`));
       const preview=node('div','reader-preview');
-      const coverLink=node('a','reader-cover-link');coverLink.href=book.path;coverLink.setAttribute('aria-label',`阅读全文：${book.title}`);
+      const coverLink=node('a','reader-cover-link');coverLink.href=book.path;coverLink.setAttribute('aria-label',`Read full article: ${book.title}`);
       const original=document.querySelector(`[data-book="${book.id}"] .book-cover`);
       if(original){const cover=original.cloneNode(true);cover.querySelector('img').loading='eager';coverLink.append(cover);}
       const titleBlock=node('div','reader-preview-title');titleBlock.append(node('p','reader-preview-english',book.english));heading.textContent=book.title;titleBlock.append(heading);
       preview.append(coverLink,titleBlock);content.append(preview);
       content.append(node('p','reader-synopsis',book.summary));
-      const read=node('a','reader-read','阅读全文 ↗');read.href=book.path;content.append(read);
-      const indexButton=node('button','reader-to-index','返回目录');indexButton.type='button';indexButton.addEventListener('click',()=>turn(state,0));content.append(indexButton);
+      const read=node('a','reader-read','Read full article ↗');read.href=book.path;content.append(read);
+      const indexButton=node('button','reader-to-index','Back to contents');indexButton.type='button';indexButton.addEventListener('click',()=>turn(state,0));content.append(indexButton);
     }
     state.dialog.querySelector('.reader-page-number').textContent=`${String(state.page+1).padStart(2,'0')} / ${String(state.books.length+1).padStart(2,'0')}`;
     state.dialog.querySelector('[data-reader-step="-1"]').disabled=state.page===0;
@@ -103,8 +103,8 @@
     if(!collection)return;
     window.LeviusDecode?.finish();
     const books=data.books.filter(book=>book.collection===collection.id);
-    const dialog=node('dialog','collection-reader');dialog.setAttribute('aria-label',`${collection.title}合集，书籍预览`);
-    dialog.innerHTML='<div class="reader-shell"><header class="reader-toolbar"><span class="reader-collection-label"></span><button type="button" class="reader-close">合上归架 <span aria-hidden="true">×</span></button></header><div class="reader-stage"><div class="reader-volume"><div class="reader-backboard"></div><div class="reader-volume-spine"></div><section class="reader-paper"><div class="reader-paper-content"></div><nav class="reader-pagination" aria-label="预览翻页"><button type="button" data-reader-step="-1" aria-label="上一页">←</button><span class="reader-page-number" aria-live="polite"></span><button type="button" data-reader-step="1" aria-label="下一页">→</button></nav></section><div class="reader-leaf"><div class="reader-front"></div><button type="button" class="reader-endpaper" aria-label="合上合集并放回书架"><img alt="" class="reader-endpaper-art" /><span class="reader-endpaper-border"></span><span class="reader-endpaper-type"><span class="reader-exlibris">EX LIBRIS / LEVIUS</span><span class="reader-mark"></span><strong></strong><span class="reader-subtitle"></span><span class="reader-imprint">COLLECTED NOTES</span></span></button></div></div></div><footer class="reader-footer"><span>← → 翻阅 <span class="reader-footer-hint">· ESC 合上</span></span><button type="button" class="reader-all">查看全部分卷 ↗</button></footer></div>';
+    const dialog=node('dialog','collection-reader');dialog.setAttribute('aria-label',`${collection.title} collection preview`);
+    dialog.innerHTML='<div class="reader-shell"><header class="reader-toolbar"><span class="reader-collection-label"></span><button type="button" class="reader-close">Return to shelf <span aria-hidden="true">×</span></button></header><div class="reader-stage"><div class="reader-volume"><div class="reader-backboard"></div><div class="reader-volume-spine"></div><section class="reader-paper"><div class="reader-paper-content"></div><nav class="reader-pagination" aria-label="Preview pagination"><button type="button" data-reader-step="-1" aria-label="Previous page">←</button><span class="reader-page-number" aria-live="polite"></span><button type="button" data-reader-step="1" aria-label="Next page">→</button></nav></section><div class="reader-leaf"><div class="reader-front"></div><button type="button" class="reader-endpaper" aria-label="Close collection and return to shelf"><img alt="" class="reader-endpaper-art" /><span class="reader-endpaper-border"></span><span class="reader-endpaper-type"><span class="reader-exlibris">EX LIBRIS / LEVIUS</span><span class="reader-mark"></span><strong></strong><span class="reader-subtitle"></span><span class="reader-imprint">COLLECTED NOTES</span></span></button></div></div></div><footer class="reader-footer"><span>← → Turn pages <span class="reader-footer-hint">· ESC Close</span></span><button type="button" class="reader-all">View all volumes ↗</button></footer></div>';
     dialog.dataset.collection=collection.id;
     const front=source.querySelector('.collection-front').cloneNode(true);
     dialog.querySelector('.reader-front').append(front);
