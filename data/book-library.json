@@ -1,0 +1,159 @@
+{
+  "collections": [
+    {
+      "id": "llm",
+      "title": "大模型",
+      "subtitle": "知识圣殿",
+      "english": "CATHEDRAL OF KNOWLEDGE",
+      "mark": "✧",
+      "href": "/categories/大模型/",
+      "description": "从神经网络的基石，走向语言模型的构建与应用。",
+      "branch": {
+        "title": "深度学习基础",
+        "href": "/categories/大模型/深度学习基础/",
+        "description": "基础分卷 · 神经网络、优化与训练"
+      }
+    },
+    {
+      "id": "rl",
+      "title": "强化学习",
+      "subtitle": "骑士试炼",
+      "english": "THE KNIGHT’S TRIALS",
+      "mark": "✥",
+      "href": "/categories/强化学习/",
+      "description": "在行动与反馈之间，探索价值、策略与决策。"
+    },
+    {
+      "id": "notes",
+      "title": "序章",
+      "subtitle": "旅途之始",
+      "english": "PROLOGUE",
+      "mark": "✦",
+      "href": "/2025/03/30/hello-world/",
+      "description": "从第一篇文章开始。"
+    }
+  ],
+  "books": [
+    {
+      "id": "llm-roadmap",
+      "collection": "llm",
+      "volume": "I",
+      "title": "大模型算法工程师 — 从零开始学习路线图",
+      "coverTitle": [
+        "大模型",
+        "学习路线图"
+      ],
+      "english": "THE ASCENT",
+      "path": "/2026/04/07/0-大模型学习路线图/",
+      "date": "2026-04-07",
+      "summary": "从深度学习基础出发，串起预训练、微调、对齐、推理部署与 Agent 的学习路径。",
+      "art": "/img/books/llm-roadmap-color.webp"
+    },
+    {
+      "id": "deep-learning",
+      "collection": "llm",
+      "volume": "II",
+      "branch": "深度学习基础",
+      "title": "深度学习基础",
+      "coverTitle": [
+        "深度学习",
+        "基础"
+      ],
+      "english": "THE FOUNDATIONS",
+      "path": "/2026/04/06/01-深度学习基础/",
+      "date": "2026-04-06",
+      "summary": "梳理神经网络、反向传播、损失函数与优化器，理解深度模型如何完成训练。",
+      "art": "/img/books/deep-learning-color.webp"
+    },
+    {
+      "id": "rl-foundations",
+      "collection": "rl",
+      "volume": "I",
+      "title": "强化学习基本概念",
+      "coverTitle": [
+        "强化学习",
+        "基本概念"
+      ],
+      "english": "THE FIRST TRIAL",
+      "path": "/2026/04/06/1_Reinforce Learning-Basic Concepts/",
+      "date": "2026-04-06",
+      "summary": "从状态、动作与奖励出发，理解智能体和环境的交互，以及策略与价值函数。",
+      "art": "/img/books/rl-foundations-color.webp"
+    },
+    {
+      "id": "value-learning",
+      "collection": "rl",
+      "volume": "II",
+      "title": "基于价值的强化学习",
+      "coverTitle": [
+        "基于价值的",
+        "强化学习"
+      ],
+      "english": "THE SCALES OF VALUE",
+      "path": "/2026/04/06/2-Value-Based Reinforcement Learning/",
+      "date": "2026-04-06",
+      "summary": "用 Q 函数评估行动价值，沿着 DQN 与时序差分学习理解价值网络的训练过程。",
+      "art": "/img/books/value-learning-color.webp"
+    },
+    {
+      "id": "policy-learning",
+      "collection": "rl",
+      "volume": "III",
+      "title": "基于策略的强化学习",
+      "coverTitle": [
+        "基于策略的",
+        "强化学习"
+      ],
+      "english": "THE CHOSEN PATH",
+      "path": "/2026/04/06/3-Policy-Based Reinforcement Learning/",
+      "date": "2026-04-06",
+      "summary": "直接学习动作的概率分布，通过策略梯度优化离散与连续动作下的决策。",
+      "art": "/img/books/policy-learning-color.webp"
+    },
+    {
+      "id": "actor-critic",
+      "collection": "rl",
+      "volume": "IV",
+      "title": "Actor-Critic 方法",
+      "coverTitle": [
+        "Actor–Critic",
+        "方法"
+      ],
+      "english": "THE TWIN OATH",
+      "path": "/2026/04/06/4-Actor-Critic/",
+      "date": "2026-04-06",
+      "summary": "让 Actor 选择动作、Critic 评估价值，通过双网络协作与时序差分反馈改进策略。",
+      "art": "/img/books/actor-critic-color.webp"
+    },
+    {
+      "id": "tree-search",
+      "collection": "rl",
+      "volume": "V",
+      "title": "蒙特卡洛树搜索",
+      "coverTitle": [
+        "蒙特卡洛",
+        "树搜索"
+      ],
+      "english": "THE TREE OF FUTURES",
+      "path": "/2026/04/06/5-Monte Carlo Tree Search/",
+      "date": "2026-04-06",
+      "summary": "在选择、扩展、评估与回传的循环中模拟多种未来，逐步找到更好的行动。",
+      "art": "/img/books/tree-search-color.webp"
+    },
+    {
+      "id": "hello-world",
+      "collection": "notes",
+      "volume": "0",
+      "title": "Hello World",
+      "coverTitle": [
+        "Hello",
+        "World"
+      ],
+      "english": "THE FIRST LIGHT",
+      "path": "/2025/03/30/hello-world/",
+      "date": "2025-03-30",
+      "summary": "博客的第一篇文章：用 Hexo 创建文章、启动预览，并生成和发布静态站点。",
+      "art": "/img/books/hello-world-color.webp"
+    }
+  ]
+}

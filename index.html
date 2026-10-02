@@ -1,204 +1,374 @@
-<!DOCTYPE html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>L_F's Blog - A place for my thoughts and ideas</title><meta name="author" content="Levius"><meta name="copyright" content="Levius"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#0d0d0d"><meta property="og:type" content="website">
-<meta property="og:title" content="L_F&#39;s Blog">
-<meta property="og:url" content="https://leviusspace.top/index.html">
-<meta property="og:site_name" content="L_F&#39;s Blog">
-<meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://leviusspace.top/img/butterfly-icon.png">
-<meta property="article:author" content="Levius">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://leviusspace.top/img/butterfly-icon.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://leviusspace.top/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
-    (() => {
-      
-    const saveToLocal = {
-      set: (key, value, ttl) => {
-        if (!ttl) return
-        const expiry = Date.now() + ttl * 86400000
-        localStorage.setItem(key, JSON.stringify({ value, expiry }))
-      },
-      get: key => {
-        const itemStr = localStorage.getItem(key)
-        if (!itemStr) return undefined
-        const { value, expiry } = JSON.parse(itemStr)
-        if (Date.now() > expiry) {
-          localStorage.removeItem(key)
-          return undefined
-        }
-        return value
-      }
-    }
-
-    window.btf = {
-      saveToLocal,
-      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
-        const script = document.createElement('script')
-        script.src = url
-        script.async = true
-        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
-        script.onload = script.onreadystatechange = () => {
-          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
-        }
-        script.onerror = reject
-        document.head.appendChild(script)
-      }),
-      getCSS: (url, id) => new Promise((resolve, reject) => {
-        const link = document.createElement('link')
-        link.rel = 'stylesheet'
-        link.href = url
-        if (id) link.id = id
-        link.onload = link.onreadystatechange = () => {
-          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
-        }
-        link.onerror = reject
-        document.head.appendChild(link)
-      }),
-      addGlobalFn: (key, fn, name = false, parent = window) => {
-        if (!false && key.startsWith('pjax')) return
-        const globalFn = parent.globalFn || {}
-        globalFn[key] = globalFn[key] || {}
-        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
-        parent.globalFn = globalFn
-      }
-    }
-  
-      
-      
-      const asideStatus = saveToLocal.get('aside-status')
-      if (asideStatus !== undefined) {
-        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
-      }
-    
-      
-    const detectApple = () => {
-      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
-        document.documentElement.classList.add('apple')
-      }
-    }
-    detectApple()
-  
-    })()
-  </script><script>const GLOBAL_CONFIG = {
-  root: '/',
-  algolia: undefined,
-  localSearch: undefined,
-  translate: undefined,
-  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
-  copy: {
-    success: '复制成功',
-    error: '复制失败',
-    noSupport: '浏览器不支持'
-  },
-  relativeDate: {
-    homepage: false,
-    post: false
-  },
-  runtime: '',
-  dateSuffix: {
-    just: '刚刚',
-    min: '分钟前',
-    hour: '小时前',
-    day: '天前',
-    month: '个月前'
-  },
-  copyright: undefined,
-  lightbox: 'null',
-  Snackbar: undefined,
-  infinitegrid: {
-    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
-    buttonText: '加载更多'
-  },
-  isPhotoFigcaption: false,
-  islazyloadPlugin: false,
-  isAnchor: false,
-  percent: {
-    toc: true,
-    rightside: false,
-  },
-  autoDarkmode: false
-}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
-  title: 'L_F\'s Blog',
-  isHighlightShrink: false,
-  isToc: false,
-  pageType: 'home'
-}</script><link rel="stylesheet" href="/css/katex/katex.min.css"><link rel="stylesheet" href="/css/vaporwave/index.css"><meta name="generator" content="Hexo 7.3.0"><link rel="alternate" href="/atom.xml" title="L_F's Blog" type="application/atom+xml">
-</head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">8</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">14</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">3</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> List</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/music/"><i class="fa-fw fas fa-music"></i><span> Music</span></a></li><li><a class="site-page child" href="/movies/"><i class="fa-fw fas fa-video"></i><span> Movie</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/gallery/"><i class="fa-fw fas fa-image"></i><span> Gallery</span></a></div></div></div></div><div class="page" id="body-wrap"><header class="full_page" id="page-header" style="background-image: url(/img/banner.jpg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/butterfly-icon.png" alt="Logo"><span class="site-name">L_F's Blog</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><span class="site-page group"><i class="fa-fw fas fa-list"></i><span> List</span><i class="fas fa-chevron-down"></i></span><ul class="menus_item_child"><li><a class="site-page child" href="/music/"><i class="fa-fw fas fa-music"></i><span> Music</span></a></li><li><a class="site-page child" href="/movies/"><i class="fa-fw fas fa-video"></i><span> Movie</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/gallery/"><i class="fa-fw fas fa-image"></i><span> Gallery</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="site-info"><h1 id="site-title">L_F's Blog</h1><div id="site-subtitle"><span id="subtitle"></span></div></div><div id="scroll-down"><i class="fas fa-angle-down scroll-down-effects"></i></div></header><main class="layout" id="content-inner"><div class="recent-posts nc" id="recent-posts"><div class="recent-post-items"><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/" title="大模型算法工程师 — 从零开始学习路线图">大模型算法工程师 — 从零开始学习路线图</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-07T02:00:00.000Z" title="发表于 2026-04-07 10:00:00">2026-04-07</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a></span></div><div class="content"> 大模型算法工程师 — 从零开始学习路线图  目标：准备大模型算法工程师暑期实习面试 起点：已有 ML 基础（CNN、Self-Attention、GAN、BN 等）+ RL 基础（Value/Policy-Based、Actor-Critic）    阶段一：深度学习与基础补齐（3-4 周）  1.1 深度学习基础 ✅  [X] 神经网络基本结构：感知机 → 多层网络 → 深层网络 [X] 前向传播与反向传播（计算图、链式法则、梯度计算） [X] 激活函数：ReLU → LeakyReLU → GELU → SiLU/SwiGLU（LLM 常用） [X] 损失函数：MSE、交叉熵、KL 散度 [X] 优化器演进：SGD → Momentum → Adam → AdamW（权重衰减修正） [X] 学习率调度：StepLR、Cosine Annealing、Warmup 策略 [X] 正则化：Dropout、Weight Decay、Label Smoothing [X] 梯度问题：梯度消失/爆炸、梯度裁剪 [X] 参数初始化：Xavier、Kaiming、Pre-LN...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/06/01-%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/" title="深度学习基础">深度学习基础</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-06T11:30:00.000Z" title="发表于 2026-04-06 19:30:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/">大模型</a><i class="fas fa-angle-right article-meta-link"></i><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/">深度学习基础</a></span></div><div class="content"> 深度学习基础  目录  1. 神经网络基本结构 2. 损失函数 3. 梯度下降与反向传播 4. 梯度消失与梯度爆炸 5. 归一化 6. 激活函数 7. 优化器 8. 正则化 9. 参数初始化 10. 学习率调度 11. 概念关系总结 12. 数学符号汇总    1. 神经网络基本结构  1.1 线性模型 最简单的神经网络就是线性模型： y^=wx+b\hat{y} = wx + b y^​=wx+b  www（权重/weight）：控制输入 xxx 对输出 y^\hat{y}y^​ 的影响程度（斜率） bbb（偏置/bias）：决定 x=0x=0x=0 时的输出基准值（截距）   1.2 为什么需要多层 单层线性模型只能拟合线性关系。直觉上，堆叠多层似乎能拟合更复杂的函数。但有一个关键问题——如果没有非线性变换，多层线性网络等价于单层。 假设一个两层网络： y^=w2(w1x+b1)+b2=w2w1⋅x+w2b1+b2=W′x+b′\hat{y} = w_2(w_1 x + b_1) + b_2 = w_2 w_1 \cdot x + w_2 b_1 + b_2 =...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/06/1_Reinforce%20Learning-Basic%20Concepts/" title="强化学习基本概念">强化学习基本概念</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/">强化学习</a></span></div><div class="content"> 强化学习基本概念  目录  1. 核心术语 2. Agent与环境交互 3. 策略 Policy 4. 状态转移 5. 回报 Return 6. 价值函数 7. 智能体控制    1. 核心术语  1.1 状态 (State, sts_tst​) 状态是对环境的完整描述，包含了智能体在当前时刻所感知到的所有信息。在游戏场景中，状态通常是当前的游戏画面帧。   1.2 动作 (Action, ata_tat​) 动作是智能体在某个状态下可以采取的行为。动作空间可以是离散的（如上下左右），也可以是连续的（如控制机械臂的角度）。 at∈{left,right,up}a_t \in \{\text{left}, \text{right}, \text{up}\} at​∈{left,right,up}  1.3 奖励 (Reward, rtr_trt​) 奖励是环境对智能体在时刻 ttt 采取动作 ata_tat​ 后的反馈，是一个标量值。正奖励表示好的结果，负奖励表示坏的结果。   2. Agent与环境交互 强化学习的核心是 智能体(Agent) 与...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/06/2-Value-Based%20Reinforcement%20Learning/" title="基于价值的强化学习">基于价值的强化学习</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/">强化学习</a></span></div><div class="content"> 基于价值的强化学习 (Value-Based Reinforcement Learning)  目录  1. Q函数近似问题 2. 深度Q网络 (DQN) 3. DQN在游戏中的应用 4. 时序差分学习 (TD Learning) 5. 完整算法流程    1. Q函数近似问题  1.1 目标 强化学习的最终目标是赢得游戏（等价于最大化总奖励）。  1.2 最优动作 如果我们知道最优动作价值函数 Q∗(s,a)Q^*(s, a)Q∗(s,a)，那么在状态 sss 下的最佳动作就是： a∗=arg⁡max⁡aQ∗(s,a)a^* = \arg\max_a Q^*(s, a) a∗=argamax​Q∗(s,a) 这意味着我们应该选择使Q值最大的动作。   1.3 核心挑战 问题：我们实际上不知道 Q∗(s,a)Q^*(s, a)Q∗(s,a) 在复杂的游戏环境中（如 Atari 游戏或 Go），状态空间和动作空间都非常庞大，无法用表格形式存储所有的 Q(s,a)Q(s, a)Q(s,a) 值。  1.4 解决方案：深度Q网络 核心思想：使用神经网络来近似...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/06/4-Actor-Critic/" title="Actor-Critic 方法">Actor-Critic 方法</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/">强化学习</a></span></div><div class="content"> Actor-Critic 方法  目录  1. 核心思想 2. Actor：策略网络 3. Critic：价值网络 4. 状态价值函数近似 5. 训练流程 6. 更新价值网络：时序差分 7. 更新策略网络：策略梯度 8. 完整算法 9. 带Baseline的策略梯度 10. 概念关系总结    1. 核心思想 Actor-Critic 方法是基于策略的强化学习与基于价值的强化学习的结合体。它同时使用两个神经网络：  Actor（演员）：策略网络 π(a∣s;θ)\pi(a|s; \theta)π(a∣s;θ)，负责选择动作 Critic（评论家）：价值网络 q(s,a;w)q(s, a; w)q(s,a;w)，负责评估动作的好坏  Actor 和 Critic 互相配合——Actor 学习如何行动，Critic 学习如何评判；Actor 根据评判结果改进自己的策略。  为什么需要 Critic？ 在纯策略梯度（如 REINFORCE）中，需要玩完整局游戏才能获得 Q 值估计，方差很大。Critic 提供了一个在线的、低方差的 Q 值估计。     2. Actor：策略网络 ...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/06/3-Policy-Based%20Reinforcement%20Learning/" title="基于策略的强化学习">基于策略的强化学习</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/">强化学习</a></span></div><div class="content"> 基于策略的强化学习 (Policy-Based Reinforcement Learning)  目录  1. 策略网络 2. 状态价值函数近似 3. 策略梯度上升 4. 策略梯度推导 5. 离散动作的策略梯度计算 6. 连续动作的策略梯度计算 7. 完整算法 8. Q值估计方法    1. 策略网络  1.1 核心思想 策略网络 (Policy Network) 是一个神经网络，用于直接参数化策略函数 π(a∣s)\pi(a|s)π(a∣s)。 π(a∣s)≈π(a∣s;θ)\pi(a|s) \approx \pi(a|s; \theta) π(a∣s)≈π(a∣s;θ) 其中 θ\thetaθ 是神经网络的可训练参数。   1.2 网络架构 策略网络通常包含以下层次： 123456789状态 S_t (图像)    ↓卷积层 (Conv) → 提取特征    ↓全连接层 (Dense)    ↓Softmax层 → 输出概率分布    ↓动作概率: &#123;&quot;left&quot;: 0.2, &quot;right&quot;: 0.1,...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2026/04/06/5-Monte%20Carlo%20Tree%20Search/" title="蒙特卡洛树搜索">蒙特卡洛树搜索</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></span><span class="article-meta"><span class="article-meta-separator">|</span><i class="fas fa-inbox"></i><a class="article-meta__categories" href="/categories/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/">强化学习</a></span></div><div class="content"> 蒙特卡洛树搜索 Monte Carlo Tree Search (MCTS)  目录  1. MCTS 概述 2. Step 1: Selection 选择 3. Step 2: Expansion 扩展 4. Step 3: Evaluation 评估 5. Step 4: Backup 回传 6. MCTS 循环 7. 决策：MCTS 之后的选择 8. 概念关系总结    1. MCTS 概述 蒙特卡洛树搜索 (Monte Carlo Tree Search, MCTS) 是一种用于决策的启发式搜索算法，广泛应用于围棋（AlphaGo）、象棋等博弈场景。MCTS 的核心思想是通过反复模拟（simulation）来评估每个可能的动作，逐步构建一棵搜索树。  每次模拟的四个步骤 MCTS 的每一次模拟 (simulation) 包含 4 个步骤，循环执行：    步骤 名称 核心任务     1 Selection 选择 决定探索哪个动作   2 Expansion 扩展 模拟对手的响应，生成新状态   3 Evaluation 评估 评估新状态的优劣   4 Backup...</div></div></div><div class="recent-post-item"><div class="recent-post-info no-cover"><a class="article-title" href="/2025/03/30/hello-world/" title="Hello World">Hello World</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">发表于</span><time datetime="2025-03-30T04:15:40.163Z" title="发表于 2025-03-30 12:15:40">2025-03-30</time></span></div><div class="content">Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub.  Quick Start  Create a new post 1$ hexo new &quot;My New Post&quot; More info: Writing  Run server 1$ hexo server More info: Server  Generate static files 1$ hexo generate More info: Generating  Deploy to remote sites 1$ hexo deploy More info: Deployment </div></div></div></div><nav id="pagination"><div class="pagination"><span class="page-number current">1</span></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Levius</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">8</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">14</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">3</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/" title="大模型算法工程师 — 从零开始学习路线图">大模型算法工程师 — 从零开始学习路线图</a><time datetime="2026-04-07T02:00:00.000Z" title="发表于 2026-04-07 10:00:00">2026-04-07</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/06/01-%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/" title="深度学习基础">深度学习基础</a><time datetime="2026-04-06T11:30:00.000Z" title="发表于 2026-04-06 19:30:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/06/1_Reinforce%20Learning-Basic%20Concepts/" title="强化学习基本概念">强化学习基本概念</a><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/06/2-Value-Based%20Reinforcement%20Learning/" title="基于价值的强化学习">基于价值的强化学习</a><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/06/4-Actor-Critic/" title="Actor-Critic 方法">Actor-Critic 方法</a><time datetime="2026-04-06T04:00:00.000Z" title="发表于 2026-04-06 12:00:00">2026-04-06</time></div></div></div></div><div class="card-widget card-categories"><div class="item-headline">
-            <i class="fas fa-folder-open"></i>
-            <span>Categories</span>
-            
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101010" />
+    <meta
+      name="description"
+      content="Levius 的个人博客。把想法写进代码。关注 AI Infra、多模态推理与 AI Agent。"
+    />
+    <meta name="author" content="Levius" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="L_F's Blog — Levius Notes" />
+    <meta
+      property="og:description"
+      content="把想法写进代码。AI Infra、多模态推理与 AI Agent。"
+    />
+    <meta property="og:url" content="https://leviusspace.top/" />
+    <meta
+      property="og:image"
+      content="https://leviusspace.top/img/redesign/portrait-cutout.webp"
+    />
+    <title>L_F's Blog — Levius Notes</title>
+    <link rel="canonical" href="https://leviusspace.top/" />
+    <link rel="icon" href="/img/favicon.png" />
+    <link
+      rel="alternate"
+      href="/atom.xml"
+      title="L_F's Blog"
+      type="application/atom+xml"
+    />
+    <link
+      rel="preload"
+      href="/fonts/press-start-2p.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/fusion-pixel-12px.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/css/home.css" />
+    <link rel="stylesheet" href="/css/home-motion.css" />
+    <link rel="stylesheet" href="/css/encom-shell.css" />
+    <link rel="stylesheet" href="/css/home-pages.css" />
+    <script src="/js/home.js" defer></script>
+    <script src="/js/home-pages.js" defer></script>
+    <script src="/js/home-motion.js" defer></script>
+    <script src="/js/encom-shell.js" defer></script>
+    <script src="/js/home-terminal.js" defer></script>
+  <link rel="stylesheet" href="/css/book-library.css" />
+<script src="/js/collection-reader.js" defer></script>
+<script src="/js/book-library.js" defer></script>
+</head>
+  <body>
+    <a class="skip-link" href="#articles">跳到文章</a>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="L_F's Blog 首页"
+          >L_F's <span>Blog</span></a
+        >
+        <button
+          class="menu-toggle"
+          aria-expanded="false"
+          aria-controls="main-nav"
+          aria-label="展开导航"
+          hidden
+        >
+          <img
+            src="/img/redesign/icons/list.svg"
+            alt=""
+            width="24"
+            height="24"
+          />
+        </button>
+        <nav id="main-nav" class="main-nav" aria-label="主导航">
+          <a href="/" aria-current="page">首页</a>
+          <a href="#articles">文章</a>
+          <a href="/archives/">归档</a>
+          <a href="/Gallery/">画廊</a>
+          <button class="search-open" hidden>搜索</button>
+        </nav>
+        <a
+          class="github-link"
+          href="https://github.com/Levius-Fubuki"
+          target="_blank"
+          rel="noopener noreferrer"
+          ><img
+            src="/img/redesign/icons/github-logo.svg"
+            alt=""
+            width="24"
+            height="24"
+          />GitHub</a
+        >
+      </header>
+      <main>
+        <section id="welcome" class="opening-page" aria-labelledby="opening-title">
+          <div class="opening-wordmark"><h2 id="opening-title" aria-label="Levius_Fubuki's BLOGS"><span>Levius_Fubuki's</span> <span>BLOGS</span></h2></div>
+          <p class="opening-subtitle">把想法写进代码。<span class="opening-cursor" aria-hidden="true"></span></p>
+          <a class="opening-scroll" href="#profile">SCROLL<span aria-hidden="true">⌄</span><span class="sr-only">进入个人介绍</span></a>
+        </section>
+        <section id="profile" class="hero" aria-labelledby="hero-title">
+          <div class="hero-window">
+            <div class="window-title">
+              <span
+                ><b>L_F’s Blog</b
+                ><span class="window-separator">/</span> PERSONAL ARCHIVE</span
+              ><span class="window-lights" aria-hidden="true"
+                ><img src="/img/redesign/icons/square.svg" alt="" /><img
+                  src="/img/redesign/icons/square.svg"
+                  alt="" /><img src="/img/redesign/icons/square.svg" alt=""
+              /></span>
+            </div>
+            <div class="hero-scene">
+              <picture class="profile-art">
+                <source media="(max-width:760px)" srcset="/img/redesign/profile-medieval-mobile.webp" />
+                <img class="profile-backdrop" src="/img/redesign/profile-medieval.webp" width="1672" height="941" alt="" aria-hidden="true" decoding="async" />
+              </picture>
+              <canvas class="ambient-field" aria-hidden="true"></canvas>
+              <div class="hero-card">
+                <iframe
+                  class="identity-card"
+                  src="/card/?embed=1"
+                  title="Sun Yunfei 与 Levius-Fubuki 的双面身份卡，单击翻面、长按拖拽、右键复位"
+                  width="600" height="550"
+                  loading="eager"
+                ></iframe>
+                <noscript><p>Sun Yunfei · 哈尔滨工业大学 · 信息安全<br />Levius-Fubuki · AI Infra · 开源贡献</p></noscript>
+              </div>
+              <div class="hero-copy">
+                <h1 id="hero-title"><span class="sr-only">LEVIUS</span><span class="text-ink" aria-hidden="true">LEVIUS</span></h1>
+                <p class="hero-intro">把想法写进代码。</p>
+                <p class="hero-topics">
+                  AI Infra <span>/</span> 多模态推理 <span>/</span> AI Agent
+                </p>
+                <div class="hero-actions">
+                  <a class="button primary" href="#articles"
+                    >阅读文章
+                    <img
+                      src="/img/redesign/icons/arrow-right.svg"
+                      alt=""
+                      width="24"
+                      height="24" /></a
+                  ><a class="button secondary terminal-launch" href="#terminal">启动终端</a>
+                </div>
+              </div>
+            </div>
+            <div class="scene-status" hidden>
+              <span class="scene-signal" aria-hidden="true"><i></i> LEVIUS / PERSONAL ARCHIVE</span>
+              <button class="motion-toggle" type="button" aria-pressed="true">环境动效：开</button>
+            </div>
           </div>
-          <ul class="card-category-list" id="aside-cat-list">
-            <li class="card-category-list-item "><a class="card-category-list-link" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/"><span class="card-category-list-name">大模型</span><span class="card-category-list-count">2</span></a><ul class="card-category-list child"><li class="card-category-list-item "><a class="card-category-list-link" href="/categories/%E5%A4%A7%E6%A8%A1%E5%9E%8B/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E5%9F%BA%E7%A1%80/"><span class="card-category-list-name">深度学习基础</span><span class="card-category-list-count">1</span></a></li></ul></li><li class="card-category-list-item "><a class="card-category-list-link" href="/categories/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/"><span class="card-category-list-name">强化学习</span><span class="card-category-list-count">5</span></a></li>
-          </ul></div><div class="card-widget card-tags"><div class="item-headline"><i class="fas fa-tags"></i><span>Tags</span></div><div class="card-tag-cloud"><a href="/tags/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/" style="font-size: 1.3em; color: #99a1ac">深度学习</a> <a href="/tags/%E6%8D%9F%E5%A4%B1%E5%87%BD%E6%95%B0/" style="font-size: 1.1em; color: #999">损失函数</a> <a href="/tags/MCTS/" style="font-size: 1.1em; color: #999">MCTS</a> <a href="/tags/%E6%AD%A3%E5%88%99%E5%8C%96/" style="font-size: 1.1em; color: #999">正则化</a> <a href="/tags/%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF/" style="font-size: 1.1em; color: #999">学习路线</a> <a href="/tags/%E4%BC%98%E5%8C%96%E5%99%A8/" style="font-size: 1.1em; color: #999">优化器</a> <a href="/tags/%E5%BC%BA%E5%8C%96%E5%AD%A6%E4%B9%A0/" style="font-size: 1.5em; color: #99a9bf">强化学习</a> <a href="/tags/DQN/" style="font-size: 1.1em; color: #999">DQN</a> <a href="/tags/%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0/" style="font-size: 1.1em; color: #999">机器学习</a> <a href="/tags/%E5%BD%92%E4%B8%80%E5%8C%96/" style="font-size: 1.1em; color: #999">归一化</a> <a href="/tags/Actor-Critic/" style="font-size: 1.1em; color: #999">Actor-Critic</a> <a href="/tags/%E6%BF%80%E6%B4%BB%E5%87%BD%E6%95%B0/" style="font-size: 1.1em; color: #999">激活函数</a> <a href="/tags/%E5%A4%A7%E6%A8%A1%E5%9E%8B/" style="font-size: 1.1em; color: #999">大模型</a> <a href="/tags/%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6/" style="font-size: 1.1em; color: #999">策略梯度</a></div></div><div class="card-widget card-archives">
-    <div class="item-headline">
-      <i class="fas fa-archive"></i>
-      <span>Archives</span>
-      
+        </section>
+<section id="terminal" class="light-table terminal-workbench" aria-label="Levius 终端工作台">
+        <h2 class="terminal-section-title">站内终端 <span>/ INTERACTIVE ARCHIVE</span></h2>
+<div class="terminal-stage">
+<div class="terminal-screen">
+<div class="table-outside" aria-hidden="true"></div>
+        <div class="table-inside">
+          <div class="lt-left">
+            <div class="lt-header lt-top"><span>LEVIUS TOUCH APP <b>OS</b><em>12</em></span><span>OS | 012</span></div>
+            <section class="lt-panel lt-readme">
+              <div class="lt-content"><h2>README <b>.TXT</b><em>END. PROGRAM</em></h2>
+                <div class="readme-body">
+                  <p>Hello <strong>User</strong>. Welcome to <strong>Levius</strong>'s personal archive.</p>
+                  <p>把想法写进代码。这里收录我的<strong>强化学习</strong>、<strong>深度学习</strong>与<strong>大模型</strong>学习笔记。</p>
+                  <p>选择右侧的 <b>ARTICLE STREAM</b> 浏览文章。文件夹会在终端中依次输入目录与启动命令。</p>
+                  <p>也可以直接输入：<br /><code>help</code> 查看命令<br /><code>search 强化学习</code> 搜索文章<br /><code>run articles.exe</code> 启动文章视图</p>
+                  <p>↑ ↓ 历史 · Tab 补全 · Enter 执行。<br />文章视图中的返回按钮可返回这里。</p>
+                  <p><a href="https://github.com/Levius-Fubuki" target="_blank" rel="noopener noreferrer">@Levius-Fubuki</a> · <a href="/archives/">全部归档</a><br /><span class="reference-credit">Interface study · <a href="https://www.robscanlon.com/encom-boardroom/" target="_blank" rel="noopener noreferrer">Rob Scanlon / ENCOM</a></span></p>
+                </div>
+              </div>
+            </section>
+            <section class="lt-panel lt-bandwidth"><div class="lt-content"><h2>ARCHIVE <b>.SIGNAL</b><em>INDEX: <span id="terminal-index-state">LOADING…</span></em></h2><canvas id="signal-wave" width="367" height="100" aria-hidden="true"></canvas></div></section>
+            <div class="lt-header lt-bottom"><span>DOCKING CHANNEL</span><span class="dock-bars" aria-hidden="true"><i></i><i></i><i></i></span></div>
+          </div>
+          <div class="lt-right">
+            <div class="lt-header lt-top"><span>CENTRAL SYSTEM DATA ... <b>LAUNCH LEVIUS ARCHIVE</b></span><span>OIA | 012</span></div>
+            <section class="lt-panel lt-globalization"><div class="lt-content">
+              <h2>BLOG VISUALIZATION ... SELECT DATA <b>.STREAM</b><em>END. PROGRAM</em></h2>
+              <button class="folder-launch folder-primary" data-launch="articles" data-terminal-command="cd /articles" type="button"><span>ARTICLE STREAM</span><img src="/img/encom/encom_folder_big.png" width="95" height="63" alt="" /></button>
+              <div class="lt-command-line">
+                <div class="command-header">Levius archive / <span class="terminal-count">—</span> articles / <span id="terminal-path">/</span></div>
+                <div id="terminal-output" class="terminal-output" role="log" aria-live="off" aria-label="终端输出记录" tabindex="0"></div>
+                <form id="terminal-form" class="terminal-input-row" data-busy="false" hidden>
+                  <label class="terminal-prompt" for="terminal-input">levius-sh:<span class="terminal-input-path">root</span>$<span class="sr-only">输入站内命令</span></label>
+                  <input id="terminal-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="500" enterkeyhint="send" aria-describedby="terminal-hints" />
+                  <button class="terminal-submit" type="submit" aria-label="执行命令">↵</button>
+                </form>
+              </div>
+              <div class="folder-row">
+                <button class="folder-launch" data-launch="reinforcement" type="button"><span>REINFORCE</span><img src="/img/encom/encom_folder_small.png" width="80" height="49" alt="" /></button>
+                <button class="folder-launch" data-launch="deep-learning" type="button"><span>DEEP LEARNING</span><img src="/img/encom/encom_folder_small.png" width="80" height="49" alt="" /></button>
+                <button class="folder-launch" data-launch="archives" type="button"><span>ARCHIVES</span><img src="/img/encom/encom_folder_small.png" width="80" height="49" alt="" /></button>
+                <button class="folder-launch" data-launch="about" type="button"><span>ABOUT ME</span><img src="/img/encom/encom_folder_small.png" width="80" height="49" alt="" /></button>
+              </div>
+            </div></section>
+            <div id="lt-keyboard"><div id="terminal-keyboard" class="terminal-keyboard" aria-label="屏幕键盘"></div></div>
+            <div class="lt-header lt-bottom"><span>TOUCHPOINT KEYBOARD ... <b>INTERACTION SEQUENCING</b></span><span>SYS | O12</span></div>
+          </div>
+          <div class="lt-rail"><div class="encom-logo">LEVIUS</div><img class="thumbprint" src="/img/encom/thumbprint.png" width="59" height="69" alt="" /></div>
+        </div>
+        <div class="terminal-tools" hidden><button class="terminal-keyboard-toggle" type="button" aria-expanded="true" aria-controls="terminal-keyboard">屏幕键盘</button></div>
+        <p id="terminal-hints" class="sr-only">上下箭头历史，Tab 补全，Ctrl L 清屏。输入 help 查看命令。</p>
+        <p id="terminal-announcement" class="sr-only" role="status" aria-live="polite"></p>
+        <noscript><p class="no-script">交互工作台需要 JavaScript。<a href="/archives/">直接浏览文章归档</a></p></noscript>
+      </div>
+<div id="program-transition" aria-hidden="true" hidden><span>ARTICLES</span></div>
+<section class="terminal-program" aria-labelledby="terminal-program-title" hidden>
+  <header><h3 id="terminal-program-title">ARTICLE STREAM</h3><button class="return-terminal" type="button">← 返回终端</button></header>
+  <div id="terminal-program-content" tabindex="0"></div>
+</section>
+</div>
+</section>
+        <section
+          id="articles"
+          class="article-index"
+          aria-labelledby="index-title"
+        >
+          <div class="section-heading">
+            <h2 id="index-title">
+              <img
+                src="/img/redesign/icons/folder.svg"
+                alt=""
+                width="30"
+                height="30"
+              />文章索引
+            </h2>
+            <span class="section-rule"></span
+            ><a
+              class="section-label"
+              href="/archives/"
+              aria-label="查看全部文章归档"
+              >/ ARTICLES</a
+            >
+          </div>
+<div class="book-library">
+      <section class="collection-shelf" aria-label="合集藏书架"><div class="cabinet-heading"><p>选择一部合集，翻阅其中的篇章。</p><span>03 COLLECTIONS / 08 VOLUMES</span></div><div class="spine-rack"><button class="collection-spine" type="button" data-open-collection="llm" data-title="大模型" data-subtitle="知识圣殿" data-description="从神经网络的基石，走向语言模型的构建与应用。" data-href="/categories/大模型/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开大模型合集，共 2 篇文章">
+          <span class="spine-object" data-collection="llm" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/llm-roadmap-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✧ COLLECTION 01</small><strong>大模型</strong><span>知识圣殿</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 01</span><span class="spine-emblem">✧</span><span class="spine-title">大模型</span><span class="spine-subtitle">知识圣殿</span><span class="spine-count">02<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">知识圣殿<span>抽出 · 翻阅</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="rl" data-title="强化学习" data-subtitle="骑士试炼" data-description="在行动与反馈之间，探索价值、策略与决策。" data-href="/categories/强化学习/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开强化学习合集，共 5 篇文章">
+          <span class="spine-object" data-collection="rl" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/rl-foundations-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✥ COLLECTION 02</small><strong>强化学习</strong><span>骑士试炼</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 02</span><span class="spine-emblem">✥</span><span class="spine-title">强化学习</span><span class="spine-subtitle">骑士试炼</span><span class="spine-count">05<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">骑士试炼<span>抽出 · 翻阅</span></span>
+        </button><button class="collection-spine" type="button" data-open-collection="notes" data-title="序章" data-subtitle="旅途之始" data-description="从第一篇文章开始。" data-href="/2025/03/30/hello-world/" aria-haspopup="dialog" aria-expanded="false" aria-label="展开序章合集，共 1 篇文章">
+          <span class="spine-object" data-collection="notes" aria-hidden="true"><span class="collection-front"><img class="collection-art-image" src="/img/books/hello-world-color.webp" alt="" width="640" height="960" decoding="async" /><span class="collection-cover-shade"></span><span class="collection-cover-heading"><small>✦ COLLECTION 03</small><strong>序章</strong><span>旅途之始</span><em>LEVIUS · COLLECTED NOTES</em></span></span><span class="collection-back"></span><span class="collection-top"></span><span class="collection-page-edge"></span><span class="spine-face"><span class="spine-cap">COLLECTION 03</span><span class="spine-emblem">✦</span><span class="spine-title">序章</span><span class="spine-subtitle">旅途之始</span><span class="spine-count">01<small>VOLUMES</small></span><span class="spine-imprint">LEVIUS</span></span></span>
+          <span class="spine-caption">旅途之始<span>抽出 · 翻阅</span></span>
+        </button></div><div class="cabinet-plinth" aria-hidden="true"></div><p class="cabinet-inscription">LEVIUS’S LIBRARY <span>·</span> 藏于书脊之间</p></section>
+      <section class="collection-detail" id="collection-volumes" aria-labelledby="collection-volume-title" hidden>
+      <div class="shelf-toolbar"><button class="collection-return" type="button">← 返回藏书架</button><span class="shelf-count" aria-live="polite"></span></div>
+      <div class="collection-detail-heading"><div><p class="book-series" id="collection-volume-subtitle"></p><h3 id="collection-volume-title" tabindex="-1"></h3></div><a class="collection-index-link" href="/categories/">查看合集索引 ↗</a></div>
+      <div class="book-rail" id="book-rail" role="region" aria-label="文章藏书，可左右滚动" tabindex="0"><article class="shelf-book" data-series="llm" data-book="llm-roadmap">
+          <a class="book-link" href="/2026/04/07/0-大模型学习路线图/" aria-label="阅读：大模型算法工程师 — 从零开始学习路线图"><span class="book-cover" data-collection="llm">
+      <img class="book-art" src="/img/books/llm-roadmap-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✧ 大模型</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>大模型</span><span>学习路线图</span></span><span class="book-cover-english">THE ASCENT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">大模型 / VOL. I</p><h3><a href="/2026/04/07/0-大模型学习路线图/">大模型算法工程师 — 从零开始学习路线图</a></h3></div>
+        </article><article class="shelf-book" data-series="llm" data-book="deep-learning">
+          <a class="book-link" href="/2026/04/06/01-深度学习基础/" aria-label="阅读：深度学习基础"><span class="book-cover" data-collection="llm">
+      <img class="book-art" src="/img/books/deep-learning-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✧ 大模型</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>深度学习</span><span>基础</span></span><span class="book-cover-english">THE FOUNDATIONS</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">大模型 / VOL. II</p><h3><a href="/2026/04/06/01-深度学习基础/">深度学习基础</a></h3></div>
+        </article><article class="shelf-book" data-series="rl" data-book="rl-foundations">
+          <a class="book-link" href="/2026/04/06/1_Reinforce Learning-Basic Concepts/" aria-label="阅读：强化学习基本概念"><span class="book-cover" data-collection="rl">
+      <img class="book-art" src="/img/books/rl-foundations-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. I</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>强化学习</span><span>基本概念</span></span><span class="book-cover-english">THE FIRST TRIAL</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">强化学习 / VOL. I</p><h3><a href="/2026/04/06/1_Reinforce Learning-Basic Concepts/">强化学习基本概念</a></h3></div>
+        </article><article class="shelf-book" data-series="rl" data-book="value-learning">
+          <a class="book-link" href="/2026/04/06/2-Value-Based Reinforcement Learning/" aria-label="阅读：基于价值的强化学习"><span class="book-cover" data-collection="rl">
+      <img class="book-art" src="/img/books/value-learning-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. II</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>基于价值的</span><span>强化学习</span></span><span class="book-cover-english">THE SCALES OF VALUE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">强化学习 / VOL. II</p><h3><a href="/2026/04/06/2-Value-Based Reinforcement Learning/">基于价值的强化学习</a></h3></div>
+        </article><article class="shelf-book" data-series="rl" data-book="policy-learning">
+          <a class="book-link" href="/2026/04/06/3-Policy-Based Reinforcement Learning/" aria-label="阅读：基于策略的强化学习"><span class="book-cover" data-collection="rl">
+      <img class="book-art" src="/img/books/policy-learning-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. III</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>基于策略的</span><span>强化学习</span></span><span class="book-cover-english">THE CHOSEN PATH</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">强化学习 / VOL. III</p><h3><a href="/2026/04/06/3-Policy-Based Reinforcement Learning/">基于策略的强化学习</a></h3></div>
+        </article><article class="shelf-book" data-series="rl" data-book="actor-critic">
+          <a class="book-link" href="/2026/04/06/4-Actor-Critic/" aria-label="阅读：Actor-Critic 方法"><span class="book-cover" data-collection="rl">
+      <img class="book-art" src="/img/books/actor-critic-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. IV</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Actor–Critic</span><span>方法</span></span><span class="book-cover-english">THE TWIN OATH</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">强化学习 / VOL. IV</p><h3><a href="/2026/04/06/4-Actor-Critic/">Actor-Critic 方法</a></h3></div>
+        </article><article class="shelf-book" data-series="rl" data-book="tree-search">
+          <a class="book-link" href="/2026/04/06/5-Monte Carlo Tree Search/" aria-label="阅读：蒙特卡洛树搜索"><span class="book-cover" data-collection="rl">
+      <img class="book-art" src="/img/books/tree-search-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✥ 强化学习</span><span>VOL. V</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>蒙特卡洛</span><span>树搜索</span></span><span class="book-cover-english">THE TREE OF FUTURES</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">强化学习 / VOL. V</p><h3><a href="/2026/04/06/5-Monte Carlo Tree Search/">蒙特卡洛树搜索</a></h3></div>
+        </article><article class="shelf-book" data-series="notes" data-book="hello-world">
+          <a class="book-link" href="/2025/03/30/hello-world/" aria-label="阅读：Hello World"><span class="book-cover" data-collection="notes">
+      <img class="book-art" src="/img/books/hello-world-color.webp" alt="" width="640" height="960" loading="lazy" decoding="async" />
+      <span class="book-foil" aria-hidden="true"></span>
+      <span class="book-edition"><span>✦ 序章</span><span>VOL. 0</span></span>
+      <span class="book-cover-type"><span class="book-cover-title"><span>Hello</span><span>World</span></span><span class="book-cover-english">THE FIRST LIGHT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+    </span></a>
+          <div class="book-caption"><p class="book-series">序章 / VOL. 0</p><h3><a href="/2025/03/30/hello-world/">Hello World</a></h3></div>
+        </article></div>
+      <div class="shelf-bottom"><span class="collection-description-line"></span><div class="shelf-controls"><button type="button" data-shelf-step="-1" aria-controls="book-rail" aria-label="上一组书籍">←</button><button type="button" data-shelf-step="1" aria-controls="book-rail" aria-label="下一组书籍">→</button></div></div>
+      </section><script type="application/json" id="collection-reader-data">{"collections": [{"id": "llm", "title": "大模型", "subtitle": "知识圣殿", "english": "CATHEDRAL OF KNOWLEDGE", "mark": "✧", "href": "/categories/大模型/", "description": "从神经网络的基石，走向语言模型的构建与应用。", "branch": {"title": "深度学习基础", "href": "/categories/大模型/深度学习基础/", "description": "基础分卷 · 神经网络、优化与训练"}}, {"id": "rl", "title": "强化学习", "subtitle": "骑士试炼", "english": "THE KNIGHT’S TRIALS", "mark": "✥", "href": "/categories/强化学习/", "description": "在行动与反馈之间，探索价值、策略与决策。"}, {"id": "notes", "title": "序章", "subtitle": "旅途之始", "english": "PROLOGUE", "mark": "✦", "href": "/2025/03/30/hello-world/", "description": "从第一篇文章开始。"}], "books": [{"id": "llm-roadmap", "collection": "llm", "volume": "I", "title": "大模型算法工程师 — 从零开始学习路线图", "coverTitle": ["大模型", "学习路线图"], "english": "THE ASCENT", "path": "/2026/04/07/0-大模型学习路线图/", "date": "2026-04-07", "summary": "从深度学习基础出发，串起预训练、微调、对齐、推理部署与 Agent 的学习路径。", "art": "/img/books/llm-roadmap-color.webp"}, {"id": "deep-learning", "collection": "llm", "volume": "II", "branch": "深度学习基础", "title": "深度学习基础", "coverTitle": ["深度学习", "基础"], "english": "THE FOUNDATIONS", "path": "/2026/04/06/01-深度学习基础/", "date": "2026-04-06", "summary": "梳理神经网络、反向传播、损失函数与优化器，理解深度模型如何完成训练。", "art": "/img/books/deep-learning-color.webp"}, {"id": "rl-foundations", "collection": "rl", "volume": "I", "title": "强化学习基本概念", "coverTitle": ["强化学习", "基本概念"], "english": "THE FIRST TRIAL", "path": "/2026/04/06/1_Reinforce Learning-Basic Concepts/", "date": "2026-04-06", "summary": "从状态、动作与奖励出发，理解智能体和环境的交互，以及策略与价值函数。", "art": "/img/books/rl-foundations-color.webp"}, {"id": "value-learning", "collection": "rl", "volume": "II", "title": "基于价值的强化学习", "coverTitle": ["基于价值的", "强化学习"], "english": "THE SCALES OF VALUE", "path": "/2026/04/06/2-Value-Based Reinforcement Learning/", "date": "2026-04-06", "summary": "用 Q 函数评估行动价值，沿着 DQN 与时序差分学习理解价值网络的训练过程。", "art": "/img/books/value-learning-color.webp"}, {"id": "policy-learning", "collection": "rl", "volume": "III", "title": "基于策略的强化学习", "coverTitle": ["基于策略的", "强化学习"], "english": "THE CHOSEN PATH", "path": "/2026/04/06/3-Policy-Based Reinforcement Learning/", "date": "2026-04-06", "summary": "直接学习动作的概率分布，通过策略梯度优化离散与连续动作下的决策。", "art": "/img/books/policy-learning-color.webp"}, {"id": "actor-critic", "collection": "rl", "volume": "IV", "title": "Actor-Critic 方法", "coverTitle": ["Actor–Critic", "方法"], "english": "THE TWIN OATH", "path": "/2026/04/06/4-Actor-Critic/", "date": "2026-04-06", "summary": "让 Actor 选择动作、Critic 评估价值，通过双网络协作与时序差分反馈改进策略。", "art": "/img/books/actor-critic-color.webp"}, {"id": "tree-search", "collection": "rl", "volume": "V", "title": "蒙特卡洛树搜索", "coverTitle": ["蒙特卡洛", "树搜索"], "english": "THE TREE OF FUTURES", "path": "/2026/04/06/5-Monte Carlo Tree Search/", "date": "2026-04-06", "summary": "在选择、扩展、评估与回传的循环中模拟多种未来，逐步找到更好的行动。", "art": "/img/books/tree-search-color.webp"}, {"id": "hello-world", "collection": "notes", "volume": "0", "title": "Hello World", "coverTitle": ["Hello", "World"], "english": "THE FIRST LIGHT", "path": "/2025/03/30/hello-world/", "date": "2025-03-30", "summary": "博客的第一篇文章：用 Hexo 创建文章、启动预览，并生成和发布静态站点。", "art": "/img/books/hello-world-color.webp"}]}</script><noscript><p><a href="/categories/">浏览全部合集与文章 ↗</a></p></noscript>
     </div>
-  
-    <ul class="card-archive-list">
-      
-        <li class="card-archive-list-item">
-          <a class="card-archive-list-link" href="/archives/2026/04/">
-            <span class="card-archive-list-date">
-              四月 2026
-            </span>
-            <span class="card-archive-list-count">7</span>
-          </a>
-        </li>
-      
-        <li class="card-archive-list-item">
-          <a class="card-archive-list-link" href="/archives/2025/03/">
-            <span class="card-archive-list-date">
-              三月 2025
-            </span>
-            <span class="card-archive-list-count">1</span>
-          </a>
-        </li>
-      
-    </ul>
-  </div><div class="card-widget card-webinfo"><div class="item-headline"><i class="fas fa-chart-line"></i><span>网站信息</span></div><div class="webinfo"><div class="webinfo-item"><div class="item-name">文章数目 :</div><div class="item-count">8</div></div><div class="webinfo-item"><div class="item-name">本站访客数 :</div><div class="item-count" id="busuanzi_value_site_uv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">本站总浏览量 :</div><div class="item-count" id="busuanzi_value_site_pv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">最后更新时间 :</div><div class="item-count" id="last-push-date" data-lastPushDate="2026-04-07T08:28:20.453Z"><i class="fa-solid fa-spinner fa-spin"></i></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2019 - 2026 By Levius</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.3.5</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>window.typedJSFn = {
-  init: str => {
-    window.typed = new Typed('#subtitle', Object.assign({
-      strings: str,
-      startDelay: 300,
-      typeSpeed: 150,
-      loop: true,
-      backSpeed: 50,
-    }, null))
-  },
-  run: subtitleType => {
-    if (true) {
-      if (typeof Typed === 'function') {
-        subtitleType()
-      } else {
-        btf.getScript('https://cdn.jsdelivr.net/npm/typed.js/dist/typed.umd.min.js').then(subtitleType)
-      }
-    } else {
-      subtitleType()
-    }
-  },
-  processSubtitle: (content, extraContents = []) => {
-    if (true) {
-      const sub = ["Welcome to my blog"].slice()
-
-      if (extraContents.length > 0) {
-        sub.unshift(...extraContents)
-      }
-
-      if (typeof content === 'string') {
-        sub.unshift(content)
-      } else if (Array.isArray(content)) {
-        sub.unshift(...content)
-      }
-
-      sub.length > 0 && typedJSFn.init(sub)
-    } else {
-      document.getElementById('subtitle').textContent = typeof content === 'string' ? content :
-        (Array.isArray(content) && content.length > 0 ? content[0] : '')
-    }
-  }
-}
-btf.addGlobalFn('pjaxSendOnce', () => { typed.destroy() }, 'typedDestroy')
-</script><script>function subtitleType () {
-  typedJSFn.processSubtitle(["Welcome to my blog"])
-}
-typedJSFn.run(subtitleType)</script></div><script src="/js/vaporwave/starfield.js"></script><script src="/js/vaporwave/crosshair.js"></script><script src="/js/vaporwave/glitch-text.js"></script><script src="/js/vaporwave/noise-banner.js"></script><script src="/js/vaporwave/magic-card.js"></script><script src="/js/vaporwave/crt-effect.js"></script><script src="/js/vaporwave/grid-background.js"></script><script src="/js/vaporwave/glb-background.js"></script><script src="/js/vaporwave/background-fix.js"></script><script src="/js/vaporwave/holographic-card.js"></script><script src="/js/vaporwave/social-dock.js"></script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
+</section>
+      </main>
+      <footer class="site-footer">
+        <p>
+          <a href="/">L_F's Blog</a
+          ><span class="footer-divider"></span>把想法写进代码。
+        </p>
+        <div class="footer-links">
+          <a href="/archives/">全部文章</a
+          ><a
+            href="https://github.com/Levius-Fubuki"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><img
+              src="/img/redesign/icons/github-logo.svg"
+              alt=""
+              width="22"
+              height="22"
+            />GitHub</a
+          >
+        </div>
+      </footer>
+    </div>
+    <dialog id="search-dialog" aria-labelledby="search-title">
+      <div class="search-header">
+        <h2 id="search-title">搜索文章</h2>
+        <button class="search-close" aria-label="关闭搜索">
+          <img src="/img/redesign/icons/x.svg" alt="" width="24" height="24" />
+        </button>
+      </div>
+      <label class="search-field"
+        ><img
+          src="/img/redesign/icons/magnifying-glass.svg"
+          alt=""
+          width="22"
+          height="22" /><span class="sr-only">文章关键词</span
+        ><input
+          id="search-input"
+          type="search"
+          placeholder="搜索标题或正文，例如 Actor-Critic"
+          autocomplete="off"
+      /></label>
+      <p id="search-status" role="status" aria-live="polite">
+        输入关键词，查找学习笔记。
+      </p>
+      <ul id="search-results" aria-label="搜索结果"></ul>
+      <div class="search-footer">
+        <span>搜索本站全部文章</span><span><kbd>Esc</kbd> 关闭</span>
+      </div>
+    </dialog>
+  </body>
+</html>

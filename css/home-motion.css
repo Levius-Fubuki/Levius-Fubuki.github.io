@@ -1,0 +1,112 @@
+/* Motion is progressive: the original page remains readable without JavaScript. */
+.ambient-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+.hero-copy { position: relative; }
+.profile-art{display:contents}
+.profile-backdrop{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:-3;pointer-events:none;filter:grayscale(1) brightness(.72);opacity:.9}
+.hero-scene::before{content:"";position:absolute;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(0deg,#08080888,transparent 35%,#08080822),linear-gradient(90deg,#08080818,transparent 45%,#08080822)}
+.hero-copy{isolation:isolate}
+.hero-copy h1,.hero-copy>p{text-shadow:0 2px 10px #000}
+.hero-copy::before{content:"";position:absolute;inset:-45px -35px -35px -45px;background:radial-gradient(ellipse at center,#080808d9 10%,#08080888 52%,#08080800 74%);z-index:-1;pointer-events:none}
+.hero-card,.identity-card{background:transparent}
+@media(min-width:761px){.hero-copy{transform:translateY(48px)}}
+.scene-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 37px;
+  padding: 0 14px;
+  border-top: 1px solid #353535;
+  color: #909090;
+  font: 10px/1.4 monospace;
+  letter-spacing: .1em;
+}
+.scene-signal { display: inline-flex; align-items: center; gap: 9px; }
+.scene-signal i { width: 4px; height: 4px; background: #bfbfbf; }
+.motion-toggle {
+  padding: 9px 0 9px 12px;
+  font-family: var(--body);
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.motion-toggle[aria-pressed="false"] { color: #888; }
+.motion-toggle:disabled { cursor: default; }
+.hero-window { position: relative; }
+.hero-window::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 14%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+.motion-running .hero-window::after {
+  opacity: .85;
+  animation: border-signal 9s linear infinite;
+}
+.motion-running .scene-signal i { animation: signal-breathe 4s ease-in-out infinite; }
+.main-nav a::before, .search-open::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms ease;
+}
+.main-nav a:hover::before, .search-open:hover::before,
+.main-nav a:focus-visible::before, .search-open:focus-visible::before { transform: scaleX(1); }
+.button img { transition: transform 240ms ease; }
+.button:hover img, .button:focus-visible img { transform: translateX(5px); }
+.button:active { transform: translateY(1px); }
+.entry { transition: background-color 260ms ease; }
+.entry::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  background: #ddd;
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform 240ms ease;
+  pointer-events: none;
+}
+.entry-content, .entry-number { transition: transform 260ms ease, color 260ms ease; }
+.entry:hover::before, .entry:focus-within::before { transform: scaleY(1); }
+/* Keep the existing stretched article link in the entry's coordinate system. */
+.entry:hover .entry-number, .entry:focus-within .entry-number { color: #fff; }
+.entry:focus-within .entry-arrow { transform: translateX(4px); }
+@keyframes border-signal {
+  0% { transform: translateX(0); opacity: 0; }
+  10%, 90% { opacity: .85; }
+  100% { transform: translateX(614%); opacity: 0; }
+}
+@keyframes signal-breathe { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (max-width: 760px) {
+  .profile-backdrop{object-position:center;filter:grayscale(1) brightness(.7)}
+  .hero-copy { background: transparent; }
+  .scene-status { padding: 0 9px; gap: 6px; letter-spacing: .02em; font-size: 8px; }
+  .scene-signal { gap: 6px; }
+  .motion-toggle { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-window::after { display: none; }
+  .button:hover img, .entry:focus-within .entry-arrow { transform: none; }
+}

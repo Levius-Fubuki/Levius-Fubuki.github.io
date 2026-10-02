@@ -1,0 +1,8 @@
+# Local authoring workspace and generated visual QA evidence.
+/card-studio/
+/docs/
+/design-qa.md
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
