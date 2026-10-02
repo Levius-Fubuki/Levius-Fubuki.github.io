@@ -1,30 +1,45 @@
-// Bound each request (including its body) and retry independently. A stalled
-// optional layer must never leave the entire card waiting on an unbounded Image.
-export async function fetchCardResource(path, {timeout = 4000, attempts = 3} = {}) {
-  let cause;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    const local = new URL(path, location.href);
-    // The public repository is an independent delivery path when the custom
-    // domain/CDN stalls. Hashed filenames keep the bytes identical on both.
-    const url = attempt && local.origin === location.origin && local.pathname.startsWith('/card/')
-      ? new URL(local.pathname.slice(1), 'https://raw.githubusercontent.com/Levius-Fubuki/Levius-Fubuki.github.io/main/')
-      : local;
-    if (attempt > 1) url.searchParams.set('card_retry', `${Date.now()}-${attempt}`);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), attempt ? Math.max(timeout, 10000) : timeout);
+// Hedge slow custom-domain requests against the same public repository bytes.
+// Complete bodies race, not just headers; cancel the losing transfer.
+export async function fetchCardResource(path, {timeout = 4000, hedgeDelay = 500, onSource = () => {}} = {}) {
+  const local = new URL(path, location.href);
+  const mirror = local.origin === location.origin && local.pathname.startsWith('/card/')
+    ? new URL(local.pathname.slice(1), 'https://raw.githubusercontent.com/Levius-Fubuki/Levius-Fubuki.github.io/main/')
+    : null;
+  async function read(url, controller, limit) {
+    const timer = setTimeout(() => controller.abort(), limit);
     try {
-      const response = await fetch(url, {signal: controller.signal, cache: attempt ? 'reload' : 'default'});
+      const response = await fetch(url, {signal: controller.signal});
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.blob();
-    } catch (error) {
-      cause = error;
-      if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
-    } finally {
-      clearTimeout(timer);
-    }
+      return {blob: await response.blob(), source: url.origin};
+    } finally { clearTimeout(timer); }
   }
-  const name = new URL(path, location.href).pathname.split('/').pop();
-  throw new Error(`${name} 加载失败，请点击重试`, {cause});
+  const controllers = [new AbortController(), new AbortController()];
+  let hedgeTimer, cause;
+  try {
+    const requests = [read(local, controllers[0], timeout)];
+    if (mirror) requests.push(new Promise((resolve, reject) => {
+      hedgeTimer = setTimeout(() => read(mirror, controllers[1], 10000).then(resolve, reject), hedgeDelay);
+    }));
+    const result = await Promise.any(requests);
+    onSource(result.source);
+    return result.blob;
+  } catch (error) { cause = error; }
+  finally {
+    clearTimeout(hedgeTimer);
+    controllers.forEach(controller => controller.abort());
+  }
+  if (mirror) {
+    // One final uncached retry if both delivery paths failed.
+    mirror.searchParams.set('card_retry', Date.now());
+    const retry = new AbortController();
+    try {
+      const result = await read(mirror, retry, 10000);
+      onSource(result.source);
+      return result.blob;
+    } catch (error) { cause = error; }
+    finally { retry.abort(); }
+  }
+  throw new Error(`${local.pathname.split('/').pop()} 加载失败，请点击重试`, {cause});
 }
 
 export async function prepareCardAssets(config, progress = () => {}) {

@@ -12,7 +12,7 @@ const fs=require('node:fs');
  const check=(n,ok)=>{if(!ok)throw Error(n);console.log('PASS '+n)};
  try{
   const p=await page();const errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/card/?embed=1');await p.waitForFunction(()=>window.__holo?.ready);
-  check('normal card initializes without errors',!errors.length);
+  check('normal card initializes without errors',!errors.length);check('card has no external render-blocking stylesheets',await p.locator('link[rel=stylesheet]').count()===0);
   check('one bundled module entry',await p.locator('script[type=module]').count()===1);
   await p.locator('#stage').click();check('card still flips',(await p.evaluate(()=>window.__holo.getState())).flipped);await p.locator('#stage').click({button:'right'});check('reset still works',!(await p.evaluate(()=>window.__holo.getState())).flipped);await p.close();
   const q=await page();let attempts=0;await q.route('**/assets/subject.*.webp*',route=>++attempts===1?route.abort('timedout'):route.fallback());await q.goto(base+'/card/?embed=1');await q.waitForFunction(()=>window.__holo?.ready);check('a failed texture retries and recovers automatically',attempts===2);await q.close();

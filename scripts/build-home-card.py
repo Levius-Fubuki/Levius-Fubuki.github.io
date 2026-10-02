@@ -29,10 +29,14 @@ config_json=json.dumps(config,ensure_ascii=False,indent=2)+'\n'
 (dest/'card-config.json').write_text(config_json)
 index=(source/'index.html').read_text()
 index=re.sub(r'\s*<script type="module"[^>]*src="\./app.bundle.js[^>]*></script>', '',index)
+# Blocking CSS must not prevent the recovery bootstrap from executing.
+# All card styles/font data are local and small enough to ship with the document.
 for name in ['style.css','preview.css','embed.css']:
- index=index.replace('./'+name,versioned_copy(dest/name))
+ css=(dest/name).read_text()
+ index=re.sub(r'<link rel="stylesheet" href="\./'+re.escape(name)+r'"\s*/>',
+              lambda _: '<style data-card-style="'+name+'">'+css+'</style>',index)
 module=versioned_copy(dest/'app.bundle.js')
-bootstrap=(root/'scripts/card-runtime/bootstrap.js').read_text()
+bootstrap=(root/'scripts/card-runtime/asset-loader.mjs').read_text().replace('export ', '')+'\n'+(root/'scripts/card-runtime/bootstrap.js').read_text()
 index=index.replace('</body>', '<script id="card-runtime-config" type="application/json">'+config_json.replace('<','\\u003c')+'</script>\n<script type="module" data-card-module="'+module+'">\n'+bootstrap+'\n</script>\n</body>')
 (dest/'index.html').write_text(index)
 home=root/'index.html';revision=hashlib.sha256(index.encode()).hexdigest()[:12]
