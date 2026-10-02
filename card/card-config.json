@@ -7,13 +7,13 @@
   "collection": "",
   "description": "正面 · 格斯与白焰 / 背面 · 星环与光晕",
   "assets": {
-    "model": "./assets/card.glb?v=4817c38f9d25",
-    "subject": "./assets/subject.webp?v=b301dd5e9f98",
-    "background": "./assets/background.webp?v=cfc36b735065",
-    "text": "./assets/front-text.webp?v=c5a6158c4de4",
-    "lineart": "./assets/lineart.webp?v=f8ce69dd6786",
-    "effects": "./assets/effects.webp?v=2ca51d3da8cb",
-    "flames": "./assets/flames.webp?v=2ac00679bd1f"
+    "model": "./assets/card.4817c38f9d25.glb",
+    "subject": "./assets/subject.b301dd5e9f98.webp",
+    "background": "./assets/background.cfc36b735065.webp",
+    "text": "./assets/front-text.c5a6158c4de4.webp",
+    "lineart": "./assets/lineart.f8ce69dd6786.webp",
+    "effects": "./assets/effects.2ca51d3da8cb.webp",
+    "flames": "./assets/flames.2ac00679bd1f.webp"
   },
   "parameters": {
     "subjectScale": 1.1,
@@ -89,11 +89,11 @@
   ],
   "back": {
     "assets": {
-      "subject": "./assets/back-subject.webp?v=05de37c416b7",
-      "background": "./assets/back-background.webp?v=3496fdc95c81",
-      "lineart": "./assets/back-lineart.webp?v=a827e8c06bfc",
-      "standing": "./assets/back-standing.webp?v=5c884024e342",
-      "text": "./assets/back-text.webp?v=4e2f6d09ae22"
+      "subject": "./assets/back-subject.05de37c416b7.webp",
+      "background": "./assets/back-background.3496fdc95c81.webp",
+      "lineart": "./assets/back-lineart.a827e8c06bfc.webp",
+      "standing": "./assets/back-standing.5c884024e342.webp",
+      "text": "./assets/back-text.4e2f6d09ae22.webp"
     },
     "portrait": {
       "width": 5.4,

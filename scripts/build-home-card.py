@@ -1,23 +1,17 @@
-"""Publish only the identity card runtime and referenced assets into /card/."""
+"""Publish the card runtime with immutable URLs and resilient delivery."""
 from pathlib import Path
 import json, shutil, subprocess, hashlib, re
 root=Path(__file__).resolve().parents[1]
 source=root/'card-studio/levius-id/web';dest=root/'card'
-subprocess.run(['npx','--yes','esbuild@0.25.0',str(source/'app.js'),'--bundle','--format=esm','--minify','--target=es2020','--outfile='+str(source/'app.bundle.js')],check=True)
 dest.mkdir(exist_ok=True);(dest/'assets').mkdir(exist_ok=True)
-for name in ['index.html','app.bundle.js','style.css','preview.css','embed.css']:
+subprocess.run(['npx','--yes','esbuild@0.25.0',str(source/'app.js'),'--bundle','--format=esm','--minify','--target=es2020','--outfile='+str(dest/'app.bundle.js')],check=True)
+for name in ['style.css','preview.css','embed.css']:
  shutil.copy2(source/name,dest/name)
-# Bust old relative-runtime URLs when a previously cached iframe is revisited.
-index=(dest/'index.html').read_text()
-for name in ['app.bundle.js','embed.css']:
- revision=hashlib.sha256((dest/name).read_bytes()).hexdigest()[:12]
- index=index.replace('./'+name, './'+name+'?v='+revision)
-(dest/'index.html').write_text(index)
-# A fresh frame URL also bypasses previously cached card documents.
-home=root/'index.html'
-revision=hashlib.sha256(index.encode()).hexdigest()[:12]
-home.write_text(re.sub(r'src="/card/\?embed=1(?:&(?:amp;)?v=[^"]*)?"',
-                       'src="/card/?embed=1&amp;v='+revision+'"', home.read_text()))
+def versioned_copy(path):
+ digest=hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+ versioned=path.with_name(path.stem+'.'+digest+path.suffix)
+ shutil.copy2(path,versioned)
+ return './'+str(versioned.relative_to(dest))
 config=json.loads((source/'card-config.json').read_text())
 seen={}
 for group in [config['assets'],config['back']['assets']]:
@@ -26,17 +20,22 @@ for group in [config['assets'],config['back']['assets']]:
   src=source/rel
   if src.suffix=='.png':
    target=dest/'assets'/src.with_suffix('.webp').name
-   # Keep text, line masks and alpha exact; lightly compress printed artwork.
    opts=['-lossless','-z','6'] if key in ['text','lineart'] else ['-q','90','-alpha_q','100','-m','5','-exact']
    subprocess.run(['cwebp','-quiet',*opts,str(src),'-o',str(target)],check=True)
   else:
    target=dest/'assets'/src.name;shutil.copy2(src,target)
-  new='./assets/'+target.name;seen[rel]=new;group[key]=new
-# Version every resource so an existing CDN/browser cache cannot mix releases.
-for group in [config['assets'],config['back']['assets']]:
- for key,rel in group.items():
-  digest=hashlib.sha256((dest/rel).read_bytes()).hexdigest()[:12]
-  group[key]=rel+'?v='+digest
-(dest/'card-config.json').write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n')
-print('Published card runtime:',dest)
-print('Runtime asset size:',round(sum(p.stat().st_size for p in (dest/'assets').iterdir())/1024/1024,2),'MiB')
+  new=versioned_copy(target);seen[rel]=new;group[key]=new
+config_json=json.dumps(config,ensure_ascii=False,indent=2)+'\n'
+(dest/'card-config.json').write_text(config_json)
+index=(source/'index.html').read_text()
+index=re.sub(r'\s*<script type="module"[^>]*src="\./app.bundle.js[^>]*></script>', '',index)
+for name in ['style.css','preview.css','embed.css']:
+ index=index.replace('./'+name,versioned_copy(dest/name))
+module=versioned_copy(dest/'app.bundle.js')
+bootstrap=(root/'scripts/card-runtime/bootstrap.js').read_text()
+index=index.replace('</body>', '<script id="card-runtime-config" type="application/json">'+config_json.replace('<','\\u003c')+'</script>\n<script type="module" data-card-module="'+module+'">\n'+bootstrap+'\n</script>\n</body>')
+(dest/'index.html').write_text(index)
+home=root/'index.html';revision=hashlib.sha256(index.encode()).hexdigest()[:12]
+home.write_text(re.sub(r'src="/card/\?embed=1(?:&(?:amp;)?v=[^"]*)?"', 'src="/card/?embed=1&amp;v='+revision+'"',home.read_text()))
+print('Published immutable card runtime:', module)
+print('Runtime assets:',len(seen))

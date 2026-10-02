@@ -1,0 +1,26 @@
+:root{color-scheme:dark;--paper:#101010;--ink:#eee;--muted:#aaa;--line:#414141;--accent:#eee;--focus:#ddd;--control:#232323}
+body{background:#101010;color:#eee}
+.wordmark-en,.collection-label,.stage-note,.footer,.finish-heading,.finish-name{color:#aaa}
+.parameter-panel{background:#161616;border-color:#444}
+.range-row input,.foil-row input{accent-color:#ddd}
+.preview-controls{position:absolute;left:50%;bottom:0;display:flex;gap:14px;align-items:center;transform:translateX(-50%);z-index:3}
+.preview-controls button{min-width:44px;min-height:36px;display:flex;align-items:center;justify-content:center;border:1px solid #555;background:#181818;color:#ddd;padding:6px 12px;font-size:12px}
+button:focus-visible{outline-color:#fff}
+.preview-controls button:hover{background:#333}
+#about{background:#171717;color:#eee}
+#about dt{color:#aaa}
+.loading{background:#101010;color:#ccc}
+.footer{gap:18px;flex-wrap:wrap}
+@media(max-width:600px){.masthead{padding-left:20px;padding-right:20px}.collection-label{display:none}.footer{padding:20px}.wordmark-en{font-size:9px}}
+.wordmark-en{max-width:none;white-space:nowrap}
+.save-button{background:#eee;color:#111}
+.icon-button:hover:not(:disabled){background:#333;color:#fff}
+.face-picker{background:#252525}
+.face-picker button[aria-pressed="true"]{background:#eee;color:#111}
+.depth-toggle[aria-expanded="true"]{background:#333;color:#eee;border-color:#666}
+.collection-label{visibility:hidden}
+@media(max-width:600px){.wordmark-en{display:none}}
+@media(max-width:600px){.title-line h1{font-size:24px;line-height:1.3}}
+
+/* Card copy remains accessible alongside the WebGL artwork. */
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }

@@ -1,12 +1,17 @@
 // Bound each request (including its body) and retry independently. A stalled
 // optional layer must never leave the entire card waiting on an unbounded Image.
-export async function fetchCardResource(path, {timeout = 12000, attempts = 3} = {}) {
+export async function fetchCardResource(path, {timeout = 4000, attempts = 3} = {}) {
   let cause;
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const url = new URL(path, location.href);
-    if (attempt) url.searchParams.set('card_retry', `${Date.now()}-${attempt}`);
+    const local = new URL(path, location.href);
+    // The public repository is an independent delivery path when the custom
+    // domain/CDN stalls. Hashed filenames keep the bytes identical on both.
+    const url = attempt && local.origin === location.origin && local.pathname.startsWith('/card/')
+      ? new URL(local.pathname.slice(1), 'https://raw.githubusercontent.com/Levius-Fubuki/Levius-Fubuki.github.io/main/')
+      : local;
+    if (attempt > 1) url.searchParams.set('card_retry', `${Date.now()}-${attempt}`);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
+    const timer = setTimeout(() => controller.abort(), attempt ? Math.max(timeout, 10000) : timeout);
     try {
       const response = await fetch(url, {signal: controller.signal, cache: attempt ? 'reload' : 'default'});
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
