@@ -37,9 +37,9 @@ Embedding 将编号查表变成向量。Attention 汇总不同位置的信息；
 
 ### 互动图：结构与开销
 
-[打开 Transformer 结构与开销互动图](/content/interactive/transformer-foundations/transformer-foundations.html)。可切换前向传播、因果掩码、head 共享、归一化、执行阶段与开销估算。图中的开销面板采用它自己标明的 MHA、SwiGLU 配置，不要把面板默认值与本文教学配置混用。
+[打开 Transformer 结构与开销互动图](/content/interactive/transformer-foundations/transformer-foundations.html?v=height-v2)。可切换前向传播、因果掩码、head 共享、归一化、执行阶段与开销估算。图中的开销面板采用它自己标明的 MHA、SwiGLU 配置，不要把面板默认值与本文教学配置混用。
 
-<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="transformer-foundations" src="/content/interactive/transformer-foundations/transformer-foundations.html" title="Transformer 结构与计算开销" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
+<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="transformer-foundations" src="/content/interactive/transformer-foundations/transformer-foundations.html?v=height-v2" title="Transformer 结构与计算开销" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
 
 ## 2. Attention 的每个轴都对应什么
 
@@ -103,9 +103,9 @@ RoPE 让分数含有位置关系，并不会自动屏蔽未来内容。位置编
 
 ### 互动图：逐步追踪形状
 
-[打开 Attention 张量形状互动图](/content/interactive/transformer-foundations/attention-shapes.html)。它使用 $B=2,S=3,D=8,H=2$ 的小例子，将投影、reshape、transpose、匹配、掩码、softmax、汇总与拼接拆成十步。
+[打开 Attention 张量形状互动图](/content/interactive/transformer-foundations/attention-shapes.html?v=height-v2)。它使用 $B=2,S=3,D=8,H=2$ 的小例子，将投影、reshape、transpose、匹配、掩码、softmax、汇总与拼接拆成十步。
 
-<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="attention-shapes" src="/content/interactive/transformer-foundations/attention-shapes.html" title="Attention 张量形状逐步推导" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
+<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="attention-shapes" src="/content/interactive/transformer-foundations/attention-shapes.html?v=height-v2" title="Attention 张量形状逐步推导" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
 
 ## 3. 训练、Prefill、Decode：变化的是哪些轴
 
@@ -262,9 +262,9 @@ $$
 
 ### 互动图：归一化与残差
 
-[打开归一化与残差互动图](/content/interactive/transformer-foundations/norms-and-residuals.html)。在数值视图中切换“先平移，再缩放完整向量”与“先缩放，再加固定平移量”；在路径视图中切换 Pre-Norm、Post-Norm。
+[打开归一化与残差互动图](/content/interactive/transformer-foundations/norms-and-residuals.html?v=height-v2)。在数值视图中切换“先平移，再缩放完整向量”与“先缩放，再加固定平移量”；在路径视图中切换 Pre-Norm、Post-Norm。
 
-<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="norms-and-residuals" src="/content/interactive/transformer-foundations/norms-and-residuals.html" title="归一化数值与残差路径" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
+<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="norms-and-residuals" src="/content/interactive/transformer-foundations/norms-and-residuals.html?v=height-v2" title="归一化数值与残差路径" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
 
 ### 5.3 Norm 类型与放置位置是两个问题
 
@@ -317,9 +317,9 @@ $$
 
 ### 互动图：旋转与相对位置
 
-[打开 RoPE 旋转互动图](/content/interactive/transformer-foundations/rope-rotation.html)。固定原始向量，单独移动 Key 位置，再将 Q、K 同时移动一格；分别观察点积是否改变。
+[打开 RoPE 旋转互动图](/content/interactive/transformer-foundations/rope-rotation.html?v=height-v2)。固定原始向量，单独移动 Key 位置，再将 Q、K 同时移动一格；分别观察点积是否改变。
 
-<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="rope-rotation" src="/content/interactive/transformer-foundations/rope-rotation.html" title="RoPE 旋转与相对位置" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
+<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="rope-rotation" src="/content/interactive/transformer-foundations/rope-rotation.html?v=height-v2" title="RoPE 旋转与相对位置" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
 
 ## 7. MLA：内容和位置怎样共同工作
 
@@ -430,9 +430,9 @@ $$
 
 ### 互动图：缓存、投影吸收、位置分离
 
-[打开 MLA 缓存互动图](/content/interactive/transformer-foundations/mla-cache.html)。逐步查看联合压缩、内容展开、投影吸收、RoPE 分离，以及不同潜变量维度下的缓存对比。
+[打开 MLA 缓存互动图](/content/interactive/transformer-foundations/mla-cache.html?v=height-v2)。逐步查看联合压缩、内容展开、投影吸收、RoPE 分离，以及不同潜变量维度下的缓存对比。
 
-<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="mla-cache" src="/content/interactive/transformer-foundations/mla-cache.html" title="MLA 压缩缓存与解耦位置" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
+<div class="transformer-interactive-viewport" style="width:100%;max-width:100%;overflow-x:auto"><iframe class="transformer-interactive" data-widget="mla-cache" src="/content/interactive/transformer-foundations/mla-cache.html?v=height-v2" title="MLA 压缩缓存与解耦位置" loading="lazy" style="display:block;width:100%;min-width:320px;height:760px;border:0" referrerpolicy="no-referrer"></iframe></div>
 
 ## 8. 答错与答得不完整的地方
 

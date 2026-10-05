@@ -2310,7 +2310,7 @@ svg.lucide {
   if (!(frame instanceof HTMLIFrameElement)) {
     return;
   }
-  let viewportHeight = globalThis.innerHeight;
+  let viewportWidth = globalThis.innerWidth;
   const storageKey = `codex:visualization-widget-state-v2:${JSON.stringify([
     globalThis.location.pathname,
     globalThis.location.search,
@@ -2475,11 +2475,10 @@ svg.lucide {
     return;
   }
   globalThis.addEventListener("resize", () => {
-    const height = Number.parseFloat(frame.style.height);
-    if (!Number.isFinite(height) || height <= viewportHeight) {
-      frame.style.removeProperty("height");
-    }
-    viewportHeight = globalThis.innerHeight;
+    // Parent height follows this frame's content; height-only resizes are feedback.
+    const width = globalThis.innerWidth;
+    if (width === viewportWidth) return;
+    viewportWidth = width;
     channel.port1.postMessage({ type: "measure" });
   });
   frame.addEventListener(
