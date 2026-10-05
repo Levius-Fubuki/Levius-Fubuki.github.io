@@ -17,6 +17,7 @@ SITE='https://leviusspace.top'
 AUTHORED=[b for b in BOOKS if b.get('source')]
 ORDER=sorted(BOOKS,key=lambda b:b['date'],reverse=True)
 changed=[]
+modified_stamps={}
 
 def read(path):return Soup((ROOT/path).read_text(),'html.parser')
 def write(path,text):
@@ -51,15 +52,27 @@ legacy_bodies={b['id']:str(read(b['path'].lstrip('/')+'index.html').select_one('
 template=(ROOT/'2026/04/07/0-大模型学习路线图/index.html').read_text()
 for b in AUTHORED:
     source=ROOT/b['source'];assert source.is_file()
-    rendered=subprocess.check_output(['node','-e',"const fs=require('fs'),{marked}=require('marked');process.stdout.write(marked(fs.readFileSync(process.argv[1],'utf8')))",str(source)],text=True)
+    if b.get('math'):
+        rendered=subprocess.check_output(['node',str(ROOT/'scripts/render-markdown.cjs'),str(source),'--math'],text=True)
+    else:
+        rendered=subprocess.check_output(['node','-e',"const fs=require('fs'),{marked}=require('marked');process.stdout.write(marked(fs.readFileSync(process.argv[1],'utf8')))",str(source)],text=True)
     fragment=Soup(rendered,'html.parser');assert fragment.h1.get_text()==b['title']
     fragment.h1['id']=b['id'];toc=new_toc(fragment)
     s=Soup(template,'html.parser');stamp=b['date']+'T00:00:00+08:00'
+    existing_path=ROOT/b['path'].lstrip('/')/'index.html'
+    existing_modified=None
+    if existing_path.is_file():
+        existing_modified=Soup(existing_path.read_text(),'html.parser').select_one('meta[property="article:modified_time"]')
+    modified=b.get('updated') or (existing_modified.get('content') if existing_modified else stamp)
+    if len(modified)==10:modified+='T00:00:00+08:00'
+    modified_stamps[b['id']]=modified
     metadata(s,b['title'],b['path'],b['summary'],b['art'],stamp)
+    s.select_one('meta[property="article:modified_time"]')['content']=modified
     s.select_one('.inner-title').string=b['title']
     a=s.select_one('#article-container');a.clear();a.append(fragment)
     for node in s.select('#post-meta time'):
-        node['datetime']=stamp;node['title']=b['date'];node.string=b['date']
+        value=modified if 'post-meta-date-updated' in node.get('class',[]) else stamp
+        node['datetime']=value;node['title']=value[:10];node.string=value[:10]
     cat=s.select_one('#post-meta a.post-meta-categories');cat.string=COLLECTIONS[b['collection']]['title'];cat['href']=COLLECTIONS[b['collection']]['href']
     replace_node(s.select_one('.article-book'),article_cover(b));replace_node(s.select_one('.toc-content'),toc)
     copyright_link=s.select_one('.post-copyright__type a');copyright_link['href']=url(b['path']);copyright_link.string=url(b['path'])
@@ -152,9 +165,11 @@ for fn in ['search.xml','atom.xml']:
             cats='<categories><category>'+esc(COLLECTIONS[b['collection']]['title'])+'</category></categories>';terms='<tags>'+''.join('<tag>'+esc(t)+'</tag>' for t in b['tags'])+'</tags>'
             entries.append(f'<entry><title>{title}</title><link href="{path}"/><url>{path}</url>{content}{cats}{terms}</entry>')
         else:
-            entries.append(f'<entry><title>{title}</title><link href="{SITE+path}"/><id>{SITE+path}</id><published>{stamp}</published><updated>{stamp}</updated>{content}<summary type="text">{esc(b["summary"])}</summary></entry>')
+            entries.append(f'<entry><title>{title}</title><link href="{SITE+path}"/><id>{SITE+path}</id><published>{stamp}</published><updated>{modified_stamps[b["id"]]}</updated>{content}<summary type="text">{esc(b["summary"])}</summary></entry>')
     pos=text.index('<entry>');text=text[:pos].rstrip()+'\n'+'\n'.join(entries)+'\n'+text[pos:]
-    if fn=='atom.xml':text=re.sub(r'<updated>.*?</updated>','<updated>'+max(b['date'] for b in BOOKS)+'T00:00:00+08:00</updated>',text,count=1)
+    if fn=='atom.xml':
+        latest=max([b['date']+'T00:00:00+08:00' for b in BOOKS]+list(modified_stamps.values()))
+        text=re.sub(r'<updated>.*?</updated>','<updated>'+latest+'</updated>',text,count=1)
     write(fn,text)
 subprocess.run(['python3',str(ROOT/'scripts/build-search-index.py')],cwd=ROOT,check=True)
 # Add any newly public pages to both sitemaps without rewriting old URLs.

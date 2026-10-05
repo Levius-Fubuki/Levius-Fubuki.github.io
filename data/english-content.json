@@ -183,6 +183,14 @@
         "World"
       ],
       "summary": "The first post: creating a Hexo article, running a preview, and generating and publishing a static site."
+    },
+    "transformer-foundations": {
+      "title": "Transformer Foundations: Shapes, FLOPs, Normalization, RoPE and MLA",
+      "coverTitle": [
+        "Transformer",
+        "Foundations"
+      ],
+      "summary": "A worked GQA example connecting tensor shapes, parameter counts, FLOPs, KV cache, normalization, RoPE and MLA, with interactive diagrams and questions from an interview review."
     }
   },
   "collections": {

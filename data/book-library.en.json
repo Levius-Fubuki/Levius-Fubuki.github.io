@@ -534,6 +534,34 @@
       ]
     },
     {
+      "id": "transformer-foundations",
+      "collection": "infra",
+      "volume": "VII",
+      "title": "Transformer Foundations: Shapes, FLOPs, Normalization, RoPE and MLA",
+      "coverTitle": [
+        "Transformer",
+        "Foundations"
+      ],
+      "english": "THE LATENT THREADS",
+      "path": "/2026/10/05/transformer-foundations/",
+      "date": "2026-10-05",
+      "summary": "A worked GQA example connecting tensor shapes, parameter counts, FLOPs, KV cache, normalization, RoPE and MLA, with interactive diagrams and questions from an interview review.",
+      "art": "/img/books/transformer-foundations.png",
+      "source": "content/posts/transformer-foundations.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "Attention",
+        "Normalization",
+        "Model Architecture",
+        "Performance Measurement",
+        "KV Cache",
+        "RoPE",
+        "MLA"
+      ],
+      "updated": "2026-10-05T21:53:44+08:00"
+    },
+    {
       "id": "hello-world",
       "collection": "notes",
       "volume": "0",

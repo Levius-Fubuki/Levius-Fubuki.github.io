@@ -534,6 +534,34 @@
       ]
     },
     {
+      "id": "transformer-foundations",
+      "collection": "infra",
+      "volume": "VII",
+      "title": "从 Transformer 张量形状到 MLA：一次 AI Infra 面试复习笔记",
+      "coverTitle": [
+        "Transformer",
+        "基础与推导"
+      ],
+      "english": "THE LATENT THREADS",
+      "path": "/2026/10/05/transformer-foundations/",
+      "date": "2026-10-05",
+      "summary": "用一个 GQA 算例串起 Attention 形状、参数与 FLOPs、KV Cache、归一化、RoPE 和 MLA，保留互动图及面试问答中的易错点与追问。",
+      "art": "/img/books/transformer-foundations.png",
+      "source": "content/posts/transformer-foundations.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "Attention",
+        "归一化",
+        "模型架构",
+        "性能测量",
+        "KV Cache",
+        "RoPE",
+        "MLA"
+      ],
+      "updated": "2026-10-05T21:53:44+08:00"
+    },
+    {
       "id": "hello-world",
       "collection": "notes",
       "volume": "0",
