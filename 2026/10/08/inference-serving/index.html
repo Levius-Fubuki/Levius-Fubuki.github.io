@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="IE=edge" http-equiv="X-UA-Compatible"/><meta content="width=device-width, initial-scale=1.0,viewport-fit=cover" name="viewport"/><title>LLM Inference Serving: From KV Cache to SLO Goodput | L_F's Blog</title><meta content="Levius" name="author"/><meta content="Levius" name="copyright"/><meta content="telephone=no" name="format-detection"/><meta content="#101010" name="theme-color"/><meta content="A worked GQA serving example connecting KV memory, paging, prefix reuse, batching, prefill/decode separation, speculative decoding, FlashAttention and fair benchmarking, with 18 interactive diagrams and 36 answered self-check questions." name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="LLM Inference Serving: From KV Cache to SLO Goodput" property="og:title"/>
+<meta content="https://leviusspace.top/2026/10/08/inference-serving/" property="og:url"/>
+<meta content="L_F's Blog" property="og:site_name"/>
+<meta content="A worked GQA serving example connecting KV memory, paging, prefix reuse, batching, prefill/decode separation, speculative decoding, FlashAttention and fair benchmarking, with 18 interactive diagrams and 36 answered self-check questions." property="og:description"/>
+<meta content="en_US" property="og:locale"/>
+<meta content="https://leviusspace.top/img/books/inference-serving.png" property="og:image"/>
+<meta content="2026-10-08T00:00:00+08:00" property="article:published_time"/>
+<meta content="2026-10-08T00:00:00+08:00" property="article:modified_time"/>
+<meta content="Levius" property="article:author"/>
+<meta content="summary" name="twitter:card"/>
+<meta content="https://leviusspace.top/img/books/inference-serving.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/08/inference-serving/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F&#x27;s Blog" type="application/atom+xml"/>
+<link href="/css/home.css?v=3c5fb2432ae5" rel="stylesheet"/><link href="/css/katex/katex.min.css?v=b93e6b35af2b" rel="stylesheet"/><link href="/css/inner-pages.css?v=067d3bef89aa" rel="stylesheet"/><link href="/css/book-library.css?v=8397bc003b9d" rel="stylesheet"/><script defer="" src="/js/home.js?v=bb73e87d1955"></script><script defer="" src="/js/inner-pages.js?v=db2f33efbc05"></script><script defer="" src="/js/book-library.js?v=c879c12ecbd2"></script><link href="/css/english-ui.css?v=c0449b8ae8bc" rel="stylesheet"/>
+<meta content="AI Infra" property="article:tag"/><meta content="KV Cache" property="article:tag"/><meta content="Attention" property="article:tag"/><meta content="Speculative Decoding" property="article:tag"/><meta content="Performance Measurement" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">Skip to content</a><div class="site-shell"><header class="site-header">
+<a aria-label="L_F&#x27;s Blog Home" class="brand" href="/">L_F's <span>Blog</span></a>
+<button aria-controls="main-nav" aria-expanded="false" aria-label="Open navigation" class="menu-toggle" hidden="">
+<img alt="" height="24" src="/img/redesign/icons/list.svg" width="24"/>
+</button>
+<nav aria-label="Main navigation" class="main-nav" id="main-nav">
+<a href="/#profile">Home</a>
+<a href="/#articles">Articles</a>
+<a aria-current="page" href="/archives/">Archive</a>
+<a href="/Gallery/">Gallery</a>
+<button class="search-open" hidden="">Search</button>
+</nav>
+<a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
+</header><main id="main-content"><nav aria-label="Breadcrumb" class="breadcrumbs"><a href="/#profile">Home</a><span>/</span><a href="/archives/">Articles</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">LLM Inference Serving: From KV Cache to SLO Goodput</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">Published</span><time class="post-meta-date-created" datetime="2026-10-08T00:00:00+08:00" title="2026-10-08">2026-10-08</time><span class="post-meta-separator">|</span><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2026-10-08T00:00:00+08:00" title="2026-10-08">2026-10-08</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/AI-Infra/">AI Infra</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">Focus mode</button><button class="copy-page" type="button">Copy link</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="inference-serving">LLM Inference Serving: From KV Cache to SLO Goodput</h1>
+<p>这份笔记整理了“大模型推理引擎与服务优化”模块的互动复习，也合并了侧边会话《Continuous原因解析》中关于调度轮次、batch slot 和 KV 位置的解释。它保留基础概念、计算过程、我的易错回答与主动追问，以及会话中的 18 张互动图。文末自测题均附答案。</p>
+<p>本文所有耗时、带宽和吞吐数字均用于教学。它们不是 vLLM、SGLang 或某款 GPU 的实测结果；串行时间线也不能直接当作真实混合 batch 的性能预测。</p>
+<h2 id="1-用一个服务案例贯穿整条知识链">1. 用一个服务案例贯穿整条知识链</h2>
+<p>假设我要部署一个支持完整因果 Attention 的 Decoder-only 模型。只为计算 KV Cache，使用下面的参数：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>含义</th>
+<th align="right">主例取值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>L</td>
+<td>Transformer 层数</td>
+<td align="right">32</td>
+</tr>
+<tr>
+<td>H_Q</td>
+<td>Query head 数</td>
+<td align="right">32</td>
+</tr>
+<tr>
+<td>H_KV</td>
+<td>KV head 数，主例为 GQA</td>
+<td align="right">8</td>
+</tr>
+<tr>
+<td>d</td>
+<td>每个 head 的维度</td>
+<td align="right">128</td>
+</tr>
+<tr>
+<td>s</td>
+<td>每个缓存元素的字节数，BF16</td>
+<td align="right">2</td>
+</tr>
+<tr>
+<td>T</td>
+<td>某请求当前已经缓存的 token 位置数</td>
+<td align="right">4096</td>
+</tr>
+<tr>
+<td>S</td>
+<td>每个 KV 逻辑块可容纳的 token 数</td>
+<td align="right">16</td>
+</tr>
+<tr>
+<td>M_KV</td>
+<td>留给 KV Cache 的显存预算</td>
+<td align="right">8 GiB</td>
+</tr>
+</tbody></table>
+<p>请求 A 已完成 4096-token prompt 的 Prefill，正在生成。请求 B 与 A 有相同的前 64 个 prompt token；请求 C 是新到达的 2000-token 长 prompt。调度器需要兼顾它们的首 token 等待时间、后续输出间隔和整体吞吐。</p>
+<p>一条请求的生命周期可以写成：</p>
+<pre><code class="language-text">请求到达 → 排队 → 查找可复用前缀 → Prefill
+         → 采样首 token → 逐轮 Decode → 完成并释放请求状态
+</code></pre>
+<p>这条流程自然引出一系列问题：历史计算怎样复用？缓存放不下怎么办？如何给新请求腾出执行位置？长 Prefill 会不会打断正在生成的请求？分离 Prefill/Decode 是否值得？怎样让目标模型一次验证多个 token？最终怎样证明服务变好了？</p>
+<h2 id="2-kv-cache-新-q-为什么仍要读历史-k-v">2. KV Cache：新 Q 为什么仍要读历史 K/V</h2>
+<h3 id="2-1-prefill-与-decode-的区别">2.1 Prefill 与 Decode 的区别</h3>
+<p>Prefill 一次处理 prompt 中的多个 token，建立各层的 K/V，并通过最后一个 prompt 位置的输出预测首个生成 token。普通 Decode 每轮将一个新位置送入模型，继续预测下一个 token。</p>
+<p>假设 prompt 有 100 个位置，Prefill 后采样得到 y₁。下一轮模型处理 y₁：计算它在每一层的 Q/K/V，将新 K/V 加入缓存，再用当前 Q 读取历史以及当前位置的 K/V。此时通常有 101 个有效 KV 位置；随后采样得到的 y₂ 尚未被模型处理，不能提前算作已缓存位置。</p>
+<iframe class="transformer-interactive" data-widget="kv-cache-walkthrough" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/kv-cache-walkthrough.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="KV Cache 与逐 token 推理"></iframe>
+<p><a href="/content/interactive/inference-serving/kv-cache-walkthrough.html?v=height-v2">单独打开此图</a></p>
+<h3 id="2-2-为什么通常缓存-k-v-而不缓存历史-q">2.2 为什么通常缓存 K/V，而不缓存历史 Q</h3>
+<p>单个 attention head 的计算为：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>S</mi><mo>=</mo><mfrac><mrow><mi>Q</mi><msup><mi>K</mi><mi mathvariant="normal">⊤</mi></msup></mrow><msqrt><mi>d</mi></msqrt></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mi>P</mi><mo>=</mo><mi mathvariant="normal">softmax</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>S</mi><mo stretchy="false">)</mo><mo separator="true">,</mo><mspace width="2em"></mspace><mi>O</mi><mo>=</mo><mi>P</mi><mi>V</mi><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">S=\frac{QK^\top}{\sqrt d},\qquad P=\operatorname{softmax}(S),\qquad O=PV.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.4561em;vertical-align:-0.93em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.5261em;"><span style="top:-2.1778em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9322em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="padding-left:0.833em;">d</span></span><span style="top:-2.8922em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg height="1.08em" preserveaspectratio="xMinYMin slice" viewbox="0 0 400000 1080" width="400em" xmlns="http://www.w3.org/2000/svg"><path d="M95,702
+c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
+c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
+c44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10
+s173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429
+c69,-144,104.5,-217.7,106.5,-221
+l0 -0
+c5.3,-9.3,12,-14,20,-14
+H400000v40H845.2724
+s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
+c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
+M834 80h400000v40h-400000z"></path></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.1078em;"><span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">Q</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.07153em;">K</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8491em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.93em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop"><span class="mord mathrm">softmax</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal" style="margin-right:0.22222em;">V</span><span class="mord">.</span></span></span></span></span>
+<p>当前输出使用当前 Q，与已有 K 匹配后对已有 V 加权。历史 Q 是此前位置产生输出时使用的查询，普通逐 token Decode 不需要再次生成那些历史输出，因此一般不保存它们作为后续 Attention 的缓存。</p>
+<p>KV Cache 避免重新执行历史位置的前向计算来取得 K/V；当前新位置的 Q/K/V、Attention、MLP 等仍需计算。当前 Q 读取历史 K/V 的工作也仍然存在。</p>
+<h3 id="2-3-历史-kv-为什么能在追加-token-后复用">2.3 历史 KV 为什么能在追加 token 后复用</h3>
+<p>在因果模型里，旧位置看不到后来追加的 token。因此，在模型、位置与输入前缀保持一致时，追加一个 token 不会改变已有位置的表示和 KV。</p>
+<p>但这不等于“每个 token 的 KV 与其他 token 无关”。第一层的 K/V 投影通常来自该位置的初始表示；后续层的输入已融合此前上下文。因此把前缀中的 b 换成 x，后面的 c、d 即使 token ID 相同，其后续层 KV 一般也会变化。</p>
+<pre><code class="language-text">A：a b c d
+B：a x c d
+
+可复用相同前缀 a 的整套 KV；不能因为 c、d 相同就复用它们的整套 KV。
+</code></pre>
+<p>如果使用双向 Attention，追加内容也可能改变旧位置表示。上述“追加后旧 KV 不变”的解释依赖因果可见性。</p>
+<iframe class="transformer-interactive" data-widget="context-and-kv" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/context-and-kv.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="因果可见性与各层 KV 的上下文依赖"></iframe>
+<p><a href="/content/interactive/inference-serving/context-and-kv.html?v=height-v2">单独打开此图</a></p>
+<h3 id="2-4-q-k-与得分矩阵的形状">2.4 Q、K 与得分矩阵的形状</h3>
+<p>单个 head、一次处理的 Q 位置数为 n_q，总 K 位置数为 n_k 时：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>Q</mi><mo>∈</mo><msup><mi mathvariant="double-struck">R</mi><mrow><msub><mi>n</mi><mi>q</mi></msub><mo>×</mo><mi>d</mi></mrow></msup><mo separator="true">,</mo><mspace width="1em"></mspace><mi>K</mi><mo>∈</mo><msup><mi mathvariant="double-struck">R</mi><mrow><msub><mi>n</mi><mi>k</mi></msub><mo>×</mo><mi>d</mi></mrow></msup><mo separator="true">,</mo><mspace width="1em"></mspace><mi>Q</mi><msup><mi>K</mi><mi mathvariant="normal">⊤</mi></msup><mo>∈</mo><msup><mi mathvariant="double-struck">R</mi><mrow><msub><mi>n</mi><mi>q</mi></msub><mo>×</mo><msub><mi>n</mi><mi>k</mi></msub></mrow></msup><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">Q\in\mathbb R^{n_q\times d},\quad K\in\mathbb R^{n_k\times d},\quad QK^\top\in\mathbb R^{n_q\times n_k}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.0935em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathbb">R</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8991em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1645em;"><span style="top:-2.357em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">q</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2819em;"><span></span></span></span></span></span></span><span class="mbin mtight">×</span><span class="mord mathnormal mtight">d</span></span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:1em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.07153em;">K</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.0935em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathbb">R</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8991em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3448em;"><span style="top:-2.3488em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.1512em;"><span></span></span></span></span></span></span><span class="mbin mtight">×</span><span class="mord mathnormal mtight">d</span></span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:1em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">Q</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.07153em;">K</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8991em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8213em;"></span><span class="mord"><span class="mord mathbb">R</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8213em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1645em;"><span style="top:-2.357em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">q</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2819em;"><span></span></span></span></span></span></span><span class="mbin mtight">×</span><span class="mord mtight"><span class="mord mathnormal mtight">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3448em;"><span style="top:-2.3488em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.1512em;"><span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th align="right">Q 的行数</th>
+<th align="right">K 的行数</th>
+<th>得分矩阵</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>整段 N-token Prefill</td>
+<td align="right">N</td>
+<td align="right">N</td>
+<td>N×N</td>
+</tr>
+<tr>
+<td>单 token Decode，总 KV 为 N</td>
+<td align="right">1</td>
+<td align="right">N</td>
+<td>1×N</td>
+</tr>
+<tr>
+<td>Prefill 一个 c-token chunk，之前有 T 个 KV</td>
+<td align="right">c</td>
+<td align="right">T+c</td>
+<td>c×(T+c)，含因果遮罩</td>
+</tr>
+</tbody></table>
+<p>主例中，4096 个历史位置后处理一个新 token，得分矩阵是 1×4097，而不是 4097×4097。增加历史长度主要增加列数；只有增加本次处理的 Q 位置数，才增加行数。</p>
+<h2 id="3-算清-kv-显存-再讨论并发">3. 算清 KV 显存，再讨论并发</h2>
+<h3 id="3-1-公式-单位与边界">3.1 公式、单位与边界</h3>
+<p>对于等长请求、缓存所有层 K/V 的主例：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn><mi>L</mi><mi>B</mi><mi>T</mi><msub><mi>H</mi><mrow><mi>K</mi><mi>V</mi></mrow></msub><mi>d</mi><mi>s</mi><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">M=2LBTH_{KV}ds.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord">2</span><span class="mord mathnormal">L</span><span class="mord mathnormal" style="margin-right:0.13889em;">BT</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.08125em;">H</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:-0.0813em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.07153em;">K</span><span class="mord mathnormal mtight" style="margin-right:0.22222em;">V</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">d</span><span class="mord mathnormal">s</span><span class="mord">.</span></span></span></span></span>
+<p>开头的 2 表示 K 和 V 两份；s=2 表示 BF16 每元素两个字节。这两个 2 的含义不同。GQA 的缓存使用 H_KV，而不是 H_Q。</p>
+<p>主例每 token 的缓存大小是：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><mo>×</mo><mn>32</mn><mo>×</mo><mn>8</mn><mo>×</mo><mn>128</mn><mo>×</mo><mn>2</mn><mo>=</mo><mn>131072</mn><mtext> bytes</mtext><mo>=</mo><mn>128</mn><mtext> KiB</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">2\times32\times8\times128\times2=131072\text{ bytes}=128\text{ KiB}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">32</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">128</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord">131072</span><span class="mord text"><span class="mord"> bytes</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord">128</span><span class="mord text"><span class="mord"> KiB</span></span><span class="mord">.</span></span></span></span></span>
+<p>于是，4096 个位置的单请求缓存为：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>4096</mn><mo>×</mo><mn>128</mn><mtext> KiB</mtext><mo>=</mo><mn>512</mn><mtext> MiB</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">4096\times128\text{ KiB}=512\text{ MiB}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">4096</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord">128</span><span class="mord text"><span class="mord"> KiB</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord">512</span><span class="mord text"><span class="mord"> MiB</span></span><span class="mord">.</span></span></span></span></span>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th align="right">理论 KV 数据量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B=1，T=4096</td>
+<td align="right">512 MiB</td>
+</tr>
+<tr>
+<td>B=2，T=4096</td>
+<td align="right">1024 MiB=1 GiB</td>
+</tr>
+<tr>
+<td>B=3，T=4096</td>
+<td align="right">1536 MiB=1.5 GiB</td>
+</tr>
+<tr>
+<td>B=1，T=8192</td>
+<td align="right">1024 MiB=1 GiB</td>
+</tr>
+</tbody></table>
+<p>8 GiB 的 KV 专用预算，理论上可容纳 16 个 4096-position 请求，或 8 个 8192-position 请求。不能把 B=2 的合计 1 GiB 当成“每请求占用 1 GiB”。</p>
+<p>请求长度不同时，应使用总有效位置数：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>M</mi><mo>=</mo><mn>2</mn><mi>L</mi><msub><mi>H</mi><mrow><mi>K</mi><mi>V</mi></mrow></msub><mi>d</mi><mi>s</mi><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>B</mi></munderover><msub><mi>T</mi><mi>i</mi></msub><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">M=2LH_{KV}ds\sum_{i=1}^{B}T_i.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:3.106em;vertical-align:-1.2777em;"></span><span class="mord">2</span><span class="mord mathnormal">L</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.08125em;">H</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:-0.0813em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.07153em;">K</span><span class="mord mathnormal mtight" style="margin-right:0.22222em;">V</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">d</span><span class="mord mathnormal">s</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.8283em;"><span style="top:-1.8723em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">i</span><span class="mrel mtight">=</span><span class="mord mtight">1</span></span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span><span style="top:-4.3em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.05017em;">B</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.2777em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<p>这些公式计算逻辑 KV 数据，不包含权重、工作区、激活、元数据、对齐与分页尾部空槽。多卡分片后每卡存储量还依赖具体并行和 KV 复制方式，不能无条件把结果除以卡数。</p>
+<iframe class="transformer-interactive" data-widget="kv-memory" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/kv-memory.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="请求数量、上下文长度与 KV head 数对显存的影响"></iframe>
+<p><a href="/content/interactive/inference-serving/kv-memory.html?v=height-v2">单独打开此图</a></p>
+<h3 id="3-2-显存容量与显存带宽">3.2 显存容量与显存带宽</h3>
+<p>容量决定能放多少数据；带宽决定数据搬得多快。小 batch Decode 常因权重或 KV 读取而受访存限制，但不能只看计算单元利用率就下结论，需要结合带宽、算子耗时与执行空隙分析。</p>
+<p>额外做一个权重读取练习：假设每轮读取 14 GB 权重，有效带宽为 2 TB/s，即 2000 GB/s，读取下界为 7 ms；权重降到 7 GB 后为 3.5 ms。这不保证整个 Decode 加速两倍，因为 KV 访问、计算、通信等部分未必同比下降，量化也可能引入反量化开销。这个权重数字是独立教学条件，不是在推导主例模型的参数量。</p>
+<p>增大 batch 可以让更多 token 在同一次矩阵运算中使用相同权重，摊薄部分读取和启动开销；同时也会增加计算、KV 读写和显存需求。吞吐可能增加，单请求输出间隔也可能增加。</p>
+<h2 id="4-pagedattention-逻辑顺序与物理位置分离">4. PagedAttention：逻辑顺序与物理位置分离</h2>
+<h3 id="4-1-块数-尾部空槽与地址计算">4.1 块数、尾部空槽与地址计算</h3>
+<p>PagedAttention 将 KV 按固定 token 数分块，用 block table 将逻辑块映射到物理块。物理块无需连续，逻辑 token 顺序通过映射保持。</p>
+<p>设每块 S 个位置，当前长度 T：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi>b</mi><mi>l</mi><mi>o</mi><mi>c</mi><mi>k</mi><mi>s</mi></mrow></msub><mo>=</mo><mrow><mo fence="true">⌈</mo><mi>T</mi><mi mathvariant="normal">/</mi><mi>S</mi><mo fence="true">⌉</mo></mrow><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>空槽</mtext><mo>=</mo><msub><mi>n</mi><mrow><mi>b</mi><mi>l</mi><mi>o</mi><mi>c</mi><mi>k</mi><mi>s</mi></mrow></msub><mi>S</mi><mo>−</mo><mi>T</mi><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">n_{blocks}=\left\lceil T/S\right\rceil,\qquad
+\text{空槽}=n_{blocks}S-T.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">b</span><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span><span class="mord mathnormal mtight">oc</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span><span class="mord mathnormal mtight">s</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;">⌈</span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="mord">/</span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="mclose delimcenter" style="top:0em;">⌉</span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord text"><span class="mord cjk_fallback">空槽</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">b</span><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span><span class="mord mathnormal mtight">oc</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span><span class="mord mathnormal mtight">s</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="mord">.</span></span></span></span></span>
+<p>T=40、S=16 时，需要 3 块，总容量 48 个槽，剩 8 个空槽。这不是整个显存池还有 8 个槽，而是该请求已分配块内的未用槽。</p>
+<p>把“第几个 token”和“从零开始的索引”分开：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>i</mi><mo>=</mo><mi>n</mi><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mspace width="2em"></mspace><mi>L</mi><mo>=</mo><mo stretchy="false">⌊</mo><mi>i</mi><mi mathvariant="normal">/</mi><mi>S</mi><mo stretchy="false">⌋</mo><mo separator="true">,</mo><mspace width="2em"></mspace><mi>o</mi><mi>f</mi><mi>f</mi><mi>s</mi><mi>e</mi><mi>t</mi><mo>=</mo><mi>i</mi><mtext> </mtext><mo lspace="0.22em" rspace="0.22em"><mrow><mi mathvariant="normal">m</mi><mi mathvariant="normal">o</mi><mi mathvariant="normal">d</mi></mrow></mo><mtext> </mtext><mi>S</mi><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">i=n-1,\qquad L=\lfloor i/S\rfloor,\qquad offset=i\bmod S.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6595em;"></span><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">L</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">⌊</span><span class="mord mathnormal">i</span><span class="mord">/</span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="mclose">⌋</span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">o</span><span class="mord mathnormal" style="margin-right:0.10764em;">ff</span><span class="mord mathnormal">se</span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.0556em;"></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin"><span class="mord"><span class="mord mathrm">mod</span></span></span><span class="mspace" style="margin-right:0.0556em;"></span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="mord">.</span></span></span></span></span>
+<p>S=16 时：</p>
+<table>
+<thead>
+<tr>
+<th align="right">第 n 个 token</th>
+<th align="right">全局索引 i</th>
+<th align="right">逻辑块</th>
+<th align="right">块内偏移</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">17</td>
+<td align="right">16</td>
+<td align="right">L1</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td align="right">40</td>
+<td align="right">39</td>
+<td align="right">L2</td>
+<td align="right">7</td>
+</tr>
+<tr>
+<td align="right">49</td>
+<td align="right">48</td>
+<td align="right">L3</td>
+<td align="right">0</td>
+</tr>
+</tbody></table>
+<p>假设 block table 为 L0→P7、L1→P2、L2→P11，则全局索引 36 位于 L2，偏移 4，去 P11 读取该位置 KV。第 49 个 token 需要 L3 的新物理块，已有三个块的数据无需搬迁。</p>
+<iframe class="transformer-interactive" data-widget="paged-kv-blocks" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/paged-kv-blocks.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="分页分配、释放与物理块复用"></iframe>
+<p><a href="/content/interactive/inference-serving/paged-kv-blocks.html?v=height-v2">单独打开此图</a></p>
+<iframe class="transformer-interactive" data-widget="token-block-index" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/token-block-index.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="token 序号、全局索引、逻辑块与偏移"></iframe>
+<p><a href="/content/interactive/inference-serving/token-block-index.html?v=height-v2">单独打开此图</a></p>
+<h3 id="4-2-块不是越小越好">4.2 块不是越小越好</h3>
+<p>较小的块往往减少尾部浪费，但需要更多映射项、分配操作和管理工作。较大的块管理更粗，尾部空槽可能更多。性能要结合访问布局、算子和调度实现评估。</p>
+<p>例如 T=17：S=16 时两块、15 个空槽；S=32 时一块、也有 15 个空槽。单个样本并不能证明小块总更省。</p>
+<iframe class="transformer-interactive" data-widget="kv-block-size" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/kv-block-size.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="块大小、尾部浪费与映射数量"></iframe>
+<p><a href="/content/interactive/inference-serving/kv-block-size.html?v=height-v2">单独打开此图</a></p>
+<h3 id="4-3-分页不突破逻辑数据量下限">4.3 分页不突破逻辑数据量下限</h3>
+<p>分页减少碎片和按最大长度预留的浪费，不自动减少每个有效位置的 K/V 元素数量。若 KV 预算 8 GiB、12 个请求实际各需 1 GiB，且没有共享、压缩或重计算，仅分页也放不下 12 GiB。FlashAttention 同样不直接缩小这些 KV 数据。</p>
+<h2 id="5-prefix-cache-相同前缀跨请求复用">5. Prefix Cache：相同前缀跨请求复用</h2>
+<p>Prefix Cache 缓存此前前缀在各层计算出的 KV。兼容的后续请求可跳过已命中前缀的 Prefill 工作。一般需要一致的模型权重、token ID、位置、适配器和影响缓存语义的配置；文本看着相同，不保证实际 token 化或模型条件相同。</p>
+<p>主例 A、B 共享前 64 个位置，每块 16 个位置，可以复用 4 个完整块。每块的数据为 16×128 KiB=2 MiB，所以共享前缀共 8 MiB。B 的 4096-position prompt 在简化的完整块命中条件下还需处理 4032 个位置；引擎为生成首 token 可能还需要边界位置或 logits 相关工作，具体以实现为准。</p>
+<p>若 A、B 此刻都缓存 4096 个位置且完全共享这 64 个位置，物理 KV 数据可从 1024 MiB 降到 1016 MiB。逻辑上每请求仍有完整上下文，物理上相同块共享，不能把“共享”理解成某请求缺少历史。</p>
+<p>命中主要减少 Prefill。B 生成的新 Q 仍要读取其有效历史 KV，不会因为前缀命中而不再做 Decode Attention。完整块复用的例子也不应泛化为所有引擎只支持完整块。</p>
+<iframe class="transformer-interactive" data-widget="prefix-cache-sharing" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/prefix-cache-sharing.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="相同前缀的物理块共享与 Prefill 复用"></iframe>
+<p><a href="/content/interactive/inference-serving/prefix-cache-sharing.html?v=height-v2">单独打开此图</a></p>
+<p>复用从开头连续匹配的位置开始。A=a b c d、B=a x c d，只能复用 a 的完整前缀结果；c、d 相同不足以抵消此前 x 的上下文变化。</p>
+<h2 id="6-continuous-batching-slot-不属于某个请求">6. Continuous Batching：slot 不属于某个请求</h2>
+<h3 id="6-1-三种组批方式">6.1 三种组批方式</h3>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>调整粒度</th>
+<th>需要理解的重点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Static Batching</td>
+<td>整批请求</td>
+<td>固定组合可能等待最长请求结束</td>
+</tr>
+<tr>
+<td>请求级 Dynamic Batching</td>
+<td>请求到达与组批窗口</td>
+<td>把可用请求汇成 batch，定义随服务框架而异</td>
+</tr>
+<tr>
+<td>Continuous Batching</td>
+<td>每次生成迭代</td>
+<td>已完成请求退出，新的就绪请求加入</td>
+</tr>
+</tbody></table>
+<p>侧边会话《Continuous原因解析》的关键解释是：batch 是本轮一起执行的临时组合。A 的连续生成依赖 A 的 token 序列、KV 与采样等状态，不依赖上一轮与它同批的请求必须继续存在。</p>
+<p>用会话里的小例子：最多两个执行位置，A 需 4 轮、B 需 2 轮、C 需 3 轮，并假设它们都已经 Decode-ready。</p>
+<table>
+<thead>
+<tr>
+<th align="right">轮次</th>
+<th>整批换批</th>
+<th>Continuous</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1</td>
+<td>A+B</td>
+<td>A+B</td>
+</tr>
+<tr>
+<td align="right">2</td>
+<td>A+B，B 完成</td>
+<td>A+B，B 完成</td>
+</tr>
+<tr>
+<td align="right">3</td>
+<td>A+空位</td>
+<td>A+C</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td>A+空位，A 完成</td>
+<td>A+C，A 完成</td>
+</tr>
+<tr>
+<td align="right">5</td>
+<td>C</td>
+<td>C，完成</td>
+</tr>
+<tr>
+<td align="right">6</td>
+<td>C</td>
+<td>—</td>
+</tr>
+<tr>
+<td align="right">7</td>
+<td>C，完成</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p>C 在两种方式下分别从第 5、3 轮开始。这里是调度轮数比较，不假设不同 batch 的单轮毫秒数相同。</p>
+<iframe class="transformer-interactive" data-widget="decode-batching" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/decode-batching.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="整批换批与 Continuous Batching 的执行轮次"></iframe>
+<p><a href="/content/interactive/inference-serving/decode-batching.html?v=height-v2">单独打开此图</a></p>
+<h3 id="6-2-batch-slot-与-kv-block-是两件事">6.2 batch slot 与 KV block 是两件事</h3>
+<pre><code class="language-text">第 2 轮：slot 0 → A → A 的 KV blocks
+         slot 1 → B → B 的 KV blocks
+
+第 3 轮：slot 0 → A → A 原来的 KV blocks
+         slot 1 → C → C 自己的 KV blocks
+</code></pre>
+<p>slot 1 是本轮执行位置，不是 B 独占的一块 GPU、一个 SM，也不是 B 的 KV 存储地址。替换 B 不需要重算或搬迁 A 的缓存；每个请求的 Attention 上下文仍相互隔离。</p>
+<p>主例的新请求 C 尚未 Prefill，因此不能把它最后一个 prompt token 输入模型就直接开始正常 Decode。必须先建立所需历史 KV，或在计算时正确重建它们。Continuous Batching 提供加入执行的机会，并不消除 Prefill 依赖。</p>
+<h2 id="7-chunked-prefill-混合-batch-与串行交错">7. Chunked Prefill、混合 batch 与串行交错</h2>
+<h3 id="7-1-拆分长-prompt-不丢掉前面的上下文">7.1 拆分长 prompt，不丢掉前面的上下文</h3>
+<p>主例 C 的 2000-token prompt 可分成四个 500-token chunk。后续 chunk 的 Q 仍需关注此前 chunk 的有效 K/V，因此不是四段彼此独立的短 prompt。</p>
+<p>分块限制每轮的 Prefill 工作量，让正在 Decode 的 A 获得更频繁的调度机会，但不能保证 A 与独自 Decode 时耗时完全一样。</p>
+<p>会话中的串行教学时间线假设：A 每次 Decode 5 ms；C 总 Prefill 80 ms；拆成四块、每块 20 ms；忽略调度开销。时间从 C 到达且 A 已在生成时开始计，不是 A 自身的到达时刻。</p>
+<table>
+<thead>
+<tr>
+<th>调度</th>
+<th>A 的四次输出时刻</th>
+<th align="right">C 首 token 时刻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>完整 C Prefill 插在两次 A Decode 之间</td>
+<td>5、90、95、100 ms</td>
+<td align="right">85 ms</td>
+</tr>
+<tr>
+<td>每块 C Prefill 与 A Decode 串行交错</td>
+<td>5、30、55、80 ms</td>
+<td align="right">100 ms</td>
+</tr>
+</tbody></table>
+<p>分块让 A 不必一次等待 80 ms，但 C 自己的 Prefill 被插入 A 的工作，首 token 可能更晚。不是“分块之后每个请求的所有延迟都改善”。</p>
+<iframe class="transformer-interactive" data-widget="chunked-prefill-timeline" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/chunked-prefill-timeline.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="长 Prefill 的串行教学时间线"></iframe>
+<p><a href="/content/interactive/inference-serving/chunked-prefill-timeline.html?v=height-v2">单独打开此图</a></p>
+<h3 id="7-2-串行交错和混合-batch-的计算组织不同">7.2 串行交错和混合 batch 的计算组织不同</h3>
+<p>串行交错的示意：</p>
+<pre><code class="language-text">A 第1层 → A 第2层 → …完成 A 前向
+C 第1层 → C 第2层 → …完成 C 前向
+</code></pre>
+<p>混合 batch 将 A 的一个 Decode token 与 C 的 500 个 Prefill token 放进一次前向：</p>
+<pre><code class="language-text">第1层：处理 A+C → 第2层：处理 A+C → …
+</code></pre>
+<p>线性层可将它们堆叠成 501 行输入，与同一权重矩阵相乘；Attention 仍使用各请求自己的上下文与遮罩。两种方式可能得到相同的逐请求数学结果，但 kernel 启动、权重复用、运算形状和资源利用不同。</p>
+<p>混合 batch 不代表所有操作在物理上完全重叠，也不代表 C 的计算免费。实际迭代耗时既不能直接用 5+20 ms 推出，也不能无条件用 max(5,20) ms 推出。</p>
+<iframe class="transformer-interactive" data-widget="separate-forward-vs-batch" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/separate-forward-vs-batch.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="两次独立前向与一次混合 batch 的层级顺序"></iframe>
+<p><a href="/content/interactive/inference-serving/separate-forward-vs-batch.html?v=height-v2">单独打开此图</a></p>
+<iframe class="transformer-interactive" data-widget="batching-and-pd-scope" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/batching-and-pd-scope.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="串行交错、共置混合 batch 和 PD 分离的资源范围"></iframe>
+<p><a href="/content/interactive/inference-serving/batching-and-pd-scope.html?v=height-v2">单独打开此图</a></p>
+<h2 id="8-ttft-tpot-itl-吞吐与-goodput">8. TTFT、TPOT、ITL、吞吐与 Goodput</h2>
+<h3 id="8-1-不同指标回答不同问题">8.1 不同指标回答不同问题</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>定义或常见测量口径</th>
+<th>对应体验</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TTFT</td>
+<td>请求起点到收到首个输出的时间</td>
+<td>等多久开始回答</td>
+</tr>
+<tr>
+<td>ITL</td>
+<td>相邻流式输出之间的间隔</td>
+<td>是否出现停顿</td>
+</tr>
+<tr>
+<td>TPOT</td>
+<td>对一个请求，首输出之后的总时间除以后续输出 token 数</td>
+<td>平均生成速度</td>
+</tr>
+<tr>
+<td>E2E latency</td>
+<td>请求起点到最后输出的时间</td>
+<td>整个回答多久完成</td>
+</tr>
+<tr>
+<td>requests/s</td>
+<td>完成请求数/测试时长</td>
+<td>整体处理请求能力</td>
+</tr>
+<tr>
+<td>output tokens/s</td>
+<td>输出 token 数/测试时长</td>
+<td>整体生成吞吐</td>
+</tr>
+<tr>
+<td>Goodput</td>
+<td>满足指定要求的成功请求数/测试时长</td>
+<td>合格服务能力</td>
+</tr>
+</tbody></table>
+<p>客户端、网关与服务端的起点可能不同；比较时必须统一测量位置和公式。对输出 N&gt;1 的请求：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>T</mi><mi>P</mi><mi>O</mi><mi>T</mi><mo>=</mo><mfrac><mrow><msub><mi>t</mi><mrow><mi>l</mi><mi>a</mi><mi>s</mi><mi>t</mi></mrow></msub><mo>−</mo><msub><mi>t</mi><mrow><mi>f</mi><mi>i</mi><mi>r</mi><mi>s</mi><mi>t</mi></mrow></msub></mrow><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mo>=</mo><mfrac><mrow><mi>E</mi><mn>2</mn><mi>E</mi><mo>−</mo><mi>T</mi><mi>T</mi><mi>F</mi><mi>T</mi></mrow><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">TPOT=\frac{t_{last}-t_{first}}{N-1}
+=\frac{E2E-TTFT}{N-1}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">TPOT</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0614em;vertical-align:-0.7693em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.2921em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">s</span><span class="mord mathnormal mtight">t</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.10764em;">f</span><span class="mord mathnormal mtight">i</span><span class="mord mathnormal mtight">rs</span><span class="mord mathnormal mtight">t</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7693em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.1297em;vertical-align:-0.7693em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3603em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05764em;">E</span><span class="mord">2</span><span class="mord mathnormal" style="margin-right:0.05764em;">E</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">TTFT</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7693em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span>
+<p>N=1 时该公式没有定义，不能随意填成一个可比较的 TPOT。p95 TPOT 通常是每请求 TPOT 的分位数，不等于把所有 ITL 混在一起后的 p95。</p>
+<p>在普通逐 token 流式输出下，ITL 可对应相邻 token 的间隔；投机解码可能一次返回多个 token，此时有些工具记录的是流式事件之间的间隔。必须检查实现，不能把多 token 事件内的 token 都默认为零间隔后混入统计。</p>
+<h3 id="8-2-排队可以改变-ttft-而不改变后续输出间隔">8.2 排队可以改变 TTFT，而不改变后续输出间隔</h3>
+<p>若请求到达 t=0，收到输出的时刻为 100、130、160、190 ms：TTFT=100 ms，ITL=30、30、30 ms，TPOT=30 ms，E2E=190 ms。将所有输出时刻推迟 50 ms，TTFT=150 ms、TPOT 仍为 30 ms、E2E=240 ms。</p>
+<iframe class="transformer-interactive" data-widget="queue-and-token-latency" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/queue-and-token-latency.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="整体等待偏移与 token 输出间隔"></iframe>
+<p><a href="/content/interactive/inference-serving/queue-and-token-latency.html?v=height-v2">单独打开此图</a></p>
+<p>在前述 A 的未分块串行时间线中，ITL 按时间顺序为 85、5、5 ms，平均为 95/3≈31.67 ms。平均值可能掩盖一次很长的停顿，应同时观察尾部间隔与分布。</p>
+<h3 id="8-3-吞吐增加-不保证满足延迟要求">8.3 吞吐增加，不保证满足延迟要求</h3>
+<p>会话中的教学数据：</p>
+<table>
+<thead>
+<tr>
+<th align="right">batch</th>
+<th align="right">输出吞吐</th>
+<th align="right">p95 TPOT</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1</td>
+<td align="right">50 tokens/s</td>
+<td align="right">20 ms</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td align="right">160 tokens/s</td>
+<td align="right">25 ms</td>
+</tr>
+<tr>
+<td align="right">8</td>
+<td align="right">220 tokens/s</td>
+<td align="right">45 ms</td>
+</tr>
+</tbody></table>
+<p>若 p95 TPOT 要求不超过 30 ms，batch 1、4 都合格；追求合格配置中的最高吞吐时，应选 4。不是“batch 8 总吞吐最高就选 8”。</p>
+<iframe class="transformer-interactive" data-widget="throughput-latency-budget" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/throughput-latency-budget.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="吞吐与 p95 TPOT 预算的权衡"></iframe>
+<p><a href="/content/interactive/inference-serving/throughput-latency-budget.html?v=height-v2">单独打开此图</a></p>
+<p>Goodput 的一个明确口径是：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>G</mi><mi>o</mi><mi>o</mi><mi>d</mi><mi>p</mi><mi>u</mi><mi>t</mi><mo>=</mo><mfrac><mrow><mi mathvariant="normal">#</mi><mo stretchy="false">{</mo><mtext>成功且同时满足所有逐请求 SLO 的请求</mtext><mo stretchy="false">}</mo></mrow><mtext>测试时长</mtext></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">Goodput=\frac{\#\{\text{成功且同时满足所有逐请求 SLO 的请求}\}}{\text{测试时长}}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">G</span><span class="mord mathnormal">oo</span><span class="mord mathnormal">d</span><span class="mord mathnormal">p</span><span class="mord mathnormal">u</span><span class="mord mathnormal">t</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.113em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.427em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord text"><span class="mord cjk_fallback">测试时长</span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">#</span><span class="mopen">{</span><span class="mord text"><span class="mord cjk_fallback">成功且同时满足所有逐请求</span><span class="mord"> SLO </span><span class="mord cjk_fallback">的请求</span></span><span class="mclose">}</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span>
+<p>10 秒内，A 完成 100 请求、其中 70 合格；B 完成 90 请求、其中 85 合格。普通请求吞吐分别为 10、9 requests/s，Goodput 分别为 7、8.5 requests/s。若目标是最多的合格请求，选 B。</p>
+<p>分位数层面的业务约束与逐请求 Goodput 的统计口径应分别说明。知道 p95 TTFT 和 p95 TPOT，不能直接推出同时满足两项逐请求约束的请求比例。</p>
+<h2 id="9-pd-分离-用资源隔离换取-kv-交接">9. PD 分离：用资源隔离换取 KV 交接</h2>
+<h3 id="9-1-资源组一般是什么">9.1 资源组一般是什么</h3>
+<p>PD 分离把 Prefill、Decode 交给不同推理实例或资源池。常见实现是不同 GPU 集合，例如 Prefill 使用 GPU0/1，Decode 使用 GPU2/3；每组可以是一张卡或多张卡。它通常不是在一张 GPU 内简单把几个 SM 固定分给 P、剩余 SM 分给 D。</p>
+<p>两组都需要执行相应阶段的完整模型前向；每组整体持有或访问所需模型权重，而不是 P 只做前几层、D 只做后几层。它们可以采用不同的并行方式和资源配置。</p>
+<p>C 的 Prefill 与 A 的 Decode 可以在两个池中同时推进；但 C 自己仍需等待必要的 Prefill 结果及 KV 交接后，才能正常继续 Decode。请求之间可以并行，同一请求的依赖并未消失。</p>
+<h3 id="9-2-交接时间必须进入成本账">9.2 交接时间必须进入成本账</h3>
+<p>主例缓存大小 512 MiB=0.5 GiB，假设有效传输带宽 4 GiB/s，则：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>t</mi><mrow><mi>t</mi><mi>r</mi><mi>a</mi><mi>n</mi><mi>s</mi><mi>f</mi><mi>e</mi><mi>r</mi></mrow></msub><mo>=</mo><mn>0.5</mn><mi mathvariant="normal">/</mi><mn>4</mn><mtext> s</mtext><mo>=</mo><mn>125</mn><mtext> ms</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">t_{transfer}=0.5/4\text{ s}=125\text{ ms}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.9012em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">r</span><span class="mord mathnormal mtight">an</span><span class="mord mathnormal mtight">s</span><span class="mord mathnormal mtight" style="margin-right:0.10764em;">f</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">er</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">0.5/4</span><span class="mord text"><span class="mord"> s</span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">125</span><span class="mord text"><span class="mord"> ms</span></span><span class="mord">.</span></span></span></span></span>
+<p>同机可能通过 NVLink、PCIe 等传输，跨机器可能使用 RDMA 等方式；“有效带宽”需实际测量，不能直接用设备标称峰值。</p>
+<iframe class="transformer-interactive" data-widget="prefill-decode-handoff" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/prefill-decode-handoff.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="PD 分离与 KV 交接成本"></iframe>
+<p><a href="/content/interactive/inference-serving/prefill-decode-handoff.html?v=height-v2">单独打开此图</a></p>
+<p>若其他计算不变、传输无法隐藏，且只避免 20 ms 等待，125 ms 交接会让时间增加约 105 ms；若避免 200 ms 等待，则净减少约 75 ms。独立并行配置、调度变化、网络争用和传输重叠都可能改变结果。</p>
+<p>因此“PD 多一次传输，所以总耗时一定更长”以及“PD 分离一定更快”都不成立。更适合比较的是，在相同资源预算下，能否改善目标负载的 TTFT、ITL 和 SLO 内吞吐。</p>
+<h3 id="9-3-pd-与组批不是一个维度">9.3 PD 与组批不是一个维度</h3>
+<p>严格分离的 P/D 执行对不会再组成同一设备上的 P+D 混合 batch，但整个系统仍能组合多种机制：P 池组批多个 Prefill chunk；D 池对多个请求 Continuous Batching；系统也可以同时有共置池和分离池。</p>
+<p>Chunked Prefill 也可以用于 P 池。它改善调度粒度，并不天然提供硬件隔离。PD 的干扰隔离同样有边界：共享网络、主机或其他资源仍可能产生争用。</p>
+<h2 id="10-投机解码-一次目标前向验证多个候选">10. 投机解码：一次目标前向验证多个候选</h2>
+<h3 id="10-1-草稿-验证与提交是不同计数">10.1 草稿、验证与提交是不同计数</h3>
+<p>草稿模型提出 A、B、C、D；目标模型用因果遮罩一次计算验证所需的条件分布，并按位置顺序决定接受前缀。</p>
+<p>如果只接受 A、B，而第三个位置目标结果为 X，提交的是 A、B、X，共 3 个；不是只提交两个。C 后面的 D 原先建立在 S+A+B+C 上，不能直接当作 S+A+B+X 后的有效候选继续提交。</p>
+<p>如果四个草稿全部接受，在经典方案的一轮验证中，还可以从目标模型的下一位置分布采样 bonus token，最多提交 5 个。实际还受 EOS、输出长度上限和算法实现约束。</p>
+<iframe class="transformer-interactive" data-widget="speculative-decoding-greedy" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/speculative-decoding-greedy.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="草稿接受前缀、修正 token 与 bonus token"></iframe>
+<p><a href="/content/interactive/inference-serving/speculative-decoding-greedy.html?v=height-v2">单独打开此图</a></p>
+<p>验证 C 的条件分布是 p(C|S,A,B)。把 C 作为某位置输入后，该位置输出用于预测下一 token；不能把输入位置与被预测位置混淆。p 是目标模型的条件概率，不是一个抽象的“正确/错误概率”。</p>
+<h3 id="10-2-为什么高接受率才有收益">10.2 为什么高接受率才有收益</h3>
+<p>教学条件：草稿 4 ms、目标验证 12 ms，一轮总计 16 ms；普通 Decode 每 token 10 ms。</p>
+<table>
+<thead>
+<tr>
+<th align="right">接受草稿数</th>
+<th align="right">本轮提交数</th>
+<th align="right">普通方法产出同样数量的时间</th>
+<th align="right">投机时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">0</td>
+<td align="right">1 个修正 token</td>
+<td align="right">10 ms</td>
+<td align="right">16 ms，更慢</td>
+</tr>
+<tr>
+<td align="right">2</td>
+<td align="right">2 草稿+1 修正</td>
+<td align="right">30 ms</td>
+<td align="right">16 ms，更快</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td align="right">4 草稿+1 bonus</td>
+<td align="right">50 ms</td>
+<td align="right">16 ms，更快</td>
+</tr>
+</tbody></table>
+<p>比较时要按实际提交的有效输出数量，不能固定拿 4 个草稿对应的普通 40 ms 比较。16/5=3.2 ms/token 是本轮成本摊销，不代表用户每 3.2 ms 收到一个 token。</p>
+<iframe class="transformer-interactive" data-widget="speculative-decoding-cost" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/speculative-decoding-cost.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="接受率、提交数量与投机解码成本"></iframe>
+<p><a href="/content/interactive/inference-serving/speculative-decoding-cost.html?v=height-v2">单独打开此图</a></p>
+<p>收益还取决于草稿速度、验证代价、候选长度、上下文长度、batch 与剩余算力。高并发下目标设备已饱和时，投机额外计算未必有利。</p>
+<h3 id="10-3-随机采样版本不能直接照搬贪心对齐">10.3 随机采样版本不能直接照搬贪心对齐</h3>
+<p>经典精确投机采样：在同一条件前缀下，草稿 x 来自 q，目标分布为 p，接受概率为：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>α</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><mi>min</mi><mo>⁡</mo><mo stretchy="false">(</mo><mn>1</mn><mo separator="true">,</mo><mi>p</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mi mathvariant="normal">/</mi><mi>q</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">\alpha(x)=\min(1,p(x)/q(x)).</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop">min</span><span class="mopen">(</span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">p</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mord">/</span><span class="mord mathnormal" style="margin-right:0.03588em;">q</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">))</span><span class="mord">.</span></span></span></span></span>
+<p>若均匀随机数 u 不超过接受概率，则接受。首次拒绝后，从修正分布采样：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>r</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><mfrac><mrow><mi>max</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>p</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>−</mo><mi>q</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo separator="true">,</mo><mn>0</mn><mo stretchy="false">)</mo></mrow><mrow><munder><mo>∑</mo><mi>y</mi></munder><mi>max</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>p</mi><mo stretchy="false">(</mo><mi>y</mi><mo stretchy="false">)</mo><mo>−</mo><mi>q</mi><mo stretchy="false">(</mo><mi>y</mi><mo stretchy="false">)</mo><mo separator="true">,</mo><mn>0</mn><mo stretchy="false">)</mo></mrow></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">r(x)=\frac{\max(p(x)-q(x),0)}{\sum_y\max(p(y)-q(y),0)}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.5488em;vertical-align:-1.1218em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.427em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mop"><span class="mop op-symbol small-op" style="position:relative;top:0em;">∑</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.0017em;"><span style="top:-2.4003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">y</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.4358em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop">max</span><span class="mopen">(</span><span class="mord mathnormal">p</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">q</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">0</span><span class="mclose">)</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mop">max</span><span class="mopen">(</span><span class="mord mathnormal">p</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">q</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">0</span><span class="mclose">)</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.1218em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span>
+<p>例：p(A)=0.2、p(B)=0.8；q(A)=0.6、q(B)=0.4。</p>
+<ul>
+<li>草稿 A：接受率 1/3，u=0.2 接受，u=0.5 拒绝。</li>
+<li>拒绝 A 后：正残差为 (0,0.4)，归一化得到 (0,1)，修正 token 为 B。</li>
+<li>草稿 B：接受率 min(1,0.8/0.4)=1；u=0.9 也接受，不需要修正采样。</li>
+</ul>
+<p>按期望计，100 次草稿约提出 60 次 A、40 次 B；20 次 A 被接受、40 次 B 被接受、40 次拒绝修正为 B，最终为 20 A、80 B，与目标分布一致。这是分布一致，不保证与单独运行目标模型得到完全相同的随机序列。</p>
+<iframe class="transformer-interactive" data-widget="speculative-sampling-acceptance" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/speculative-sampling-acceptance.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="目标/草稿分布、接受概率与正残差修正"></iframe>
+<p><a href="/content/interactive/inference-serving/speculative-sampling-acceptance.html?v=height-v2">单独打开此图</a></p>
+<h2 id="11-flashattention-与-online-softmax">11. FlashAttention 与 Online Softmax</h2>
+<h3 id="11-1-省-s-p-的物化-不省有效-attention-的语义">11.1 省 S/P 的物化，不省有效 Attention 的语义</h3>
+<p>朴素 Attention 会把得分 S 和概率 P 等大中间矩阵写入 HBM，再由后续算子读取。FlashAttention 使用分块与片上计算，避免完整 S/P 的 HBM 存储和反复读写，仍计算有效位置的精确 Attention。不同浮点运算顺序可能产生数值差异，不应宣称逐位一致。</p>
+<p>FlashAttention 没有通过少看历史 token 来加速，也没有消除 KV Cache。稠密 Prefill 的 Attention 算术量仍为 O(N²d)；不能因为使用了 FlashAttention 就说计算复杂度降成线性。单 token Decode 的得分形状是 1×N，其数据访问和并行特点也与完整 Prefill 不同。</p>
+<iframe class="transformer-interactive" data-widget="flashattention-tiling" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/inference-serving/flashattention-tiling.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="FlashAttention 的得分分块与片上累计状态"></iframe>
+<p><a href="/content/interactive/inference-serving/flashattention-tiling.html?v=height-v2">单独打开此图</a></p>
+<h3 id="11-2-为什么分块-softmax-不能各块算完再平均">11.2 为什么分块 Softmax 不能各块算完再平均</h3>
+<p>对一个 Q，令 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>w</mi><mi>i</mi></msub><mo>=</mo><msup><mi>e</mi><msub><mi>s</mi><mi>i</mi></msub></msup></mrow><annotation encoding="application/x-tex">w_i=e^{s_i}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02691em;">w</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0269em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6644em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.6644em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">s</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3281em;"><span style="top:-2.357em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.143em;"><span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span>，暂时忽略数值稳定性：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo>=</mo><mfrac><mrow><munder><mo>∑</mo><mi>i</mi></munder><msub><mi>w</mi><mi>i</mi></msub><msub><mi>V</mi><mi>i</mi></msub></mrow><mrow><munder><mo>∑</mo><mi>i</mi></munder><msub><mi>w</mi><mi>i</mi></msub></mrow></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">O=\frac{\sum_iw_iV_i}{\sum_iw_i}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.4254em;vertical-align:-0.9857em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.4397em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mop"><span class="mop op-symbol small-op" style="position:relative;top:0em;">∑</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.162em;"><span style="top:-2.4003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2997em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02691em;">w</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0269em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.6897em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mop"><span class="mop op-symbol small-op" style="position:relative;top:0em;">∑</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.162em;"><span style="top:-2.4003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2997em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02691em;">w</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0269em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.22222em;">V</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.2222em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.9857em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span>
+<table>
+<thead>
+<tr>
+<th>块</th>
+<th>未归一化权重</th>
+<th>V</th>
+<th align="right">分母</th>
+<th align="right">分子</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>1、1</td>
+<td>2、4</td>
+<td align="right">2</td>
+<td align="right">6</td>
+</tr>
+<tr>
+<td>2</td>
+<td>3、3</td>
+<td>6、8</td>
+<td align="right">6</td>
+<td align="right">42</td>
+</tr>
+</tbody></table>
+<p>累计分母 8、分子 48，所以 O=6。块 1 自己的输出为 3，块 2 为 7，直接平均得到 5，是错的；两个块应按总权重 2 和 6 合并。</p>
+<h3 id="11-3-更新最大值时-旧累计值一起缩放">11.3 更新最大值时，旧累计值一起缩放</h3>
+<p>为避免指数溢出，Softmax 使用 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><msub><mi>s</mi><mi>i</mi></msub><mo>−</mo><mi>m</mi></mrow></msup></mrow><annotation encoding="application/x-tex">e^{s_i-m}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.7713em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7713em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">s</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3281em;"><span style="top:-2.357em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.143em;"><span></span></span></span></span></span></span><span class="mbin mtight">−</span><span class="mord mathnormal mtight">m</span></span></span></span></span></span></span></span></span></span></span></span>，其中 m 是当前已看见的最大得分。保存三个量：最大值 m、累计分母 ℓ、累计分子 z；实际 z 是与 V 同维度的向量，前面的标量例子只是简化。</p>
+<p>新块最大值为 m_b 时，更新：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>m</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mo>=</mo><mi>max</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>m</mi><mo separator="true">,</mo><msub><mi>m</mi><mi>b</mi></msub><mo stretchy="false">)</mo><mo separator="true">,</mo><mspace width="2em"></mspace><mi>a</mi><mo>=</mo><msup><mi>e</mi><mrow><mi>m</mi><mo>−</mo><msup><mi>m</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup></mrow></msup><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">m'=\max(m,m_b),\qquad a=e^{m-m'},</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8019em;"></span><span class="mord"><span class="mord mathnormal">m</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop">max</span><span class="mopen">(</span><span class="mord mathnormal">m</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal">m</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">b</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">a</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.1869em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9925em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">m</span><span class="mbin mtight">−</span><span class="mord mtight"><span class="mord mathnormal mtight">m</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8278em;"><span style="top:-2.931em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="mpunct">,</span></span></span></span></span>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi mathvariant="normal">ℓ</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mo>=</mo><mi>a</mi><mi mathvariant="normal">ℓ</mi><mo>+</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mtext>新块</mtext></mrow></munder><msup><mi>e</mi><mrow><msub><mi>s</mi><mi>i</mi></msub><mo>−</mo><msup><mi>m</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup></mrow></msup><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">\ell'=a\ell+\sum_{i\in\text{新块}}e^{s_i-m'},</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8019em;"></span><span class="mord"><span class="mord">ℓ</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7778em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">a</span><span class="mord">ℓ</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:2.3717em;vertical-align:-1.3217em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.8557em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">i</span><span class="mrel mtight">∈</span><span class="mord text mtight"><span class="mord cjk_fallback mtight">新块</span></span></span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.3217em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9925em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">s</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3281em;"><span style="top:-2.357em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.143em;"><span></span></span></span></span></span></span><span class="mbin mtight">−</span><span class="mord mtight"><span class="mord mathnormal mtight">m</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8278em;"><span style="top:-2.931em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="mpunct">,</span></span></span></span></span>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>z</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mo>=</mo><mi>a</mi><mi>z</mi><mo>+</mo><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mtext>新块</mtext></mrow></munder><msup><mi>e</mi><mrow><msub><mi>s</mi><mi>i</mi></msub><mo>−</mo><msup><mi>m</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup></mrow></msup><msub><mi>V</mi><mi>i</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mi>O</mi><mo>=</mo><msup><mi>z</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mi mathvariant="normal">/</mi><msup><mi mathvariant="normal">ℓ</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">z'=az+\sum_{i\in\text{新块}}e^{s_i-m'}V_i,\qquad O=z'/\ell'.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8019em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.04398em;">z</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">a</span><span class="mord mathnormal" style="margin-right:0.04398em;">z</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:2.3717em;vertical-align:-1.3217em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.05em;"><span style="top:-1.8557em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">i</span><span class="mrel mtight">∈</span><span class="mord text mtight"><span class="mord cjk_fallback mtight">新块</span></span></span></span></span><span style="top:-3.05em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.3217em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9925em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight">s</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3281em;"><span style="top:-2.357em;margin-left:0em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.143em;"><span></span></span></span></span></span></span><span class="mbin mtight">−</span><span class="mord mtight"><span class="mord mathnormal mtight">m</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8278em;"><span style="top:-2.931em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.22222em;">V</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.2222em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.0519em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.04398em;">z</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mord">/</span><span class="mord"><span class="mord">ℓ</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<p>旧值需要缩放，因为之前减的是旧 m；新块直接按新 m′ 计算，无需重复调整。</p>
+<p>会话中的练习：旧 m=2、ℓ=2、z=8，新块只有 s=4、V=10，则 m′=4、a=e⁻²，新权重为 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><mn>4</mn><mo>−</mo><mn>4</mn></mrow></msup></mrow><annotation encoding="application/x-tex">e^{4-4}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span><span class="mbin mtight">−</span><span class="mord mtight">4</span></span></span></span></span></span></span></span></span></span></span></span>=e⁰=1，因此：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi mathvariant="normal">ℓ</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mo>=</mo><mn>2</mn><msup><mi>e</mi><mrow><mo>−</mo><mn>2</mn></mrow></msup><mo>+</mo><mn>1</mn><mo separator="true">,</mo><mspace width="2em"></mspace><msup><mi>z</mi><mo lspace="0em" mathvariant="normal" rspace="0em">′</mo></msup><mo>=</mo><mn>8</mn><msup><mi>e</mi><mrow><mo>−</mo><mn>2</mn></mrow></msup><mo>+</mo><mn>1</mn><mo>×</mo><mn>10.</mn></mrow><annotation encoding="application/x-tex">\ell'=2e^{-2}+1,\qquad z'=8e^{-2}+1\times10.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8019em;"></span><span class="mord"><span class="mord">ℓ</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.9474em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">−</span><span class="mord mtight">2</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.9963em;vertical-align:-0.1944em;"></span><span class="mord">1</span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.04398em;">z</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8019em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.9474em;vertical-align:-0.0833em;"></span><span class="mord">8</span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">−</span><span class="mord mtight">2</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">10.</span></span></span></span></span>
+<p>我最初把 e⁻² 乘到了新块上，应当改为缩放旧累计值。之后若出现得分 6，当前两项都已经属于旧累计结果，应把整个 (2e⁻²+1) 乘 e^{4-6}，再加新块贡献。若新块最大值只有 1，最大值仍是 2，缩放系数 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><mn>2</mn><mo>−</mo><mn>2</mn></mrow></msup></mrow><annotation encoding="application/x-tex">e^{2-2}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span><span class="mbin mtight">−</span><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></span>=1，旧值不变。</p>
+<h3 id="11-4-当前-q-的累计状态不能代替历史-kv">11.4 当前 Q 的累计状态不能代替历史 KV</h3>
+<p>这些累计状态属于当前 Q。下一个 Q 改变后，QKᵀ 得分改变，历史 V 的权重也改变，不能直接复用上一 Q 的分子和分母，跳过历史 K/V。</p>
+<table>
+<thead>
+<tr>
+<th>技术</th>
+<th>主要复用或优化的对象</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>KV Cache</td>
+<td>历史位置在各层的 K/V</td>
+</tr>
+<tr>
+<td>PagedAttention</td>
+<td>KV 的物理分配、寻址与共享管理</td>
+</tr>
+<tr>
+<td>Prefix Cache</td>
+<td>兼容请求的相同前缀 KV</td>
+</tr>
+<tr>
+<td>FlashAttention</td>
+<td>一次 Attention 内中间结果的存储与读写</td>
+</tr>
+</tbody></table>
+<h2 id="12-量化-按需分配与历史重计算">12. 量化、按需分配与历史重计算</h2>
+<h3 id="12-1-权重量化和-kv-量化不是同一件事">12.1 权重量化和 KV 量化不是同一件事</h3>
+<p>权重量化减少模型参数存储；KV 量化减少缓存元素存储。一个实例中的请求通常共享权重，而 KV 随请求数量和上下文增长。收益应同时评估量化格式、元数据、反量化代价与输出质量。</p>
+<p>独立显存练习：总显存 24 GiB、权重 14 GiB、其他固定开销 2 GiB、每请求 KV 1 GiB。原配置可容纳 8 个请求；仅权重降到 7 GiB，可容纳 15 个；仅每请求 KV 降到 0.5 GiB、权重不变，可容纳 16 个。权重占用减半不等于并发翻倍。</p>
+<h3 id="12-2-我的-只保留最新-kv-究竟指什么">12.2 我的“只保留最新 KV”究竟指什么</h3>
+<p>会话里我提出：“可以不一定每个请求都保存完整的 KV……只保存最新的。”这句话最初被理解成删除历史后不再参与 Attention。我的后续澄清是：<strong>只保留最新的 KV，之前的在需要时重新计算。</strong></p>
+<p>这是用计算换显存的可行思路，不能记录成“错误地认为历史 KV 不需要”。应区分三个方案：</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>是否保留完整上下文语义</th>
+<th>主要代价或限制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>按当前实际长度分配，不预留最大长度</td>
+<td>可以</td>
+<td>管理开销，实际 KV 数据仍存在</td>
+</tr>
+<tr>
+<td>缺失历史 KV 时正确重计算</td>
+<td>可以</td>
+<td>重复前向计算、Decode 延迟、临时显存</td>
+</tr>
+<tr>
+<td>丢弃历史 KV 且不再重建</td>
+<td>普通完整 Attention 下不等价</td>
+<td>上下文可见性改变</td>
+</tr>
+</tbody></table>
+<p>深层历史 KV 依赖此前上下文表示，重建通常需要执行相应前缀计算，不是只拿历史 embedding 乘一次 K/V 投影。重计算也不是零显存：如果先重建所有历史 KV，再一起使用，仍会产生临时存储需求；是否分块生成并及时释放、如何组批，会影响峰值。</p>
+<p>还可以把部分缓存放到 CPU 等存储，再按需传回，但这属于 offload，代价主要是传输与调度，和重新计算不同。实际滑动窗口模型可按模型规定只看窗口；不能无条件将完整 Attention 模型改成窗口后仍宣称语义相同。</p>
+<p>题目“没有做 KV 量化”是初始条件，不是禁止提出量化。KV 量化本身可以做；若此前表述让人理解为不能量化，应修正这一点。</p>
+<h2 id="13-怎样公平比较-vllm-与-sglang">13. 怎样公平比较 vLLM 与 SGLang</h2>
+<h3 id="13-1-固定外部条件-允许合理内部调优">13.1 固定外部条件，允许合理内部调优</h3>
+<p>比较前，先确定目标是单请求延迟、饱和吞吐、SLO 内吞吐，还是成本。不能先看一张吞吐表再倒推业务目标。</p>
+<p>应记录和控制：</p>
+<ol>
+<li>模型与语义：相同权重、tokenizer、chat template、精度、输出约束与采样配置；量化和投机方案若不同，需明确质量与额外资源条件。</li>
+<li>硬件预算：GPU 型号和数量、拓扑、主机与网络；草稿模型或 PD 额外资源也要计入，不能只比较目标模型卡数。</li>
+<li>工作负载：相同请求或输入/输出长度分布、共享前缀比例、上下文和输出长度限制。相同平均长度不等于相同长尾负载。</li>
+<li>缓存与预热：运行时预热与 Prefix Cache 状态分别管理。</li>
+<li>加压方式：到达速率、并发数、突发方式、测试时长与错误处理。</li>
+<li>指标口径：TTFT、ITL、TPOT、E2E、失败率、分位数与 Goodput；保存逐请求数据。</li>
+<li>可重复性：固定软件版本，记录关键参数，重复测试并检查波动。允许各引擎在同一资源和业务约束内分别调优，不要求内部参数逐项完全相同。</li>
+</ol>
+<h3 id="13-2-预热不等于没有缓存命中">13.2 预热不等于没有缓存命中</h3>
+<p>模型加载、编译、kernel 准备等运行时预热可以排除初始化影响；用测试 prompt 预热，则可能把它的 KV 留进 Prefix Cache。</p>
+<p>无前缀复用场景可在运行时预热后清空前缀缓存，或在两边关闭前缀缓存；还要避免正式测试内出现未设计的相同前缀。有前缀复用场景则保持相同共享前缀分布与缓存准备条件，并单独报告命中情况。</p>
+<p>4096-token prompt 只修改最后一个 token，前 4095 个位置仍相同。假设仅完整块可复用且 S=16，可命中前 4080 个位置、255 个完整块，剩 16 个位置重新处理。“请求不完全相同”不能保证冷缓存。</p>
+<h3 id="13-3-固定并发与固定到达速率">13.3 固定并发与固定到达速率</h3>
+<p>固定并发：始终保持指定数量的在途请求，完成一个再补一个；服务越快，客户端自动发送得越快。</p>
+<p>固定到达速率：按设定速率发请求，不因旧请求尚未完成而自动停发。若实际处理能力 8 requests/s，到达 10 requests/s，且无拒绝、超时或背压，则队列平均每秒增加约 2 个请求，后续 TTFT 持续增加。</p>
+<p>要逐步提高负载，观察吞吐与延迟曲线。不能把发送速率当成成功完成吞吐，也不能把过载时 TTFT 变长直接归因于 Prefill 算子变慢。</p>
+<h3 id="13-4-面试回答范例">13.4 面试回答范例</h3>
+<blockquote>
+<p>我会先确定线上 SLO 与资源预算，统一模型、精度、硬件和请求长度及前缀分布。运行时预热后，分别控制未命中和命中前缀缓存的场景。用固定到达速率和固定并发方式逐步加压，记录 TTFT、TPOT、ITL、E2E、失败率和满足要求的有效吞吐。允许两个引擎分别合理调优，保存版本与配置，重复验证后，选择目标负载下有效吞吐更高的方案。</p>
+</blockquote>
+<p>本文没有根据虚构数据给 vLLM 或 SGLang 排名，也没有把本轮原理复习当成对两者源码的完整审计。</p>
+<h2 id="14-回到主例-一条请求怎样串起所有优化">14. 回到主例：一条请求怎样串起所有优化</h2>
+<table>
+<thead>
+<tr>
+<th>主例中的问题</th>
+<th>处理路径</th>
+<th>需要验证的边界</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A 每轮继续生成</td>
+<td>计算新 Q/K/V，读取历史 KV</td>
+<td>不重算历史 Q；缓存位置数随处理新位置增长</td>
+</tr>
+<tr>
+<td>4096-position KV 多大</td>
+<td>128 KiB/token，512 MiB/request</td>
+<td>H_KV 与 H_Q、单请求与 batch 合计不能混淆</td>
+</tr>
+<tr>
+<td>缓存物理分配不连续</td>
+<td>16-position 逻辑块与 block table</td>
+<td>减少碎片，不压缩实际数据</td>
+</tr>
+<tr>
+<td>B 共享 A 的前 64 个位置</td>
+<td>复用 4 个块、8 MiB 前缀</td>
+<td>后续 Decode 仍读历史；兼容性与边界处理依实现</td>
+</tr>
+<tr>
+<td>短请求完成、C 等待</td>
+<td>iteration 边界重组 batch</td>
+<td>slot 不等于 KV 地址；C 先建立 Prefill 状态</td>
+</tr>
+<tr>
+<td>C 的 2000-token Prefill 干扰 A</td>
+<td>拆成四个 500-token chunk，考虑混合 batch</td>
+<td>数学结果与资源组织分开；分块不保证零干扰</td>
+</tr>
+<tr>
+<td>A 的输出出现长停顿</td>
+<td>看 ITL 分布与尾部，不只看平均 TPOT</td>
+<td>A 已开始生成，不能把这里的首个示意点当其 TTFT</td>
+</tr>
+<tr>
+<td>干扰仍难控制</td>
+<td>评估 PD 资源池与 KV 交接</td>
+<td>0.5 GiB/4 GiB/s=125 ms，额外传输是否值得</td>
+</tr>
+<tr>
+<td>Decode 目标前向重复多</td>
+<td>草稿+并行验证+顺序接受</td>
+<td>成本按有效提交数计算；接受率与负载决定收益</td>
+</tr>
+<tr>
+<td>Attention 中间数据搬运多</td>
+<td>FlashAttention 与 Online Softmax</td>
+<td>精确语义；不消除 KV，不把复杂度误写为线性</td>
+</tr>
+<tr>
+<td>KV 实际需求仍超预算</td>
+<td>量化、降低活跃并发、重计算或 offload</td>
+<td>显存、计算、传输和质量分别评估</td>
+</tr>
+<tr>
+<td>需要上线选择引擎</td>
+<td>相同条件下扫描负载并统计 Goodput</td>
+<td>不用最高裸吞吐替代业务要求</td>
+</tr>
+</tbody></table>
+<p>对于“首 token 很慢，开始后输出顺畅”，先拆分排队、Prefill 与其他开销。教学例 TTFT=800 ms 排队+150 ms Prefill+50 ms 其他=1000 ms；Prefill 减半后为 925 ms，而排队降到 200 ms 后为 400 ms。TTFT 不总由 Prefill 主导，投机解码也不是这类问题的默认答案。</p>
+<h2 id="15-我的易错回答-以及应该怎样修正">15. 我的易错回答，以及应该怎样修正</h2>
+<p>以下保留会话中真实出现的理解偏差与不完整回答。已经澄清的合理方案单独说明，不把它们继续列为错误。</p>
+<table>
+<thead>
+<tr>
+<th>当时的回答或理解</th>
+<th>不够准确的地方</th>
+<th>复习时的正确表述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>“KV 都是 token 自己拥有的，与其他 token 无关”</td>
+<td>忽略深层表示对前文的依赖</td>
+<td>追加不改因果历史；修改前缀会影响后续层 KV</td>
+</tr>
+<tr>
+<td>“省掉之前算好的 KV，保留新 token 的 QKV”</td>
+<td>漏掉新 token 的 Attention、MLP 与历史读取</td>
+<td>避免历史前向重算，新位置完整计算与历史 KV 访问仍存在</td>
+</tr>
+<tr>
+<td>用包含 B=2 的大小推单请求容量</td>
+<td>把 batch 合计当每请求</td>
+<td>主例单请求 512 MiB，B=2 合计 1 GiB；8 GiB 可放16请求</td>
+</tr>
+<tr>
+<td>token 序号、索引、块号混用</td>
+<td>没先做 n−1</td>
+<td>先 i=n−1，再整除求块号、取模求偏移</td>
+</tr>
+<tr>
+<td>“C 走槽位2，所以可以加入”</td>
+<td>把执行位置当资源或 KV 地址</td>
+<td>batch成员可在轮次边界更新；槽位与KV地址解耦</td>
+</tr>
+<tr>
+<td>“分 chunk 就不影响 A”</td>
+<td>粒度控制不等于资源隔离</td>
+<td>C仍消耗算力与带宽，混合迭代可能变长</td>
+</tr>
+<tr>
+<td>“组批就是 A、C 交替进行”</td>
+<td>串行独立前向与混合前向不同</td>
+<td>看每层是否共同处理A+C，而不只看两请求是否都推进</td>
+</tr>
+<tr>
+<td>“这两种方式其实一样”</td>
+<td>数学结果相同不代表执行组织相同</td>
+<td>kernel启动、权重访问、矩阵形状与利用率不同</td>
+</tr>
+<tr>
+<td>ITL 回答“5、85、5”</td>
+<td>未沿实际输出时刻依次相减</td>
+<td>5/90/95/100的ITL为85/5/5；均值95/3</td>
+</tr>
+<tr>
+<td>整体等待偏移后认为 TTFT 不变、TPOT 变小</td>
+<td>混淆请求起点与相邻输出间隔</td>
+<td>全部时刻等量推迟：TTFT/E2E增加，TPOT不变</td>
+</tr>
+<tr>
+<td>SLO内回答“batch1、4”</td>
+<td>给出了合格集合，未完成吞吐最优选择</td>
+<td>都合格，但在该表中最高合格吞吐是batch4</td>
+</tr>
+<tr>
+<td>投机拒绝第三个后“只提交前两个”</td>
+<td>少算目标修正 token</td>
+<td>经典方案提交A、B、X共3个</td>
+</tr>
+<tr>
+<td>第一位置拒绝时拿普通40ms比较</td>
+<td>用草稿长度代替实际产出</td>
+<td>本轮仅提交1个，对照普通10ms；16ms投机更慢</td>
+</tr>
+<tr>
+<td>选p(C|S,A,B)，理由是“预测是否正确”</td>
+<td>条件分布不是二分类正确率</td>
+<td>p是目标模型在该前缀下生成各token的分布</td>
+</tr>
+<tr>
+<td>“先热身一遍”解决缓存公平性</td>
+<td>同prompt预热可能制造命中</td>
+<td>运行时预热与前缀缓存状态分别控制</td>
+</tr>
+<tr>
+<td>Goodput算7、8.5，漏普通吞吐</td>
+<td>未完整回答两种指标</td>
+<td>普通10、9；有效7、8.5 requests/s</td>
+</tr>
+<tr>
+<td>“正常TTFT最大占比就是Prefill”</td>
+<td>高负载可能主要在排队</td>
+<td>先测量请求耗时分解，不能默认瓶颈</td>
+</tr>
+<tr>
+<td>最大值更新时把e⁻²乘新块</td>
+<td>缩放方向反了</td>
+<td>旧分母2e⁻²+1；旧分子8e⁻²+10</td>
+</tr>
+<tr>
+<td>单token Decode先写“4097、4097”</td>
+<td>历史K数量误作Q行数</td>
+<td>1×4097；历史只增加列，不重新产生历史Q行</td>
+</tr>
+<tr>
+<td>“Flash只加快读写，不能降低显存占用”</td>
+<td>忽略减少S/P物化</td>
+<td>可减少Attention中间存储，但不直接缩小KV本身</td>
+</tr>
+<tr>
+<td>12GiB实际KV、8GiB预算回答“不一定能”</td>
+<td>明确数据下不应保留模糊性</td>
+<td>无共享/压缩/重计算时，不能全部驻GPU</td>
+</tr>
+</tbody></table>
+<p>最终澄清：“只保留最新 KV，之前重新算”是可行的计算换显存方案；我理解历史 K/V 供当前 Q 使用。此前教学把这句话解释为永久丢弃历史，是沟通误读，不是需要继续纠正的知识错误。</p>
+<h2 id="16-我主动追问的问题">16. 我主动追问的问题</h2>
+<h3 id="问-pd-的不同-gpu-资源组-是不同卡还是-sm">问：PD 的不同 GPU 资源组，是不同卡还是 SM？</h3>
+<p>答：常见 PD 分离指不同实例使用不同 GPU 集合，可每组单卡或多卡；通常不是简单把一张卡的 SM 切成 P/D 两组。具体实现可能有其他共享方式，不能靠“组”这个词推断硬件隔离。</p>
+<h3 id="问-pd-多了-kv-交接-所以-prefill-decode-总耗时一定更长吗">问：PD 多了 KV 交接，所以 Prefill+Decode 总耗时一定更长吗？</h3>
+<p>答：在计算不变、没有竞争且传输不能隐藏时，会多出交接成本。在线负载下，避免的等待、不同并行配置与资源争用变化可能超过交接成本，所以总体结论需要实测。</p>
+<h3 id="问-之前的串行时间图属于未分离状态吗-a-decode-和-c-prefill-能同时进行吗">问：之前的串行时间图属于未分离状态吗？A Decode 和 C Prefill 能同时进行吗？</h3>
+<p>答：那张图明确假设同资源串行执行，是解释分块如何缩短一次阻塞的教学模型。共置混合 batch 可以在同一模型前向推进 A/C，不等于全部 kernel 物理并行；PD 两池可独立推进两请求，但 C 的自身 Decode 仍依赖其 Prefill。</p>
+<h3 id="问-共置混批与-pd-分离无法共存吗">问：共置混批与 PD 分离无法共存吗？</h3>
+<p>答：同一严格隔离的 P/D 执行对不会又属于同一设备的混合batch；整个系统可以同时有不同池。P池可组批/分块，D池可Continuous Batching，组批技术并没有被PD禁用。</p>
+<h3 id="问-串行交错与混合-batch-感觉一样-为什么要区分">问：串行交错与混合 batch 感觉一样，为什么要区分？</h3>
+<p>答：串行是完成一请求的全部层后，再完成另一请求；混合是同一层处理两请求后进入下一层。它们的逐请求数学结果可相同，但执行边界和资源复用不同。</p>
+<h3 id="问-为什么-e4-4e-4-4-e4-4-1-新加的1和1-10不用缩放">问：为什么 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><mn>4</mn><mo>−</mo><mn>4</mn></mrow></msup></mrow><annotation encoding="application/x-tex">e^{4-4}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span><span class="mbin mtight">−</span><span class="mord mtight">4</span></span></span></span></span></span></span></span></span></span></span></span>=1？新加的1和1×10不用缩放？</h3>
+<p>答：新块使用更新后的最大值4，得分也为4，所以指数为0，e⁰=1。它已在新尺度下，无需重复缩放；若下一块把最大值提高到6，现在的所有累计贡献都变成旧值，需整体乘<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><mn>4</mn><mo>−</mo><mn>6</mn></mrow></msup></mrow><annotation encoding="application/x-tex">e^{4-6}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span><span class="mbin mtight">−</span><span class="mord mtight">6</span></span></span></span></span></span></span></span></span></span></span></span>。</p>
+<h3 id="问-能否只保存最新-kv-历史按需重算-之前不是不能量化吗">问：能否只保存最新 KV，历史按需重算？之前不是不能量化吗？</h3>
+<p>答：正确重算可保留语义，但增加前缀计算与临时显存，需衡量Decode代价。KV量化本身可用，“题设未量化”不是禁止提出量化。记录这次追问时应保留我的最终澄清。</p>
+<h2 id="17-自测题与参考答案">17. 自测题与参考答案</h2>
+<p>建议先遮住答案。计算题说明单位；场景题说清条件、瓶颈、措施与代价，不只背技术名称。</p>
+<h3 id="题1-为什么只缓存-k-v-通常不缓存历史-q">题1：为什么只缓存 K/V，通常不缓存历史 Q？</h3>
+<p><strong>答案：</strong> 当前输出使用新Q读取历史K/V；历史Q是旧位置的查询，普通Decode不需要重算旧位置输出。新token的Q仍需计算。</p>
+<h3 id="题2-100-token-prompt处理完-采样得到y₁-处理y₁时有多少kv位置">题2：100-token prompt处理完，采样得到y₁；处理y₁时有多少KV位置？</h3>
+<p><strong>答案：</strong> 加上y₁自己的K/V后通常是101。随后采样的y₂尚未前向，不能提前计入缓存。</p>
+<h3 id="题3-主例b-3-t-4096的kv是多少-8gib预算在t-8192时理论可容纳多少请求">题3：主例B=3、T=4096的KV是多少？8GiB预算在T=8192时理论可容纳多少请求？</h3>
+<p><strong>答案：</strong> 3×512MiB=1536MiB=1.5GiB；T翻倍后单请求1GiB，可容纳8请求。不含其他开销。</p>
+<h3 id="题4-s-16-40个token需要几块-多少尾部空槽-第40个token在哪里">题4：S=16，40个token需要几块、多少尾部空槽？第40个token在哪里？</h3>
+<p><strong>答案：</strong> ceil(40/16)=3块，3×16−40=8空槽；索引39，L2，偏移7。</p>
+<h3 id="题5-i-36-s-16-l2-p11-读哪里-第49个token新增时-旧块要搬吗">题5：i=36，S=16，L2→P11，读哪里？第49个token新增时，旧块要搬吗？</h3>
+<p><strong>答案：</strong> L2、offset4，读取P11对应位置；第49个token索引48位于L3、offset0，需要新块但旧块不用搬。</p>
+<h3 id="题6-a-a-b-c-d-b-a-x-c-d-哪些位置的整套kv可直接复用">题6：A=a b c d，B=a x c d，哪些位置的整套KV可直接复用？</h3>
+<p><strong>答案：</strong> 相同前缀a；后续c/d的深层KV受不同前文影响，不能只按token相同复用。物理块粒度可能进一步限制复用。</p>
+<h3 id="题7-主例b共享64token-s-16-可复用几块-主要省哪个阶段">题7：主例B共享64token、S=16，可复用几块？主要省哪个阶段？</h3>
+<p><strong>答案：</strong> 4完整块、8MiB；主要省Prefill，不省新Q对有效历史KV的读取。</p>
+<h3 id="题8-continuous-batching换掉b-会不会让a丢缓存-c没prefill能直接加入正常decode吗">题8：Continuous Batching换掉B，会不会让A丢缓存？C没Prefill能直接加入正常Decode吗？</h3>
+<p><strong>答案：</strong> 不会，执行slot与KV地址解耦；不能，C需要建立或正确重建历史KV。加入batch不消除依赖。</p>
+<h3 id="题9-混合batch含a的1个decode位置与c的500个prefill位置-线性层有多少输入位置-是否允许a关注c">题9：混合batch含A的1个Decode位置与C的500个Prefill位置，线性层有多少输入位置？是否允许A关注C？</h3>
+<p><strong>答案：</strong> 合计501；不同请求Attention上下文隔离，不能相互关注。</p>
+<h3 id="题10-a输出时刻5-90-95-100ms-itl与平均tpot是多少">题10：A输出时刻5/90/95/100ms，ITL与平均TPOT是多少？</h3>
+<p><strong>答案：</strong> 85/5/5ms；(100−5)/(4−1)=95/3≈31.67ms。</p>
+<h3 id="题11-到达0-输出100-130-160-190ms-全体推迟50ms-ttft-tpot-e2e呢">题11：到达0，输出100/130/160/190ms，全体推迟50ms，TTFT、TPOT、E2E呢？</h3>
+<p><strong>答案：</strong> 150ms、30ms、240ms；排队偏移不改变相邻输出间隔。</p>
+<h3 id="题12-10秒完成20请求-每请求50个输出token-两种吞吐是多少">题12：10秒完成20请求，每请求50个输出token，两种吞吐是多少？</h3>
+<p><strong>答案：</strong> 2requests/s；100output tokens/s。不能用单请求1/TPOT替代整体吞吐。</p>
+<h3 id="题13-batch1-4-8的吞吐为50-160-220-p95tpot为20-25-45ms-预算-30ms选谁">题13：batch1/4/8的吞吐为50/160/220，p95TPOT为20/25/45ms，预算≤30ms选谁？</h3>
+<p><strong>答案：</strong> 合格集合为1和4；追求最高合格吞吐选4。</p>
+<h3 id="题14-10秒内a成功100-合格70-b成功90-合格85-普通吞吐与goodput">题14：10秒内A成功100、合格70；B成功90、合格85，普通吞吐与Goodput？</h3>
+<p><strong>答案：</strong> A为10与7；B为9与8.5requests/s；合格请求最多选B。</p>
+<h3 id="题15-到达10requests-s-处理8-无拒绝或超时-队列与ttft怎样变">题15：到达10requests/s、处理8，无拒绝或超时，队列与TTFT怎样变？</h3>
+<p><strong>答案：</strong> 平均每秒积累约2请求，后续等待和TTFT增大；不表示Prefill算子本身变慢。</p>
+<h3 id="题16-ttft由800ms排队-150msprefill-50ms其他组成-prefill降到75或排队降到200-结果">题16：TTFT由800ms排队、150msPrefill、50ms其他组成。Prefill降到75或排队降到200，结果？</h3>
+<p><strong>答案：</strong> 分别925ms和400ms，后一目标收益更大；实现减少排队仍需具体资源或调度措施。</p>
+<h3 id="题17-把最大batch从8调到32-一定同时改善ttft-tpot和goodput吗">题17：把最大batch从8调到32，一定同时改善TTFT、TPOT和Goodput吗？</h3>
+<p><strong>答案：</strong> 不一定。吞吐可能提高、排队可能减少，单轮工作和输出间隔也可能增大；超过SLO时Goodput可能下降。</p>
+<h3 id="题18-512mib-kv以4gib-s交接需要多久-避免20ms或200ms等待时的净变化">题18：512MiB KV以4GiB/s交接需要多久？避免20ms或200ms等待时的净变化？</h3>
+<p><strong>答案：</strong> 125ms；其他不变且不重叠时，分别多105ms、少75ms。</p>
+<h3 id="题19-pd让c的prefill与a的decode并行-是否也让c在prefill未就绪时decode">题19：PD让C的Prefill与A的Decode并行，是否也让C在Prefill未就绪时Decode？</h3>
+<p><strong>答案：</strong> 否，不同请求可并行，同一请求仍有数据依赖。</p>
+<h3 id="题20-草稿abcd接受ab-第三位置被修正为x-提交几个-全接受时呢">题20：草稿ABCD接受AB，第三位置被修正为X，提交几个？全接受时呢？</h3>
+<p><strong>答案：</strong> 经典方案提交ABX共3个；全接受可加bonus，共5个，受终止条件约束。</p>
+<h3 id="题21-投机总16ms-普通10ms-token-首次拒绝时哪个更快-接受2个时呢">题21：投机总16ms、普通10ms/token，首次拒绝时哪个更快？接受2个时呢？</h3>
+<p><strong>答案：</strong> 首次拒绝仅产1个，普通10ms比16快；接受2个加修正产3个，普通30ms比16慢。</p>
+<h3 id="题22-验证草稿c用p-c-s-p-c-s-a-还是p-c-s-a-b">题22：验证草稿C用p(C|S)、p(C|S,A)还是p(C|S,A,B)？</h3>
+<p><strong>答案：</strong> p(C|S,A,B)，即在此前候选前缀下的目标条件分布。</p>
+<h3 id="题23-p-0-2-0-8-q-0-6-0-4-草稿a接受率-拒绝后修正分布-草稿b呢">题23：p=(0.2,0.8)、q=(0.6,0.4)，草稿A接受率、拒绝后修正分布？草稿B呢？</h3>
+<p><strong>答案：</strong> A接受率1/3；正残差(0,0.4)归一化为(0,1)，修正B。草稿B接受率1，不进行拒绝修正。</p>
+<h3 id="题24-flashattention删掉了s-p的计算吗-删掉kv了吗">题24：FlashAttention删掉了S/P的计算吗？删掉KV了吗？</h3>
+<p><strong>答案：</strong> 都没有。它避免完整S/P物化与大量HBM读写，逐块完成有效Attention；历史KV仍需提供。</p>
+<h3 id="题25-两块权重-1-1-3-3-v-2-4-6-8-最终输出是多少">题25：两块权重(1,1)/(3,3)，V(2,4)/(6,8)，最终输出是多少？</h3>
+<p><strong>答案：</strong> 分母8、分子48、输出6；不能把块输出3和7直接平均为5。</p>
+<h3 id="题26-旧m-2-ℓ-2-z-8-新位置s-4-v-10-更新公式">题26：旧m=2、ℓ=2、z=8，新位置s=4、V=10，更新公式？</h3>
+<p><strong>答案：</strong> m′=4，a=e⁻²；ℓ′=2e⁻²+1，z′=8e⁻²+10。新权重<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><mn>4</mn><mo>−</mo><mn>4</mn></mrow></msup></mrow><annotation encoding="application/x-tex">e^{4-4}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span><span class="mbin mtight">−</span><span class="mord mtight">4</span></span></span></span></span></span></span></span></span></span></span></span>=1。</p>
+<h3 id="题27-下一块最大值6时-之前新加的1需要一起缩放吗-最大值没变时呢">题27：下一块最大值6时，之前新加的1需要一起缩放吗？最大值没变时呢？</h3>
+<p><strong>答案：</strong> 要，整个旧累计值乘<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>e</mi><mrow><mn>4</mn><mo>−</mo><mn>6</mn></mrow></msup></mrow><annotation encoding="application/x-tex">e^{4-6}</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span><span class="mbin mtight">−</span><span class="mord mtight">6</span></span></span></span></span></span></span></span></span></span></span></span>；最大值不变时旧值乘1，无需改变。</p>
+<h3 id="题28-当前总k位置8192-单token-decode得分矩阵有几行几列">题28：当前总K位置8192，单token Decode得分矩阵有几行几列？</h3>
+<p><strong>答案：</strong> 1行8192列。旧Q不重新计算；若多个Q位置一起处理，行数才相应增加。</p>
+<h3 id="题29-下一q能直接复用上一q的online-softmax分子-分母而不读历史kv吗">题29：下一Q能直接复用上一Q的Online Softmax分子、分母而不读历史KV吗？</h3>
+<p><strong>答案：</strong> 不能。Q改变，历史位置的得分和V权重改变；上一Q的累计状态不通用。</p>
+<h3 id="题30-24gib总显存-14gib权重-2gib其他-每请求kv1gib-原配置-权重7gib-kv0-5gib各能放几请求">题30：24GiB总显存、14GiB权重、2GiB其他、每请求KV1GiB，原配置/权重7GiB/KV0.5GiB各能放几请求？</h3>
+<p><strong>答案：</strong> 8、15、16；两种量化的作用对象不同。</p>
+<h3 id="题31-8gib-kv预算-12请求各实际1gib-paged-flash保证放得下吗-可怎样处理">题31：8GiB KV预算、12请求各实际1GiB，Paged+Flash保证放得下吗？可怎样处理？</h3>
+<p><strong>答案：</strong> 不可全部驻GPU；可限制活跃并发、KV量化、增加预算，或设计按需重计算/offload。后两者减少驻留但引入计算/传输与临时存储代价。</p>
+<h3 id="题32-只保留最新kv-历史重算-与永久丢弃历史有什么区别">题32：只保留最新KV、历史重算，与永久丢弃历史有什么区别？</h3>
+<p><strong>答案：</strong> 正确重算能提供完整Attention所需KV，保持语义；永久丢弃且不重建改变可见上下文。重算深层KV通常依赖前缀前向，不是独立embedding投影。</p>
+<h3 id="题33-只改4096-token-prompt最后一个token-能保证冷缓存吗">题33：只改4096-token prompt最后一个token，能保证冷缓存吗？</h3>
+<p><strong>答案：</strong> 不能，前4095token仍相同；S=16完整块条件下可复用4080token、255块。</p>
+<h3 id="题34-a测输入128-输出1024-b测输入8192-输出128-a输出吞吐更高-能给引擎排名吗">题34：A测输入128/输出1024、B测输入8192/输出128，A输出吞吐更高，能给引擎排名吗？</h3>
+<p><strong>答案：</strong> 不能，Prefill/Decode工作比例与长度负载不同。先统一模型、资源、工作负载、缓存与指标，再比较。</p>
+<h3 id="题35-compute利用率低且hbm带宽接近实测上限-换算力更强但带宽相同gpu保证加速吗">题35：Compute利用率低且HBM带宽接近实测上限，换算力更强但带宽相同GPU保证加速吗？</h3>
+<p><strong>答案：</strong> 更可能访存带宽受限，不能保证明显加速；需结合算子profiling，而不是只比较FLOPs峰值。</p>
+<h3 id="题36-14gb权重-2000gb-s带宽-权重减半后读取下界与整轮加速">题36：14GB权重、2000GB/s带宽，权重减半后读取下界与整轮加速？</h3>
+<p><strong>答案：</strong> 7ms降到3.5ms；整轮不保证两倍，其他耗时与重叠、量化开销都需评估。</p>
+<h2 id="18-互动图索引">18. 互动图索引</h2>
+<p>正文中的图可以操作；单独打开便于集中练习。部分图使用更小的token数、4-token块或不同默认batch以便看清结构，计算时以各图条件为准，不把这些缩尺默认值混入主例。</p>
+<ol>
+<li><a href="/content/interactive/inference-serving/kv-cache-walkthrough.html">KV Cache逐token流程</a></li>
+<li><a href="/content/interactive/inference-serving/context-and-kv.html">上下文与深层KV</a></li>
+<li><a href="/content/interactive/inference-serving/kv-memory.html">KV显存计算</a></li>
+<li><a href="/content/interactive/inference-serving/paged-kv-blocks.html">分页分配和物理块</a></li>
+<li><a href="/content/interactive/inference-serving/token-block-index.html">token索引与偏移</a></li>
+<li><a href="/content/interactive/inference-serving/kv-block-size.html">块大小与尾部浪费</a></li>
+<li><a href="/content/interactive/inference-serving/prefix-cache-sharing.html">Prefix Cache共享</a></li>
+<li><a href="/content/interactive/inference-serving/decode-batching.html">Continuous Batching轮次</a></li>
+<li><a href="/content/interactive/inference-serving/chunked-prefill-timeline.html">Chunked Prefill串行时间线</a></li>
+<li><a href="/content/interactive/inference-serving/queue-and-token-latency.html">排队与token延迟</a></li>
+<li><a href="/content/interactive/inference-serving/throughput-latency-budget.html">吞吐与延迟预算</a></li>
+<li><a href="/content/interactive/inference-serving/prefill-decode-handoff.html">PD交接成本</a></li>
+<li><a href="/content/interactive/inference-serving/batching-and-pd-scope.html">组批与PD范围</a></li>
+<li><a href="/content/interactive/inference-serving/separate-forward-vs-batch.html">独立前向与混合batch</a></li>
+<li><a href="/content/interactive/inference-serving/speculative-decoding-greedy.html">投机接受与提交</a></li>
+<li><a href="/content/interactive/inference-serving/speculative-decoding-cost.html">投机成本</a></li>
+<li><a href="/content/interactive/inference-serving/speculative-sampling-acceptance.html">投机随机接受与修正</a></li>
+<li><a href="/content/interactive/inference-serving/flashattention-tiling.html">FlashAttention分块</a></li>
+</ol>
+<h2 id="19-官方资料与论文">19. 官方资料与论文</h2>
+<ul>
+<li><a href="https://huggingface.co/docs/transformers/main/cache_explanation">Hugging Face：Cache explanation</a>：因果缓存、Prefill与Decode。</li>
+<li><a href="https://docs.vllm.ai/en/latest/design/paged_attention/">vLLM：Paged Attention</a>：分页KV访问设计。</li>
+<li><a href="https://docs.vllm.ai/en/latest/features/automatic_prefix_caching/">vLLM：Automatic Prefix Caching</a>：前缀复用与收益范围。</li>
+<li><a href="https://docs.vllm.ai/en/latest/configuration/optimization/">vLLM：Optimization and Tuning</a>：Chunked Prefill与调度预算。</li>
+<li><a href="https://huggingface.co/docs/transformers/main/continuous_batching">Hugging Face：Continuous batching</a>：在线组批。</li>
+<li><a href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/batcher.html">NVIDIA Triton：Batchers</a>：请求级Dynamic Batching。</li>
+<li><a href="https://docs.vllm.ai/en/latest/features/disagg_prefill/">vLLM：Disaggregated Prefill</a>：P/D实例与KV交接。</li>
+<li><a href="https://arxiv.org/abs/2401.09670">DistServe论文</a>：按延迟约束评估分离服务。</li>
+<li><a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a>：经典接受、拒绝与修正采样。</li>
+<li><a href="https://arxiv.org/abs/2205.14135">FlashAttention论文</a>：IO-aware分块精确Attention。</li>
+<li><a href="https://github.com/vllm-project/vllm/blob/main/docs/benchmarking/cli.md">vLLM Benchmark CLI文档源文件</a>：指标口径、负载与缓存公平性。</li>
+<li><a href="https://developer.nvidia.com/blog/mastering-llm-techniques-inference-optimization/">NVIDIA：Inference Optimization</a>：推理计算与访存权衡。</li>
+</ul>
+<p>官方latest/main文档会变化；实际压测应记录使用的版本、配置与测量日期。本文的基础公式与教学算例不依赖某个最新版本的默认参数。</p>
+<script defer="" src="/js/transformer-interactives.js"></script>
+<style>
+@media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
+</style>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">Author: </span><span class="post-copyright-info"><a href="https://leviusspace.top">Levius</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">Article URL: </span><span class="post-copyright-info"><a href="https://leviusspace.top/2026/10/08/inference-serving/">https://leviusspace.top/2026/10/08/inference-serving/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">License: </span><span class="post-copyright-info">Unless otherwise noted, all posts are licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> . When reusing this work, please credit <a href="https://leviusspace.top" target="_blank">L_F's Blog</a>.</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/AI%20Infra/">AI Infra</a><a class="post-meta__tags" href="/tags/KV%20Cache/">KV Cache</a><a class="post-meta__tags" href="/tags/Attention/">Attention</a><a class="post-meta__tags" href="/tags/%E6%8A%95%E6%9C%BA%E8%A7%A3%E7%A0%81/">Speculative Decoding</a><a class="post-meta__tags" href="/tags/%E6%80%A7%E8%83%BD%E6%B5%8B%E9%87%8F/">Performance Measurement</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/05/transformer-foundations/" title="Transformer Foundations: Shapes, FLOPs, Normalization, RoPE and MLA"><div class="info"><div class="info-1"><div class="info-item-1">Older post</div><div class="info-item-2">Transformer Foundations: Shapes, FLOPs, Normalization, RoPE and MLA</div></div></div></a></nav></div></div><aside class="inner-sidebar"><section aria-label="Article cover" class="article-book">
+<span class="book-cover" data-collection="infra">
+<img alt="Medieval illustrated cover for LLM Inference Serving: From KV Cache to SLO Goodput" class="book-art" decoding="async" height="960" loading="lazy" src="/img/books/inference-serving.png" width="640"/>
+<span aria-hidden="true" class="book-foil"></span>
+<span class="book-edition"><span>✣ AI Infra</span><span>VOL. VIII</span></span>
+<span class="book-cover-type"><span class="book-cover-title"><span>Inference</span><span>Serving</span></span><span class="book-cover-english">FROM CACHE TO GOODPUT</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
+</span>
+<div class="article-book-caption"><a href="/categories/AI-Infra/">✣ AI Infra ↗</a><span>Volume VIII</span></div>
+</section><details class="contents-panel" open=""><summary>On this page <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-用一个服务案例贯穿整条知识链"><span class="toc-text">1. One Serving Example Connecting the Knowledge Chain</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-kv-cache-新-q-为什么仍要读历史-k-v"><span class="toc-text">2. KV Cache: Why a New Query Still Reads Historical Keys and Values</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-prefill-与-decode-的区别"><span class="toc-text">2.1 Prefill Versus Decode</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-为什么通常缓存-k-v-而不缓存历史-q"><span class="toc-text">2.2 Why Cache Keys and Values Rather Than Historical Queries</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-历史-kv-为什么能在追加-token-后复用"><span class="toc-text">2.3 Why Appending Tokens Preserves Causal KV State</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-q-k-与得分矩阵的形状"><span class="toc-text">2.4 Query, Key and Score Matrix Shapes</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-算清-kv-显存-再讨论并发"><span class="toc-text">3. Calculate KV Memory Before Discussing Concurrency</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-公式-单位与边界"><span class="toc-text">3.1 Formula, Units and Scope</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-显存容量与显存带宽"><span class="toc-text">3.2 Memory Capacity Versus Bandwidth</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-pagedattention-逻辑顺序与物理位置分离"><span class="toc-text">4. PagedAttention: Logical Order and Physical Placement</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-块数-尾部空槽与地址计算"><span class="toc-text">4.1 Blocks, Tail Slots and Address Calculation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-块不是越小越好"><span class="toc-text">4.2 Smaller Blocks Are Not Always Better</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-分页不突破逻辑数据量下限"><span class="toc-text">4.3 Paging Does Not Compress Logical KV Data</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-prefix-cache-相同前缀跨请求复用"><span class="toc-text">5. Prefix Cache: Reuse Across Requests</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-continuous-batching-slot-不属于某个请求"><span class="toc-text">6. Continuous Batching: Slots Do Not Belong to Requests</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-1-三种组批方式"><span class="toc-text">6.1 Three Batching Strategies</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-2-batch-slot-与-kv-block-是两件事"><span class="toc-text">6.2 Batch Slots Versus KV Blocks</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-chunked-prefill-混合-batch-与串行交错"><span class="toc-text">7. Chunked Prefill, Mixed Batches and Serial Interleaving</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-1-拆分长-prompt-不丢掉前面的上下文"><span class="toc-text">7.1 Split a Long Prompt Without Losing Its Context</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-2-串行交错和混合-batch-的计算组织不同"><span class="toc-text">7.2 Serial Interleaving Versus a Mixed Batch</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-ttft-tpot-itl-吞吐与-goodput"><span class="toc-text">8. TTFT, TPOT, ITL, Throughput and Goodput</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-1-不同指标回答不同问题"><span class="toc-text">8.1 What Each Metric Measures</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-2-排队可以改变-ttft-而不改变后续输出间隔"><span class="toc-text">8.2 Queueing Can Change TTFT Without Changing Output Intervals</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-3-吞吐增加-不保证满足延迟要求"><span class="toc-text">8.3 Higher Throughput Does Not Guarantee the Latency Budget</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-pd-分离-用资源隔离换取-kv-交接"><span class="toc-text">9. Prefill/Decode Separation and KV Handoff</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-1-资源组一般是什么"><span class="toc-text">9.1 What a GPU Resource Group Usually Means</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-2-交接时间必须进入成本账"><span class="toc-text">9.2 Count the Handoff Cost</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-3-pd-与组批不是一个维度"><span class="toc-text">9.3 PD Separation and Batching Are Different Dimensions</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#10-投机解码-一次目标前向验证多个候选"><span class="toc-text">10. Speculative Decoding: Verify Multiple Candidates in One Forward Pass</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-1-草稿-验证与提交是不同计数"><span class="toc-text">10.1 Drafted, Accepted and Committed Token Counts</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-2-为什么高接受率才有收益"><span class="toc-text">10.2 Why Acceptance Rate Determines the Benefit</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#10-3-随机采样版本不能直接照搬贪心对齐"><span class="toc-text">10.3 Exact Speculative Sampling</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#11-flashattention-与-online-softmax"><span class="toc-text">11. FlashAttention and Online Softmax</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-1-省-s-p-的物化-不省有效-attention-的语义"><span class="toc-text">11.1 Avoid Materializing Scores and Probabilities</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-2-为什么分块-softmax-不能各块算完再平均"><span class="toc-text">11.2 Why Independently Normalized Blocks Cannot Be Averaged</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-3-更新最大值时-旧累计值一起缩放"><span class="toc-text">11.3 Rescale Old Accumulators When the Maximum Changes</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#11-4-当前-q-的累计状态不能代替历史-kv"><span class="toc-text">11.4 Query-Specific Statistics Cannot Replace Historical KV</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#12-量化-按需分配与历史重计算"><span class="toc-text">12. Quantization, On-Demand Allocation and Recalculation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-1-权重量化和-kv-量化不是同一件事"><span class="toc-text">12.1 Weight Quantization Versus KV Quantization</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#12-2-我的-只保留最新-kv-究竟指什么"><span class="toc-text">12.2 What I Meant by Keeping Only the Latest KV</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#13-怎样公平比较-vllm-与-sglang"><span class="toc-text">13. Fairly Comparing vLLM and SGLang</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-1-固定外部条件-允许合理内部调优"><span class="toc-text">13.1 Hold External Conditions Constant and Tune Internals</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-2-预热不等于没有缓存命中"><span class="toc-text">13.2 Runtime Warmup Versus Prefix Cache Warmup</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-3-固定并发与固定到达速率"><span class="toc-text">13.3 Fixed Concurrency Versus Fixed Arrival Rate</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#13-4-面试回答范例"><span class="toc-text">13.4 An Interview Answer</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#14-回到主例-一条请求怎样串起所有优化"><span class="toc-text">14. Return to the Worked Serving Example</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#15-我的易错回答-以及应该怎样修正"><span class="toc-text">15. My Incomplete Answers and Corrections</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#16-我主动追问的问题"><span class="toc-text">16. Questions I Asked During the Review</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-pd-的不同-gpu-资源组-是不同卡还是-sm"><span class="toc-text">Question: GPU cards or SMs in a PD resource group?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-pd-多了-kv-交接-所以-prefill-decode-总耗时一定更长吗"><span class="toc-text">Question: Does PD always add end-to-end latency?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-之前的串行时间图属于未分离状态吗-a-decode-和-c-prefill-能同时进行吗"><span class="toc-text">Question: Can Decode and Prefill progress together?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-共置混批与-pd-分离无法共存吗"><span class="toc-text">Question: Can mixed batching coexist with PD separation?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-串行交错与混合-batch-感觉一样-为什么要区分"><span class="toc-text">Question: Why distinguish interleaving and mixed batches?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-为什么-e4-4e-4-4-e4-4-1-新加的1和1-10不用缩放"><span class="toc-text">问：为什么 e4−4e^{4-4}e4−4=1？新加的1和1×10不用缩放？</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#问-能否只保存最新-kv-历史按需重算-之前不是不能量化吗"><span class="toc-text">Question: Keeping latest KV and recomputing history</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#17-自测题与参考答案"><span class="toc-text">17. Self-Check Questions and Answers</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题1-为什么只缓存-k-v-通常不缓存历史-q"><span class="toc-text">Question 1: Why cache K/V rather than Q?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题2-100-token-prompt处理完-采样得到y₁-处理y₁时有多少kv位置"><span class="toc-text">Question 2: How many KV positions after processing the first generated token?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题3-主例b-3-t-4096的kv是多少-8gib预算在t-8192时理论可容纳多少请求"><span class="toc-text">Question 3: KV memory and request capacity</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题4-s-16-40个token需要几块-多少尾部空槽-第40个token在哪里"><span class="toc-text">Question 4: Block count, slack and token position</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题5-i-36-s-16-l2-p11-读哪里-第49个token新增时-旧块要搬吗"><span class="toc-text">Question 5: Physical lookup and growth without relocation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题6-a-a-b-c-d-b-a-x-c-d-哪些位置的整套kv可直接复用"><span class="toc-text">Question 6: Reuse after a prefix mismatch</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题7-主例b共享64token-s-16-可复用几块-主要省哪个阶段"><span class="toc-text">Question 7: Shared prefix blocks and saved work</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题8-continuous-batching换掉b-会不会让a丢缓存-c没prefill能直接加入正常decode吗"><span class="toc-text">Question 8: Replacing requests and Prefill readiness</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题9-混合batch含a的1个decode位置与c的500个prefill位置-线性层有多少输入位置-是否允许a关注c"><span class="toc-text">Question 9: Mixed-batch token count and context isolation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题10-a输出时刻5-90-95-100ms-itl与平均tpot是多少"><span class="toc-text">Question 10: ITL and average TPOT</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题11-到达0-输出100-130-160-190ms-全体推迟50ms-ttft-tpot-e2e呢"><span class="toc-text">Question 11: Queueing shifts and latency metrics</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题12-10秒完成20请求-每请求50个输出token-两种吞吐是多少"><span class="toc-text">Question 12: Request and output-token throughput</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题13-batch1-4-8的吞吐为50-160-220-p95tpot为20-25-45ms-预算-30ms选谁"><span class="toc-text">Question 13: Choose a batch under the latency budget</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题14-10秒内a成功100-合格70-b成功90-合格85-普通吞吐与goodput"><span class="toc-text">Question 14: Request throughput versus Goodput</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题15-到达10requests-s-处理8-无拒绝或超时-队列与ttft怎样变"><span class="toc-text">Question 15: Overload, queue growth and TTFT</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题16-ttft由800ms排队-150msprefill-50ms其他组成-prefill降到75或排队降到200-结果"><span class="toc-text">Question 16: Optimize the dominant TTFT component</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题17-把最大batch从8调到32-一定同时改善ttft-tpot和goodput吗"><span class="toc-text">Question 17: Larger batches and latency trade-offs</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题18-512mib-kv以4gib-s交接需要多久-避免20ms或200ms等待时的净变化"><span class="toc-text">Question 18: KV transfer time and net savings</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题19-pd让c的prefill与a的decode并行-是否也让c在prefill未就绪时decode"><span class="toc-text">Question 19: Cross-request concurrency and same-request dependencies</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题20-草稿abcd接受ab-第三位置被修正为x-提交几个-全接受时呢"><span class="toc-text">Question 20: Accepted prefixes and committed tokens</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题21-投机总16ms-普通10ms-token-首次拒绝时哪个更快-接受2个时呢"><span class="toc-text">Question 21: Speculative cost per effective output</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题22-验证草稿c用p-c-s-p-c-s-a-还是p-c-s-a-b"><span class="toc-text">Question 22: The conditional distribution for verification</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题23-p-0-2-0-8-q-0-6-0-4-草稿a接受率-拒绝后修正分布-草稿b呢"><span class="toc-text">Question 23: Acceptance probability and residual sampling</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题24-flashattention删掉了s-p的计算吗-删掉kv了吗"><span class="toc-text">Question 24: What FlashAttention avoids</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题25-两块权重-1-1-3-3-v-2-4-6-8-最终输出是多少"><span class="toc-text">Question 25: Merge unnormalized block statistics</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题26-旧m-2-ℓ-2-z-8-新位置s-4-v-10-更新公式"><span class="toc-text">Question 26: Update Online Softmax accumulators</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题27-下一块最大值6时-之前新加的1需要一起缩放吗-最大值没变时呢"><span class="toc-text">Question 27: Rescale an entire old accumulator</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题28-当前总k位置8192-单token-decode得分矩阵有几行几列"><span class="toc-text">Question 28: Decode score matrix dimensions</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题29-下一q能直接复用上一q的online-softmax分子-分母而不读历史kv吗"><span class="toc-text">Question 29: Can different queries share softmax statistics?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题30-24gib总显存-14gib权重-2gib其他-每请求kv1gib-原配置-权重7gib-kv0-5gib各能放几请求"><span class="toc-text">Question 30: Weight versus KV quantization capacity</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题31-8gib-kv预算-12请求各实际1gib-paged-flash保证放得下吗-可怎样处理"><span class="toc-text">Question 31: KV data exceeding the memory budget</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题32-只保留最新kv-历史重算-与永久丢弃历史有什么区别"><span class="toc-text">Question 32: Recalculation versus permanent eviction</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题33-只改4096-token-prompt最后一个token-能保证冷缓存吗"><span class="toc-text">Question 33: Cold cache after changing only the final token?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题34-a测输入128-输出1024-b测输入8192-输出128-a输出吞吐更高-能给引擎排名吗"><span class="toc-text">Question 34: Can unlike workloads rank engines?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题35-compute利用率低且hbm带宽接近实测上限-换算力更强但带宽相同gpu保证加速吗"><span class="toc-text">Question 35: Diagnose a bandwidth bottleneck</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#题36-14gb权重-2000gb-s带宽-权重减半后读取下界与整轮加速"><span class="toc-text">Question 36: Weight-reading lower bound versus whole-step speedup</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#18-互动图索引"><span class="toc-text">18. Interactive Diagram Index</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#19-官方资料与论文"><span class="toc-text">19. Official Documentation and Papers</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ Back to terminal</a></aside></div></main><footer class="site-footer">
+<p>
+<a href="/">L_F's Blog</a><span class="footer-divider"></span>Learning, experimenting, taking notes.
+        </p>
+<div class="footer-links">
+<a href="/archives/">All articles</a><a href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="22" src="/img/redesign/icons/github-logo.svg" width="22"/>GitHub</a>
+</div>
+</footer></div><dialog aria-labelledby="search-title" id="search-dialog">
+<div class="search-header">
+<h2 id="search-title">Search articles</h2>
+<button aria-label="Close search" class="search-close">
+<img alt="" height="24" src="/img/redesign/icons/x.svg" width="24"/>
+</button>
+</div>
+<label class="search-field"><img alt="" height="22" src="/img/redesign/icons/magnifying-glass.svg" width="22"/><span class="sr-only">Article keywords</span><input autocomplete="off" id="search-input" placeholder="Search titles or content, e.g. Actor-Critic" type="search"/></label>
+<p aria-live="polite" id="search-status" role="status">
+        Enter keywords to find notes.
+      </p>
+<ul aria-label="Search results" id="search-results"></ul>
+<div class="search-footer">
+<span>Search all articles</span><span><kbd>Esc</kbd> Close</span>
+</div>
+</dialog><button aria-label="Back to top" class="back-top" hidden="" type="button">↑</button><p class="sr-only" id="inner-status" role="status"></p><div aria-hidden="true" class="reading-progress"></div></body></html>

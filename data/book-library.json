@@ -576,6 +576,30 @@
       "summary": "博客的第一篇文章：用 Hexo 创建文章、启动预览，并生成和发布静态站点。",
       "art": "/img/books/hello-world-color.webp",
       "tags": []
+    },
+    {
+      "id": "inference-serving",
+      "collection": "infra",
+      "volume": "VIII",
+      "title": "从 KV Cache 到有效吞吐：大模型推理引擎与服务优化复习笔记",
+      "coverTitle": [
+        "推理引擎",
+        "服务优化"
+      ],
+      "english": "FROM CACHE TO GOODPUT",
+      "path": "/2026/10/08/inference-serving/",
+      "date": "2026-10-08",
+      "summary": "用一个GQA服务案例串起KV显存、分页与前缀复用、在线组批、PD分离、投机解码、FlashAttention和有效吞吐；保留复习中的易错点、主动追问、18张互动图与36道附答案自测。",
+      "art": "/img/books/inference-serving.png",
+      "source": "content/posts/inference-serving.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "KV Cache",
+        "Attention",
+        "投机解码",
+        "性能测量"
+      ]
     }
   ]
 }

@@ -191,6 +191,14 @@
         "Foundations"
       ],
       "summary": "A worked GQA example connecting tensor shapes, parameter counts, FLOPs, KV cache, normalization, RoPE and MLA, with interactive diagrams and questions from an interview review."
+    },
+    "inference-serving": {
+      "title": "LLM Inference Serving: From KV Cache to SLO Goodput",
+      "coverTitle": [
+        "Inference",
+        "Serving"
+      ],
+      "summary": "A worked GQA serving example connecting KV memory, paging, prefix reuse, batching, prefill/decode separation, speculative decoding, FlashAttention and fair benchmarking, with 18 interactive diagrams and 36 answered self-check questions."
     }
   },
   "collections": {

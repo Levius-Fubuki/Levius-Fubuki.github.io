@@ -576,6 +576,30 @@
       "summary": "The first post: creating a Hexo article, running a preview, and generating and publishing a static site.",
       "art": "/img/books/hello-world-color.webp",
       "tags": []
+    },
+    {
+      "id": "inference-serving",
+      "collection": "infra",
+      "volume": "VIII",
+      "title": "LLM Inference Serving: From KV Cache to SLO Goodput",
+      "coverTitle": [
+        "Inference",
+        "Serving"
+      ],
+      "english": "FROM CACHE TO GOODPUT",
+      "path": "/2026/10/08/inference-serving/",
+      "date": "2026-10-08",
+      "summary": "A worked GQA serving example connecting KV memory, paging, prefix reuse, batching, prefill/decode separation, speculative decoding, FlashAttention and fair benchmarking, with 18 interactive diagrams and 36 answered self-check questions.",
+      "art": "/img/books/inference-serving.png",
+      "source": "content/posts/inference-serving.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "KV Cache",
+        "Attention",
+        "Speculative Decoding",
+        "Performance Measurement"
+      ]
     }
   ]
 }
