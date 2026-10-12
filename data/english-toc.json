@@ -476,6 +476,7 @@
   "阶段四：应用与前沿（2-3 周）": "Phase 4: Applications and Frontiers (2–3 Weeks)",
   "随机梯度下降（SGD）": "Stochastic Gradient Descent (SGD)",
   "首先声明输入语言的范围": "Define the Supported Input Language First",
+  "执行路径声明也要接受验证": "Execution-Path Claims Need Validation",
   "1. 用一个配置走完整条链": "1. A worked configuration from input to output",
   "互动图：结构与开销": "Interactive: architecture and costs",
   "2. Attention 的每个轴都对应什么": "2. What each Attention axis means",
@@ -516,6 +517,7 @@
   "“内容统一后是不是一定减少 FLOPs？”": "Does absorption always reduce FLOPs?",
   "10. 从浅到深自测": "10. Self-checks from basic to advanced",
   "参考资料": "References",
+  "缓存验收要检查状态转移": "Validate Cache State Transitions",
   "1. 用一个服务案例贯穿整条知识链": "1. One Serving Example Connecting the Knowledge Chain",
   "2. KV Cache：新 Q 为什么仍要读历史 K/V": "2. KV Cache: Why a New Query Still Reads Historical Keys and Values",
   "2.1 Prefill 与 Decode 的区别": "2.1 Prefill Versus Decode",
@@ -673,5 +675,6 @@
   "E. 精度与 loss 归一化": "E. Precision and Loss Normalization",
   "F. SP 与 CP": "F. Sequence and Context Parallelism",
   "G. 扩卡与诊断": "G. Scaling and Diagnosis",
-  "19. 复习时保留的判断方法": "19. Reasoning Rules to Keep for Revision"
+  "19. 复习时保留的判断方法": "19. Reasoning Rules to Keep for Revision",
+  "基准程序的异常恢复也要验收": "Validate Benchmark Failure Recovery"
 }

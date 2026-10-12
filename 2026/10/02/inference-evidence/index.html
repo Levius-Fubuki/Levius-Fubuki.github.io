@@ -9,11 +9,11 @@
 <meta content="en_US" property="og:locale"/>
 <meta content="https://leviusspace.top/img/books/inference-evidence.png" property="og:image"/>
 <meta content="2026-10-02T00:00:00+08:00" property="article:published_time"/>
-<meta content="2026-10-02T00:00:00+08:00" property="article:modified_time"/>
+<meta content="2026-10-13T07:08:30+08:00" property="article:modified_time"/>
 <meta content="Levius" property="article:author"/>
 <meta content="summary" name="twitter:card"/>
 <meta content="https://leviusspace.top/img/books/inference-evidence.png" name="twitter:image"/><link href="/img/favicon.png" rel="shortcut icon"/><link href="https://leviusspace.top/2026/10/02/inference-evidence/" rel="canonical"/><meta content="Hexo 7.3.0" name="generator"/><link href="/atom.xml" rel="alternate" title="L_F&#x27;s Blog" type="application/atom+xml"/>
-<link href="/css/home.css?v=3c5fb2432ae5" rel="stylesheet"/><link href="/css/katex/katex.min.css?v=b93e6b35af2b" rel="stylesheet"/><link href="/css/inner-pages.css?v=067d3bef89aa" rel="stylesheet"/><link href="/css/book-library.css?v=8397bc003b9d" rel="stylesheet"/><script defer="" src="/js/home.js?v=d2d969cff00c"></script><script defer="" src="/js/inner-pages.js?v=db2f33efbc05"></script><script defer="" src="/js/book-library.js?v=c879c12ecbd2"></script><link href="/css/english-ui.css?v=c0449b8ae8bc" rel="stylesheet"/>
+<link href="/css/home.css?v=3c5fb2432ae5" rel="stylesheet"/><link href="/css/katex/katex.min.css?v=b93e6b35af2b" rel="stylesheet"/><link href="/css/inner-pages.css?v=067d3bef89aa" rel="stylesheet"/><link href="/css/book-library.css?v=8397bc003b9d" rel="stylesheet"/><script defer="" src="/js/home.js?v=3a3d38179582"></script><script defer="" src="/js/inner-pages.js?v=db2f33efbc05"></script><script defer="" src="/js/book-library.js?v=c879c12ecbd2"></script><link href="/css/english-ui.css?v=c0449b8ae8bc" rel="stylesheet"/>
 <meta content="Large Language Models" property="article:tag"/><meta content="Performance Measurement" property="article:tag"/></head><body class="inner-page page-post"><a class="skip-link" href="#main-content">Skip to content</a><div class="site-shell"><header class="site-header">
 <a aria-label="L_F&#x27;s Blog Home" class="brand" href="/">L_F's <span>Blog</span></a>
 <button aria-controls="main-nav" aria-expanded="false" aria-label="Open navigation" class="menu-toggle" hidden="">
@@ -27,9 +27,9 @@
 <button class="search-open" hidden="">Search</button>
 </nav>
 <a class="github-link" href="https://github.com/Levius-Fubuki" rel="noopener noreferrer" target="_blank"><img alt="" height="24" src="/img/redesign/icons/github-logo.svg" width="24"/>GitHub</a>
-</header><main id="main-content"><nav aria-label="Breadcrumb" class="breadcrumbs"><a href="/#profile">Home</a><span>/</span><a href="/archives/">Articles</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">Published</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/工程经验/">Engineering Lessons</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">Focus mode</button><button class="copy-page" type="button">Copy link</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="inference-evidence">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</h1>
+</header><main id="main-content"><nav aria-label="Breadcrumb" class="breadcrumbs"><a href="/#profile">Home</a><span>/</span><a href="/archives/">Articles</a></nav><header class="inner-masthead"><div class="inner-window-label"><span>ARTICLE / LEVIUS NOTES</span><span aria-hidden="true">□ □ □</span></div><div class="inner-title-block"><p class="inner-eyebrow">L_F'S BLOG / PERSONAL ARCHIVE</p><h1 class="inner-title" data-decode="">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><span class="post-meta-label">Published</span><time class="post-meta-date-created" datetime="2026-10-02T00:00:00+08:00" title="2026-10-02">2026-10-02</time><span class="post-meta-separator">|</span><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2026-10-13T07:08:30+08:00" title="2026-10-13">2026-10-13</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><a class="post-meta-categories" href="/categories/工程经验/">Engineering Lessons</a></span></div></div><div class="reading-tools"><button aria-pressed="false" class="reading-width" type="button">Focus mode</button><button class="copy-page" type="button">Copy link</button></div></div></header><div class="inner-layout"><div class="inner-content"><div id="post"><article class="container post-content" id="article-container"><h1 id="inference-evidence">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</h1>
 <p>推理优化最容易留下的是一张速度表，最容易丢失的是这张表成立的条件。模型版本、输入长度、缓存是否预热、失败请求怎样计数，只要其中一项变了，两个数字就可能已经不在回答同一个问题。</p>
-<p>这篇文章把算子学习、推理实验和公开开源贡献中反复出现的问题，整理成一套可以落实到文件与请求记录的工作方法。公开案例包括我参与的 vLLM-Omni 基准客户端修复和 System1-Omni Graph 实验，状态核验于 2026-10-02。文中的小规模算例是教学示例；项目效果只引用已公开且说明范围的证据。</p>
+<p>这篇文章把算子学习、推理实验和公开开源贡献中反复出现的问题，整理成一套可以落实到文件与请求记录的工作方法。公开案例包括我参与的 vLLM-Omni 基准客户端修复和 System1-Omni Graph 实验，相关案例按各自日期核验；2026-10-13 更新 SDPA 输出布局与验证范围，并补充基准异常恢复案例。文中的小规模算例是教学示例；项目效果只引用已公开且说明范围的证据。</p>
 <h2 id="一条性能结论至少包含什么">一条性能结论至少包含什么</h2>
 <p>“快了 20%”缺少了比较对象。它可能指某个 kernel 的 CUDA event 时间，也可能指单请求从客户端发出到完成的时间，还可能指整个并发窗口的吞吐。三者的分母不同，不能放进同一列直接比较。</p>
 <p>我会把一条结论写成一个完整句子：在某硬件和软件修订下，使用某输入分布与采样设置，候选相对于基线，在指定测量边界内达到什么变化，同时通过了哪些正确性与资源检查。句子如果写不完整，通常意味着实验记录还有缺项。</p>
@@ -79,11 +79,71 @@
     return "eligible_for_review"
 </code></pre>
 <p>它特意把通过全部门槛写成“可进入评审”，而非“自动上线”。部署还可能需要版本回滚、监控、业务负载和恢复测试。具体项目可以精简流程，但不应让一个通用汇总器的 PASS 取代所有尚未验证的条件。</p>
+<h2 id="执行路径声明也要接受验证">执行路径声明也要接受验证</h2>
+<p>“使用 SDPA”仍然只是后端名称，无法说明一次调用实际走了哪条分支。我提交的 <a href="https://github.com/vllm-project/vllm-omni/pull/7895">vLLM-Omni PR #7895</a> 补充了构造后的 CUDA 执行路径说明：Q 与 K/V 头数相同、原生 GQA，以及先展开 K/V 再调用 SDPA。这几种实现会影响实际工作量与中间张量，测量记录只写一个后端名称，会丢掉解释结果所需的条件。</p>
+<p>这项修改依赖的执行契约框架来自其他贡献者的 <a href="https://github.com/vllm-project/vllm-omni/pull/7379">PR #7379</a>，该 PR 已于 2026-10-02 合并。我的工作是后续 SDPA 适配，不能把上游 FA4 原型或其验证结果计入自己的实现。截至 <strong>2026-10-13</strong>，#7895 仍开放、非草稿，提交为 <code>88a1389826d4e696a446e0597ee46a90c65ec627</code>。当前版本在推理 fullgraph 支持上继续调整了输出布局；10 月 3 日的 eager-only 版本，以及后续 <code>e089dec16</code> 的连续 BHSD 边界，都属于历史阶段。</p>
+<p>实现里容易漏掉的是：负责说明路径的 resolver，必须观察到与真正 forward 相同的输入。外部输入布局为 <code>[B, S, H, D]</code>，探测时转为 SDPA 使用的 <code>[B, H, S, D]</code>；padding mask 也要按同样规则归一化。若 resolver 用原始 mask 探测、forward 用展开后的 mask 探测，两边可能选出不同结论。此时日志虽然详细，却在描述一条没有实际执行的路径。</p>
+<p>补丁因此把 GQA 分支判断提取为共享函数，并在测试中记录两次探测的张量地址、形状、stride、dtype、device、mask 内容和 causal 参数，确认两者一致。数值用例以显式展开 K/V 后的 SDPA 作为参考，覆盖 FP16/BF16、相同与不同头数、batch 1/2、head dimension 64/512、Q/K 长度相同与不同，以及有无 padding mask。这个参考验证具体路径与展开语义，不能代替模型输出或 FP32 真值检查。</p>
+<p><a href="https://github.com/vllm-project/vllm-omni/pull/7895#issuecomment-5955775205">后续评审</a>提出 fullgraph 要求后，问题从“能不能准确描述路径”扩展到了“编译器能不能处理这条路径”。同头数分支把 <code>enable_gqa</code> 变成明确的 Python 布尔值，避免直接把符号头数比较传给 SDPA；CUDA GQA 推理分支则使用 custom op，把运行时后端选择放在编译边界内。它没有凭空消除选择过程，而是改变了编译器观察该过程的方式。</p>
+<p>custom op 还必须使 fake 输出与真实输出的形状、dtype 和 stride 一致。当前实现先把真实输出排列为连续 BSHD，再让 fake 实现按 <code>[B, S, H, Dv]</code> 分配，对应测试还覆盖 V 维度与 Q/K 不同的情况；autocast 场景在边界前显式处理输入精度，防止普通 SDPA 与 custom op 的 dtype 行为分离。带梯度的输入或 mask 避开该无 backward 的推理边界，继续走原有路径。这些处理比给函数加一个“支持编译”标签更关键。</p>
+<table>
+<thead>
+<tr>
+<th>声明</th>
+<th>当前适配中的含义</th>
+<th>不能据此推出什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code style="white-space: nowrap">SUPPORTED</code></td>
+<td>指定条件下的路径具备相应支持证据</td>
+<td>所有设备、dtype、mask 和并行方式都支持</td>
+</tr>
+<tr>
+<td><code style="white-space: nowrap">UNMIGRATED</code></td>
+<td>当前契约没有为这条路径建立充分声明</td>
+<td>现有 forward 必然无法运行</td>
+</tr>
+<tr>
+<td><code style="white-space: nowrap">TRACEABLE</code></td>
+<td>已覆盖的同头数推理路径可直接追踪</td>
+<td>任意动态形状都只生成一个图</td>
+</tr>
+<tr>
+<td><code style="white-space: nowrap">CUSTOM_OP</code></td>
+<td>已覆盖的 GQA 推理通过 custom-op 边界编译</td>
+<td>边界内部已被编译器融合，或已经更快</td>
+</tr>
+<tr>
+<td><code style="white-space: nowrap">EAGER_ONLY</code></td>
+<td>例如 Q/K/V 需要梯度时，契约仍只承诺 eager</td>
+<td>训练 fullgraph 已经过验证</td>
+</tr>
+</tbody></table>
+<p>未覆盖的条件仍需要明确拒绝或保留未迁移状态。CPU 张量不能因调用方填写 <code>platform="cuda"</code> 就变成 CUDA 证据；mask 与输入设备不一致也不能继承成功结论。因果、并行、packed、paged KV 等路径继续留在本次契约之外。autocast 虽有输出 dtype 回归，能力声明仍为 <code>UNMIGRATED</code>；“某用例通过”和“对外承诺一类输入”有不同门槛。</p>
+<p>这次公开报告把新 GPU 验证绑定到 <code>e089dec16</code>：RTX 4090、SM89、驱动 595.71.05、Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。原实现的 <strong>12 个 fullgraph 用例失败</strong>，候选的同组 <strong>12 个通过</strong>；用例使用 <code>fullgraph=True, dynamic=True</code>，覆盖三种头数/维度配置、两种精度、有无 mask，并在每组中执行两种 Q/K 长度。完整聚焦套件 <strong>137 passed</strong>，包含实际 <code>Attention.forward</code>、schema/fake/dynamic、autocast 与梯度回退；CI 标记筛选得到 <strong>95 passed</strong>，隐藏 CUDA 后为 <strong>95 skipped</strong>。95 项是筛选口径，不能与 137 相加；L4 标记用于 CI 路由，实际报告的硬件是 RTX 4090。</p>
+<p>旧版的 99/57 项记录继续作为历史证据，不能与新报告拼接成一个测试总数。评审者的 GH200 结果也不属于我的 RTX 4090 运行。这些记录不自动覆盖后续布局改动。本轮博客维护只读核对公开报告、补丁和工作区代码，没有重新运行 GPU。</p>
+<p><a href="https://github.com/vllm-project/vllm-omni/pull/7895#discussion_r4193615192">布局建议</a>已在 <code>88a138982</code> 实现并<a href="https://github.com/vllm-project/vllm-omni/pull/7895#discussion_r4237226573">回复评审</a>。custom op 直接返回连续 BSHD，调用方无需先取得连续 BHSD 再排列；沿最后两个轴展开 heads 时与输出共享存储。fake 的形状和 stride 同步修改，才能让编译器得到与真实执行一致的布局。这里支持的是“后续 flatten 为 view”的具体性质；SDPA kernel 本身的输出转成连续 BSHD 仍可能需要复制，不能简称“消除了所有复制”。</p>
+<p>这次布局验证另用 <strong>A800 80GB PCIe、SM80</strong>，绑定 <code>88a138982</code>，软件为 Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。旧布局在新增四项 CPU 布局用例中全部失败，改后完整聚焦套件 <strong>145 passed</strong>；其中包括 12 项动态 Inductor fullgraph、六项生产 <code>Attention.forward</code> 和八项 schema/fake/dynamic-AOT <code>opcheck</code>。CI 标记筛选为 <strong>99 passed</strong>，隐藏 CUDA 为 <strong>99 skipped</strong>。这些子集不能再加到 145 上，也不能把 RTX 4090 与 A800 两次成绩拼成一次跨设备实验。当前 head 已返回的 pre-commit、Python 3.11/3.12 构建和 DCO 检查均成功；这并不代表补丁已合并或所有未返回检查已完成。</p>
+<p>结论仍有明确上限：这是选定输入的推理 fullgraph 和布局验证，不是训练 fullgraph、CUDA Graph capture、多卡、模型 E2E 或性能基准。没有布局复制的性能测量，也没有任意形状只编译一个图的保证。更新文章时，把旧观察、已实施改动、当前验证与待验证收益分别写清楚，比给旧报告追加一个更大的测试总数更有用。</p>
+<h2 id="基准程序的异常恢复也要验收">基准程序的异常恢复也要验收</h2>
+<p>优化代码正确，测量脚本仍可能污染下一组结果。我提交的 <a href="https://github.com/vllm-project/vllm-omni/pull/8722">SeedVR2 缓存 PR #8722</a>包含一个配对短测程序：关闭/开启 DiT 缓存分别预热，随后用 AB/BA 交替顺序测量，固定输入、seed、精度和 attention 路径，并在计时结束后核对完整 DiT 张量与最终 RGB。缓存复用窗口行索引和 RoPE 表，没有改变窗口边界或精度。</p>
+<p>公开报告中的两个 Thor 单卡暖请求，DiT 耗时分别下降 26.24% 和 15.87%，完整暖请求只下降 7.13% 和 3.12%。这个差距直接提醒读者：一个阶段更快不能等比例推广到整个请求，更不能推广到 120 帧长视频、其他 GPU 或 HTTP 服务吞吐。两组各四轮配对，合计 16 个实测输出与新鲜上游参考的完整 DiT/RGB 哈希一致；它们是固定短测条件下的数值证据。恢复视频与生成视频也不能使用同一个任务名称。</p>
+<p>测量脚本会临时替换方法、切换环境变量、关闭 cuDNN benchmark，并持有用于事后哈希的输出引用。如果模型初始化、一次生成、RGB 转换或最终关闭抛异常，只在正常返回时恢复这些状态，就可能让后续实验继续执行带钩子的路径，或保留本不该常驻的张量。此时下一轮虽有完整计时记录，实验条件已经改变。</p>
+<p>当前 <code>984368181a4e63e74013b6c3a29dbcc624c7b1a9</code> 用 <code>ExitStack</code> 登记逆序恢复动作，并在 <code>finally</code> 中停用计时与清空捕获引用；每个动作与相应临时状态一起登记。即使关闭引擎失败，其他恢复回调仍会执行。CPU 故障注入直接检查这些退出路径，验证的是测试工具的行为，不是 GPU 算子速度。当前 PR 的生产推理代码与原性能测量提交 <code>3aa51dd2</code> 一致，新增的是基准清理和回归；文章没有把这次脚本修复说成额外推理加速。</p>
+<p>本次核验时 #8722 仍为开放草稿，多卡、其他加速器和 HTTP E2E 尚未纳入报告。更一般的验收方法是：正常、失败和清理三个出口都要保存结果状态，确认钩子、开关与资源所有权恢复以后，下一轮才具备可比较的起点。正常测量的漂亮均值不能代替这项检查。</p>
 <h2 id="graph-的构建成本也属于请求成本">Graph 的构建成本也属于请求成本</h2>
 <p>Graph replay 可能减少主机提交开销，但动态场景需要构建、验证、缓存和淘汰。只有同一个可复用配置再次出现，并且还留在缓存中，才有机会积累 replay 收益。单形状热循环主要验证复用状态，无法回答形状不断变化时的行为。</p>
 <p><a href="https://github.com/ThinkFlowLab/system1-omni/pull/22">System1-Omni PR #22</a> 的公开记录包含一个有价值的反例：资源预算收紧后，变化输入触发反复淘汰和 capture，特定场景 Graph 比 eager 更慢。它展示了为什么缓存预算和形状分布必须随性能记录一起公开，而不是只报告最理想的 replay 耗时。</p>
 <p>若一次构建成本为 C，每次复用节省 d，在忽略其他开销且 d 为正的理想条件下，需要超过 C/d 次复用才可能收回成本。若缓存经常提前淘汰，实际请求序列达不到这个次数，局部测量中的好结果就无法兑现。这个估算适合检查方向，实际还要加入验证、内存和回退开销。</p>
 <p>准入、冷却和预算机制可以限制无效构建，但预算的对象要写清楚。缓存常驻字节不等于整个进程显存；同步 capture 的时间预算也不一定能中途抢占 GPU 工作。相关探索应按具体提交与评审状态描述，不能把开放 PR 中的能力写成主分支已经默认启用。</p>
+<p>2026-10-08 核验时，<a href="https://github.com/ThinkFlowLab/system1-omni/pull/33">PR #33</a> 已于 10 月 5 日合并，所述策略提交为 <code>f4069e0aa4b32c533d117a7821ff7b3161c3237b</code>。它给 Python 多模态 worker 增加按不同请求计数的准入、冷却、capture 次数和耗时预算，并提供 eager 回退。历史报告在固定 RTX 4090 环境记录了 187 项 CPU 测试、五个图文变化案例、四类准入/回退策略，以及七次与 eager 逐位一致的 full-logit 对照，其中三次发生在真实淘汰后的存活图回放。合并没有改变证据边界：常驻缓存限额不含模型权重和临时候选；同步 capture 也可能在返回前超过耗时额度。它不能承诺进程显存硬上限或新吞吐收益，更不能当作另一个原生 Rust/CUDA worker 的验收报告。</p>
+<h2 id="缓存验收要检查状态转移">缓存验收要检查状态转移</h2>
+<p>相同的“缓存命中率”也可能建立在不同容量模型上。我提交的 <a href="https://github.com/llm-d/llm-d-router/pull/3033">llm-d-router PR #3033</a> 已于 2026-10-07 合并，核验 head 为 <code>9d9609c9c6f3060370affefef018c5183fe61004</code>。它针对多模态 encoder cache：图片尺寸不同，encoder embedding 数量也不同，用固定条目数的 LRU 估计容量，会把“大条目已在后端淘汰”误判为仍然命中，或提前忘掉尚在后端的小条目。</p>
+<p>改动按 embedding 数量计容量，并给条目登记正在引用它的请求。<code>acquire</code> 获得引用，条目进入固定状态；最后一个引用 <code>release</code> 后，才进入可淘汰队列。空间不足时，先判断全部可回收条目是否足够，足够才真正淘汰，避免失败预留先破坏原缓存。这是一套带生命周期的状态模型，不能只凭最后剩下几个键判断实现正确。</p>
+<p>请求边界同样需要验证。转发前获取引用，首个正常响应体 chunk 到达时释放引用并提交此前无法预留的条目；取消或状态淘汰只释放，不凭空提交缓存。一个自然结束的单 chunk 响应与首响应之前的中止，都可能同时带开始/结束标记，因此还要检查 <code>TerminationCause</code>。完成标志使用原子操作，让响应回调和状态淘汰竞争时只清理一次。这里检查的是路由器对缓存的估计，不能当作后端实际显存的完整账本。</p>
+<p>公开记录提供了两类不同的 5,000 次回放。确定请求回放比较固定条目 LRU 与 vLLM 0.26.0 的命中状态，最佳条目容量仍只有 91.2% 一致率；另一组随机差分回放则逐步核对 acquire、release、commit、容量、引用集合和可淘汰顺序。这两组回答的问题不同，不能混成“一万个请求的线上命中率”。它们支持在固定参考版本下校验状态机，没有证明整个服务的吞吐提升。</p>
+<p>这也给实验设计一个可复用办法：先列出可能改变资源所有权的事件，再设计正常完成、取消、淘汰和回调竞争序列，逐步比较状态。最终键集合一致仍可能掩盖中间误淘汰；平均命中率相近也可能掩盖某类请求总被错判。将中间状态作为证据，才有机会解释结果为何正确。</p>
 <h2 id="性能归因要尊重测量边界">性能归因要尊重测量边界</h2>
 <p>Amdahl 定律适合做第一步量级检查。若目标部分占原耗时 f，局部加速 s，其他部分完全不变时，整体理想加速为 <code>1 / ((1-f) + f/s)</code>。它帮助解释为什么一个快了两倍的小算子，在完整请求中可能几乎看不到变化。</p>
 <p>但实际系统还有重叠和排队。通信与计算可以交叠，某个操作变快后可能改变关键路径，也可能让原本被覆盖的成本暴露出来。不能把 profiler 里父子范围和重叠区间全部相加，再当成完整请求耗时。</p>
@@ -102,7 +162,7 @@
 <span class="book-cover-type"><span class="book-cover-title"><span>Inference</span><span>Evidence</span></span><span class="book-cover-english">THE MEASURE</span><span class="book-imprint">LEVIUS FUBUKI · COLLECTED NOTES</span></span>
 </span>
 <div class="article-book-caption"><a href="/categories/工程经验/">⌘ Engineering Lessons ↗</a><span>Volume I</span></div>
-</section><details class="contents-panel" open=""><summary>On this page <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#一条性能结论至少包含什么"><span class="toc-text">Minimum Evidence for a Performance Claim</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#把实验分成可独立判断的层级"><span class="toc-text">Split Experiments into Independently Assessable Layers</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#从一份算子学习笔记回查结论"><span class="toc-text">Tracing Conclusions Back to Kernel Study Notes</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#先定义成功-再计算速度"><span class="toc-text">Define Success Before Calculating Speed</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#请求指标要从测量点推出来"><span class="toc-text">Derive Request Metrics from Measurement Points</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#单变量对照之后-再看交互作用"><span class="toc-text">Check Interactions After Single-Variable Comparisons</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#先测噪声-再解释小收益"><span class="toc-text">Measure Noise Before Explaining Small Gains</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#正确性门槛要先于性能筛选"><span class="toc-text">Apply Correctness Gates Before Performance Screening</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#graph-的构建成本也属于请求成本"><span class="toc-text">Graph Construction Is Part of Request Cost</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#性能归因要尊重测量边界"><span class="toc-text">Performance Attribution Must Respect Measurement Boundaries</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#让结论跟着版本走"><span class="toc-text">Tie Conclusions to Versions</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ Back to terminal</a></aside></div></main><footer class="site-footer">
+</section><details class="contents-panel" open=""><summary>On this page <span>CONTENTS</span></summary><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#一条性能结论至少包含什么"><span class="toc-text">Minimum Evidence for a Performance Claim</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#把实验分成可独立判断的层级"><span class="toc-text">Split Experiments into Independently Assessable Layers</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#从一份算子学习笔记回查结论"><span class="toc-text">Tracing Conclusions Back to Kernel Study Notes</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#先定义成功-再计算速度"><span class="toc-text">Define Success Before Calculating Speed</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#请求指标要从测量点推出来"><span class="toc-text">Derive Request Metrics from Measurement Points</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#单变量对照之后-再看交互作用"><span class="toc-text">Check Interactions After Single-Variable Comparisons</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#先测噪声-再解释小收益"><span class="toc-text">Measure Noise Before Explaining Small Gains</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#正确性门槛要先于性能筛选"><span class="toc-text">Apply Correctness Gates Before Performance Screening</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#执行路径声明也要接受验证"><span class="toc-text">Execution-Path Claims Need Validation</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#基准程序的异常恢复也要验收"><span class="toc-text">Validate Benchmark Failure Recovery</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#graph-的构建成本也属于请求成本"><span class="toc-text">Graph Construction Is Part of Request Cost</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#缓存验收要检查状态转移"><span class="toc-text">Validate Cache State Transitions</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#性能归因要尊重测量边界"><span class="toc-text">Performance Attribution Must Respect Measurement Boundaries</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#让结论跟着版本走"><span class="toc-text">Tie Conclusions to Versions</span></a></li></ol></div></details><a class="back-terminal" href="/#terminal">↙ Back to terminal</a></aside></div></main><footer class="site-footer">
 <p>
 <a href="/">L_F's Blog</a><span class="footer-divider"></span>Learning, experimenting, taking notes.
         </p>
