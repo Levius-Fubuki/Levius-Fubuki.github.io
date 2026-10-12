@@ -600,6 +600,32 @@
         "投机解码",
         "性能测量"
       ]
+    },
+    {
+      "id": "distributed-training",
+      "collection": "infra",
+      "volume": "IX",
+      "title": "从一次训练迭代到 64 卡扩展：分布式训练与显存优化复习笔记",
+      "coverTitle": [
+        "分布式训练",
+        "显存优化"
+      ],
+      "english": "SHARDS TO SCALING",
+      "path": "/2026/10/12/distributed-training/",
+      "date": "2026-10-12",
+      "summary": "以7B训练任务串起梯度累积、DDP、ZeRO/FSDP、TP/PP/SP/CP、激活重计算、混合精度与64卡扩展诊断；保留真实易错点、主动追问、27张互动图和42道附答案自测题。",
+      "art": "/img/books/distributed-training.png",
+      "source": "content/posts/distributed-training.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "分布式训练",
+        "ZeRO",
+        "FSDP",
+        "模型并行",
+        "显存优化",
+        "性能测量"
+      ]
     }
   ]
 }

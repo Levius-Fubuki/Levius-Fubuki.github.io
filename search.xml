@@ -4217,6 +4217,675 @@ C 第1层 → C 第2层 → …完成 C 前向
 @media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
 </style>
 ]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>KV Cache</tag><tag>Attention</tag><tag>Speculative Decoding</tag><tag>Performance Measurement</tag></tags></entry>
+<entry><title>Distributed Training and Memory Optimization: From One Step to 64 GPUs</title><link href="/2026/10/12/distributed-training/"/><url>/2026/10/12/distributed-training/</url><content type="html"><![CDATA[<h1 id="distributed-training">Distributed Training and Memory Optimization: From One Step to 64 GPUs</h1>
+<p>准备大模型训练与推理优化面试时，我在这一模块最需要厘清的是三个区别：保存了什么，不等于计算了什么；合并梯度贡献，不一定要除以卡数；模型状态能放下，不等于整个训练过程能放下。这篇笔记把基础概念、贯穿案例、答题中的误区和主动追问整理在一起，保留本轮学习的 27 张互动图，并为自测题附上答案。</p>
+<p>内容来自本模块的互动复习，也衔接了相邻会话《1-模型基础与计算量：P0，先建立后续优化的基础》和《2-推理引擎与服务优化：P0，优先深入》中的张量轴、归一化、因果 Attention、重计算和性能评测概念。以下是原理复习，不是声称所有问题都已在同岗位面经中出现，也不是实际多 GPU 性能实验。图中显存、时间与吞吐数字均为教学数据。</p>
+<h2 id="1-用一个训练任务贯穿知识链">1. 用一个训练任务贯穿知识链</h2>
+<p>假设我要训练一个 7B 参数的 Decoder-only Transformer，采用 Adam，目标是先在 8 张 GPU 上运行，再分析扩到 64 张 GPU 的效率。先约定一套便于手算的模型状态配置：</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th align="right">每参数字节数</th>
+<th align="right">7B 模型总量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>低精度模型参数</td>
+<td align="right">2</td>
+<td align="right">14 GB</td>
+</tr>
+<tr>
+<td>低精度梯度</td>
+<td align="right">2</td>
+<td align="right">14 GB</td>
+</tr>
+<tr>
+<td>FP32 主参数</td>
+<td align="right">4</td>
+<td align="right">28 GB</td>
+</tr>
+<tr>
+<td>Adam 一阶矩 m</td>
+<td align="right">4</td>
+<td align="right">28 GB</td>
+</tr>
+<tr>
+<td>Adam 二阶矩 v</td>
+<td align="right">4</td>
+<td align="right">28 GB</td>
+</tr>
+<tr>
+<td>合计</td>
+<td align="right">16</td>
+<td align="right">112 GB</td>
+</tr>
+</tbody></table>
+<p>这里 P=7×10⁹，GB 按 10⁹ 字节计算。把主参数、m、v 合称“优化器相关状态”，占 12P 字节。<strong>16 字节/参数是本文的题设，不是所有 PyTorch 或 BF16 训练的默认布局。</strong> 实际还应确认参数与梯度 dtype、优化器实现、是否存在主参数、状态压缩和 offload。</p>
+<p>训练任务沿着下面的顺序推进：</p>
+<pre><code class="language-text">拿到数据 → 前向 → 计算 loss → 反向生成梯度
+        → 合并各数据分片的贡献 → 完成梯度累积与必要处理
+        → 优化器更新 → 进入下一轮
+</code></pre>
+<p>任务中依次遇到的问题是：112 GB 状态放不下；减小 batch 后仍放不下；DDP 并没有把显存池合起来；ZeRO/FSDP 可以分片存储，但计算时仍需参数；单层矩阵太大时再考虑 TP；整段层堆叠可用 PP；长序列带来激活和 Attention 压力，需要 checkpoint、SP、CP；数值计算需要正确精度与归一化；最后，扩卡收益必须从有效吞吐与关键路径验证。</p>
+<p>这些技术可以组合，但不是在同一个维度重复“除以 GPU 总数”。后文会分别说明每一种 GPU 组分担的工作。</p>
+<h2 id="2-一次训练迭代-梯度计算与参数更新分开">2. 一次训练迭代：梯度计算与参数更新分开</h2>
+<h3 id="2-1-backward-不会自动更新参数">2.1 backward 不会自动更新参数</h3>
+<p>前向用当前参数计算输出与 loss。<code>loss.backward()</code> 通过链式法则计算梯度，并累积到参数的 <code>.grad</code>；<code>optimizer.step()</code> 再使用梯度与优化器状态更新参数。<code>zero_grad()</code> 清理之前的梯度，避免不需要的跨迭代累积。<a href="https://docs.pytorch.org/tutorials/beginner/basics/autogradqs_tutorial.html">PyTorch 自动微分教程</a>、<a href="https://docs.pytorch.org/tutorials/recipes/recipes/zeroing_out_gradients.html">清理梯度教程</a></p>
+<p>因此“已经反向、还没 step”的时刻，参数尚未改变，梯度已经生成。若连续执行两次 backward 而不清理，得到的是两次梯度之和，不是后一次覆盖前一次。</p>
+<iframe class="transformer-interactive" data-widget="training-step" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/training-step.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="训练迭代：前向、反向、更新与清理"></iframe>
+<p><a href="/content/interactive/distributed-training/training-step.html?v=height-v2">单独打开此图</a></p>
+<h3 id="2-2-梯度累积为什么通常能模拟更大-batch">2.2 梯度累积为什么通常能模拟更大 batch</h3>
+<p>把一个大 batch 分成 k 个等大小 micro-batch。若每个 micro-batch 的 loss 都是均值，目标是整个大 batch 的均值，则应累积各个梯度的 1/k：可以先把各 loss 除以 k，再 backward；完成 k 次后只更新一次。</p>
+<p>参数梯度的形状由参数形状决定。一个含 100 万可训练标量的模型，普通稠密训练中对应 100 万梯度元素；micro-batch 从 8 降到 1，并不会变成 12.5 万梯度元素。累积多次是在同一份梯度位置上加值。</p>
+<p>纯 DP 下，若按样本计数：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>B</mi><mrow><mi>g</mi><mi>l</mi><mi>o</mi><mi>b</mi><mi>a</mi><mi>l</mi></mrow></msub><mo>=</mo><msub><mi>B</mi><mrow><mi>m</mi><mi>i</mi><mi>c</mi><mi>r</mi><mi>o</mi><mo separator="true">,</mo><mi>p</mi><mi>e</mi><mi>r</mi><mtext> </mtext><mi>r</mi><mi>a</mi><mi>n</mi><mi>k</mi></mrow></msub><mo>×</mo><msub><mi>k</mi><mrow><mi>a</mi><mi>c</mi><mi>c</mi><mi>u</mi><mi>m</mi></mrow></msub><mo>×</mo><msub><mi>N</mi><mrow><mi>D</mi><mi>P</mi></mrow></msub><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">B_{global}=B_{micro,per\ rank}\times k_{accum}\times N_{DP}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05017em;">B</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.0502em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">g</span><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span><span class="mord mathnormal mtight">o</span><span class="mord mathnormal mtight">ba</span><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05017em;">B</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.0502em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">mi</span><span class="mord mathnormal mtight">cro</span><span class="mpunct mtight">,</span><span class="mord mathnormal mtight">p</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">er</span><span class="mspace mtight"><span class="mtight"> </span></span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">r</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">ank</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.0315em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">cc</span><span class="mord mathnormal mtight">u</span><span class="mord mathnormal mtight">m</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.02778em;">D</span><span class="mord mathnormal mtight" style="margin-right:0.13889em;">P</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<p>TP 或 PP 内部合作处理同一批数据，不能把它们的卡数再当作独立样本份数乘进去。变长语言模型任务还应另行记录实际有效 token 数。</p>
+<p>“梯度累积等价于大 batch”有条件：loss 权重正确、累积期间参数固定、优化器只更新一次、非线性梯度处理放在合适位置。BatchNorm 等依赖 batch 统计的操作、不同 Dropout 随机轨迹以及浮点求和次序，都可能让实际结果不能逐位一致。</p>
+<h2 id="3-显存拆账-减小-micro-batch-减少什么">3. 显存拆账：减小 micro-batch 减少什么</h2>
+<h3 id="3-1-持久状态-激活与临时空间">3.1 持久状态、激活与临时空间</h3>
+<p>模型参数、参数梯度与优化器状态通常形成较大的持续占用。激活是前向产生、反向需要的中间结果；临时空间还包括算子 workspace、参数聚合、通信 buffer、输入、框架与分配器开销。</p>
+<p>实际峰值应按时间取最大值：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>M</mi><mrow><mi>p</mi><mi>e</mi><mi>a</mi><mi>k</mi></mrow></msub><mo>=</mo><munder><mrow><mi>max</mi><mo>⁡</mo></mrow><mi>t</mi></munder><mrow><mo fence="true">[</mo><msub><mi>M</mi><mrow><mi>s</mi><mi>t</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>+</mo><msub><mi>M</mi><mrow><mi>a</mi><mi>c</mi><mi>t</mi><mi>i</mi><mi>v</mi><mi>a</mi><mi>t</mi><mi>i</mi><mi>o</mi><mi>n</mi></mrow></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>+</mo><msub><mi>M</mi><mrow><mi>g</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi>e</mi><mi>r</mi></mrow></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>+</mo><msub><mi>M</mi><mrow><mi>w</mi><mi>o</mi><mi>r</mi><mi>k</mi><mi>s</mi><mi>p</mi><mi>a</mi><mi>c</mi><mi>e</mi></mrow></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>+</mo><msub><mi>M</mi><mrow><mi>o</mi><mi>t</mi><mi>h</mi><mi>e</mi><mi>r</mi></mrow></msub><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo fence="true">]</mo></mrow><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">M_{peak}=\max_t\left[M_{state}(t)+M_{activation}(t)+M_{gather}(t)+M_{workspace}(t)+M_{other}(t)\right].</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">p</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">ak</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.45em;vertical-align:-0.7em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.4306em;"><span style="top:-2.4em;margin-left:0em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span><span class="mop">max</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;">[</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">s</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">c</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">i</span><span class="mord mathnormal mtight" style="margin-right:0.03588em;">v</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">i</span><span class="mord mathnormal mtight">o</span><span class="mord mathnormal mtight">n</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">g</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">er</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.02691em;">w</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">or</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span><span class="mord mathnormal mtight">s</span><span class="mord mathnormal mtight">p</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">ce</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">o</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">er</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mclose delimcenter" style="top:0em;">]</span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">.</span></span></span></span></span>
+<p>不要把不同时间出现的每一项独立峰值机械相加，也不要只计算持久状态就宣布能训练。allocated、reserved 与设备可用显存也是不同的观察口径。</p>
+<iframe class="transformer-interactive" data-widget="adam-memory" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/adam-memory.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="Adam 训练模型状态的显存组成"></iframe>
+<p><a href="/content/interactive/distributed-training/adam-memory.html?v=height-v2">单独打开此图</a></p>
+<h3 id="3-2-micro-batch-不是模型状态的缩放系数">3.2 micro-batch 不是模型状态的缩放系数</h3>
+<p>主例的参数仍是 14 GB，梯度仍是 14 GB，优化器相关状态仍是 84 GB。减少 micro-batch 主要减少同时保存的激活和部分输入、临时张量，不能把梯度与优化器状态也按 batch 比例缩小。激活也未必精确线性缩放：序列长度、Attention 实现、padding、保存策略和算子 workspace 都会影响结果。</p>
+<iframe class="transformer-interactive" data-widget="microbatch-memory" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/microbatch-memory.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="micro-batch 改变激活但不改变参数状态形状"></iframe>
+<p><a href="/content/interactive/distributed-training/microbatch-memory.html?v=height-v2">单独打开此图</a></p>
+<h2 id="4-dp-与-ddp-数据不同-模型状态仍复制">4. DP 与 DDP：数据不同，模型状态仍复制</h2>
+<p>数据并行让各 rank 使用相同的完整模型处理不同样本。DDP 在反向中同步梯度；参数以相同初始值开始，再使用一致的梯度更新，保持模型副本一致。DP 是策略名；PyTorch 的 <code>DataParallel</code> 与 <code>DistributedDataParallel</code> 是不同实现，面试中不要把策略与类名混为一谈。</p>
+<p>当各 rank 的本地 loss 都是等大小 batch 的均值时，跨卡平均本地梯度对应全局均值目标。若不同 rank 有不同数量的有效 token，则需要按目标定义正确加权，不能默认等权平均一定正确。</p>
+<p>DDP 不是把 8 张 24 GB GPU 合成一张 192 GB GPU。本文配置下，每卡仍要容纳约 112 GB 模型状态。它提高数据处理吞吐，但没有消除模型副本的冗余。DDP 通常按 bucket 同步，梯度桶就绪后可以启动 AllReduce，与之后的反向计算重叠。<a href="https://docs.pytorch.org/docs/stable/notes/ddp.html">DDP 设计说明</a></p>
+<iframe class="transformer-interactive" data-widget="ddp-gradient-sync" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/ddp-gradient-sync.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="DDP 本地样本与跨卡梯度同步"></iframe>
+<p><a href="/content/interactive/distributed-training/ddp-gradient-sync.html?v=height-v2">单独打开此图</a></p>
+<h2 id="5-三种集合通信-先认清张量位置">5. 三种集合通信：先认清张量位置</h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>合并的对象</th>
+<th>每卡最后得到什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AllGather</td>
+<td>各卡不同位置的分片</td>
+<td>拼接后的完整张量</td>
+</tr>
+<tr>
+<td>AllReduce</td>
+<td>各卡相同位置的数值</td>
+<td>完整的归约结果</td>
+</tr>
+<tr>
+<td>ReduceScatter</td>
+<td>相同位置先归约，再分配位置</td>
+<td>归约结果的一部分</td>
+</tr>
+</tbody></table>
+<p>例如 GPU 0 梯度 <code>[2,4]</code>，GPU 1 梯度 <code>[6,8]</code>，两列分别对应两个参数。跨卡平均是 <code>[(2+6)/2,(4+8)/2]=[4,6]</code>。ReduceScatter 后，GPU 0 可以只保留 4，GPU 1 只保留 6。</p>
+<p>把 GPU 0 内部的 <code>(2+4)/2</code> 算成 3，把 GPU 1 内部的 <code>(6+8)/2</code> 算成 7，是混合不同参数的梯度，改变了问题本身。<strong>归约对齐的是相同参数或相同输出位置。</strong></p>
+<iframe class="transformer-interactive" data-widget="gradient-position-reduction" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/gradient-position-reduction.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="按参数位置跨 rank 归约"></iframe>
+<p><a href="/content/interactive/distributed-training/gradient-position-reduction.html?v=height-v2">单独打开此图</a></p>
+<p>“归约”不自动等于“求平均”。对于 TP 同一输出的部分贡献，应求和恢复输出；对于已包含全局 loss 权重的梯度贡献，也不应重复除以卡数。数据并行目标中的平均缩放，需要依据 loss 定义处理。<a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html">NCCL 集合通信说明</a></p>
+<h2 id="6-zero-逐步去掉模型状态冗余">6. ZeRO：逐步去掉模型状态冗余</h2>
+<p>沿用参数 2P、梯度 2P、优化器相关状态 12P 的假设，均匀分到 N 个数据并行 rank：</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>参数</th>
+<th>梯度</th>
+<th>优化器相关状态</th>
+<th>每卡持久状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DDP</td>
+<td>完整</td>
+<td>完整</td>
+<td>完整</td>
+<td>16P</td>
+</tr>
+<tr>
+<td>ZeRO-1</td>
+<td>完整</td>
+<td>完整</td>
+<td>分片</td>
+<td>4P+12P/N</td>
+</tr>
+<tr>
+<td>ZeRO-2</td>
+<td>完整</td>
+<td>分片</td>
+<td>分片</td>
+<td>2P+14P/N</td>
+</tr>
+<tr>
+<td>ZeRO-3</td>
+<td>分片</td>
+<td>分片</td>
+<td>分片</td>
+<td>16P/N</td>
+</tr>
+</tbody></table>
+<p>这些是状态账本，不包含运行峰值的其他项目。阶段定义参考 <a href="https://www.deepspeed.ai/tutorials/zero/">DeepSpeed ZeRO 官方教程</a> 与 <a href="https://arxiv.org/abs/1910.02054">ZeRO 论文</a>。</p>
+<h3 id="6-1-zero-1-先分片优化器状态">6.1 ZeRO-1：先分片优化器状态</h3>
+<p>每个 rank 负责部分参数的优化器状态与更新。更新后，各 rank 交换更新的参数，使完整参数副本保持一致。主例 4 卡时：14+14+84/4=49 GB/卡。即使 N 趋于很大，完整参数与梯度仍至少 28 GB，因此本文题设的 24 GB 卡不能只靠 ZeRO-1 解决状态容量问题。</p>
+<iframe class="transformer-interactive" data-widget="zero-one-partition" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/zero-one-partition.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="ZeRO-1 分片优化器相关状态"></iframe>
+<p><a href="/content/interactive/distributed-training/zero-one-partition.html?v=height-v2">单独打开此图</a></p>
+<h3 id="6-2-zero-2-再分片归约后的梯度">6.2 ZeRO-2：再分片归约后的梯度</h3>
+<p>4 卡时：14+14/4+84/4=38.5 GB/卡。8 卡时：14+1.75+10.5=26.25 GB/卡，仍超过 24 GB。</p>
+<p><strong>梯度分片不等于只计算自己负责的参数梯度。</strong> 每个 rank 仍对自己的本地数据执行完整模型的前后向，并产生本地数据对各参数的贡献；随后归约、分片保存。可以按 bucket 边计算边通信释放，不要求先持有整个模型所有梯度。</p>
+<p>ReduceScatter 操作的是梯度张量时，只改变梯度的结果布局，不会因此把 ZeRO-2 的完整模型参数切掉。</p>
+<iframe class="transformer-interactive" data-widget="zero-two-memory" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/zero-two-memory.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="ZeRO-2 梯度和优化器状态分片"></iframe>
+<p><a href="/content/interactive/distributed-training/zero-two-memory.html?v=height-v2">单独打开此图</a></p>
+<h3 id="6-3-zero-3-参数平时也分片">6.3 ZeRO-3：参数平时也分片</h3>
+<p>8 卡时持久模型状态为 112/8=14 GB/卡。需要计算某一层时，聚合该层参数；用完后按策略重新分片。额外参数通信换来了更低的驻留显存。</p>
+<iframe class="transformer-interactive" data-widget="zero-three-lifecycle" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/zero-three-lifecycle.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="ZeRO-3 当前层参数聚合与释放"></iframe>
+<p><a href="/content/interactive/distributed-training/zero-three-lifecycle.html?v=height-v2">单独打开此图</a></p>
+<h2 id="7-fsdp-把参数的生命周期讲完整">7. FSDP：把参数的生命周期讲完整</h2>
+<h3 id="7-1-分片单位与通信分组是两回事">7.1 分片单位与通信分组是两回事</h3>
+<p>全分片 FSDP 与 ZeRO-3 共享“参数、梯度和优化器状态分片”的核心思路，但不能把两个框架的 API、调度和实现细节完全等同。FSDP2 教程中参数表示为分片 DTensor，默认沿参数 dim 0 分片；把 Transformer block 设为 FSDP 单元，则让一组参数一起参与相关聚合调度。它并不是把整个 block 永久交给某一个 rank 独立计算。<a href="https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html">FSDP2 官方教程</a></p>
+<p>较小通信单元通常降低一次聚合的完整参数量，但增加 collective 启动与调度次数。较大单元则可能减少启动次数，却需要更大的临时完整参数。预取可以减少等待，也可能让相邻单元的完整参数同时驻留。选择粒度需要测量。</p>
+<iframe class="transformer-interactive" data-widget="fsdp-gather-granularity" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/fsdp-gather-granularity.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="FSDP 参数聚合粒度与临时驻留量"></iframe>
+<p><a href="/content/interactive/distributed-training/fsdp-gather-granularity.html?v=height-v2">单独打开此图</a></p>
+<h3 id="7-2-一个-block-的完整计算过程">7.2 一个 block 的完整计算过程</h3>
+<p>以下采用“前向后重新分片、反向需要输入梯度、不预取”的明确题设：</p>
+<ol>
+<li><strong>前向前：</strong> 每张卡原本只有参数分片，AllGather 临时恢复当前 block 的完整参数。</li>
+<li><strong>前向：</strong> 各卡用完整参数处理自己的本地数据，保存反向需要的激活。其他 block 暂时仍是分片。</li>
+<li><strong>前向后：</strong> 释放临时完整参数，保留参数分片和必要激活。释放参数不等于释放激活。</li>
+<li><strong>反向前：</strong> 再次 AllGather，恢复当前 block 的完整参数。各卡计算本地数据对该 block 所有可训练参数的贡献和输入梯度。</li>
+<li><strong>梯度就绪：</strong> ReduceScatter 合并相同参数位置的贡献，按拥有者保留梯度分片；根据 loss 定义完成正确缩放。用完的完整参数与激活可以释放。</li>
+<li><strong>更新：</strong> 本轮所有必要反向、累积与梯度处理完成后，各卡更新自己的参数分片，使用对应梯度和优化器状态。无需长期保存完整参数；下一轮 AllGather 会聚合更新后的分片。</li>
+</ol>
+<p>具体释放时机取决于 reshard 配置、预取、梯度累积及实现；这里讲的是指定策略的生命周期。</p>
+<h3 id="7-3-用小矩阵确认-完整计算-是什么意思">7.3 用小矩阵确认“完整计算”是什么意思</h3>
+<p>设 W=[[1,2],[3,4]]，GPU 0 平时保存第一行，GPU 1 保存第二行。采用列向量 y=Wx。GPU 0 的本地 x₀=[1,1]，GPU 1 的本地 x₁=[2,1]。</p>
+<p>AllGather 后，两卡都使用完整 W：GPU 0 得到 y₀=[3,7]；GPU 1 得到 y₁=[4,10]。这两个输出不同，原因是本地数据不同，不是输出被拆成一半。</p>
+<p>若各卡 loss 为 ½‖y‖²，则本地参数梯度是 yxᵀ：</p>
+<pre><code class="language-text">GPU 0：[[ 3, 3], [ 7, 7]]
+GPU 1：[[ 8, 4], [20,10]]
+跨卡均值：[[5.5,3.5], [13.5,8.5]]
+</code></pre>
+<p>GPU 0 保留平均梯度第一行，GPU 1 保留第二行。用学习率 0.1 的 SGD 方便手算，更新后的 W=[[0.45,1.65],[1.65,3.15]]。主训练案例仍使用 Adam；这里更换优化器只是展示分片的拥有与更新，不改变计算范围。</p>
+<iframe class="transformer-interactive" data-widget="fsdp-matrix-walkthrough" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/fsdp-matrix-walkthrough.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="FSDP 小矩阵：聚合、前后向、归约与更新"></iframe>
+<p><a href="/content/interactive/distributed-training/fsdp-matrix-walkthrough.html?v=height-v2">单独打开此图</a></p>
+<p>我的最终理解是：<strong>计算本地数据对完整 block 的梯度贡献，保存和更新本卡负责的分片。</strong></p>
+<h2 id="8-tp-切分的是算子的计算">8. TP：切分的是算子的计算</h2>
+<h3 id="8-1-输出维度切分与输入维度切分">8.1 输出维度切分与输入维度切分</h3>
+<p>为避免“行并行、列并行”的命名造成混淆，本文小矩阵统一用 <strong>y=Wx，W 的形状为 [out,in]</strong>。常见框架用行向量 Y=XW，此时画出来的行列方向会相反，应优先说清切的是输入还是输出特征。</p>
+<p>按输出维度切 W 的行：每张卡产生不同输出元素，若需要完整输出则拼接。按输入维度切 W 的列：每张卡只算相同输出的一部分贡献，必须求和恢复输出。</p>
+<p>例如 W=[[1,2],[3,4]]、x=[1,1]，输出切分时两卡得到 [3] 和 [7]，拼接为 [3,7]。输入切分时两卡分别计算 [1,3] 与 [2,4]，求和仍是 [3,7]。后者不能除以 2。</p>
+<iframe class="transformer-interactive" data-widget="tensor-parallel-output-split" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/tensor-parallel-output-split.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="TP 按输出特征切分"></iframe>
+<p><a href="/content/interactive/distributed-training/tensor-parallel-output-split.html?v=height-v2">单独打开此图</a></p>
+<iframe class="transformer-interactive" data-widget="tensor-parallel-input-split" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/tensor-parallel-input-split.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="TP 按输入特征切分并求和"></iframe>
+<p><a href="/content/interactive/distributed-training/tensor-parallel-input-split.html?v=height-v2">单独打开此图</a></p>
+<p>FSDP 聚合完整算子参数后，各卡为自己的数据执行完整算子；TP 用参数子矩阵合作执行同一个算子。这就是“存储分片”与“计算分片”的差异。</p>
+<h3 id="8-2-mlp-两层配对-避免中间立刻拼全">8.2 MLP 两层配对，避免中间立刻拼全</h3>
+<p>第一层按输出切分，得到不同 hidden 元素；ReLU 是逐元素函数，各卡可以对自己的完整 hidden 元素独立处理。第二层按输入切分，直接消费本卡 hidden 分片，再求和得到完整输出。无需在两层之间先 AllGather hidden。<a href="https://docs.pytorch.org/tutorials/intermediate/TP_tutorial.html">PyTorch TP 教程</a></p>
+<p>一个 2→4→2 示例：x=[2,1]，W₁ 的行是 [1,0]、[0,1]、[1,1]、[-1,1]。第一层输出为 [2,1,3,-1]。两卡 ReLU 后分别是 [2,1] 与 [3,0]。第二层对应子矩阵为 I 和 2I，贡献为 [2,1]、[6,0]，最终输出 [8,1]。</p>
+<p>但输入切分产生的“部分贡献”不能随意先过 ReLU。若两卡部分值为 [2,-3] 与 [-1,4]，先加再 ReLU 得到 [1,1]；先各自 ReLU 再加得到 [2,4]。非线性通常不能跨越求和移动。</p>
+<iframe class="transformer-interactive" data-widget="tensor-parallel-mlp-pair" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/tensor-parallel-mlp-pair.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="TP MLP 输出切分与输入切分配对"></iframe>
+<p><a href="/content/interactive/distributed-training/tensor-parallel-mlp-pair.html?v=height-v2">单独打开此图</a></p>
+<h3 id="8-3-attention-按完整-head-切分">8.3 Attention 按完整 head 切分</h3>
+<p>普通 MHA 可以让不同 rank 负责不同完整 head。QKV 投影按输出特征切分，各卡完成所拥有 head 的 Attention，再通过输入切分的输出投影 Wₒ 合并贡献。</p>
+<p>只按 head 切分时，每个 rank 的本地 head 可以拥有完整序列的 Q/K/V。一个 head 的 Softmax 沿 key 位置进行，不需要其他 head 的 K/V。GQA、MQA 的 KV 头分配需要结合框架配置，不能机械套用每个 rank 都拥有独立相同数量 KV head 的假设。</p>
+<iframe class="transformer-interactive" data-widget="tensor-parallel-attention-heads" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/tensor-parallel-attention-heads.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="Attention TP：完整 head 的序列计算"></iframe>
+<p><a href="/content/interactive/distributed-training/tensor-parallel-attention-heads.html?v=height-v2">单独打开此图</a></p>
+<h3 id="8-4-反向为什么有时求和-有时拼接">8.4 反向为什么有时求和，有时拼接</h3>
+<p>对于 y=Wx，记 G=∂L/∂y：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mrow><mi mathvariant="normal">∂</mi><mi>L</mi></mrow><mrow><mi mathvariant="normal">∂</mi><mi>x</mi></mrow></mfrac><mo>=</mo><msup><mi>W</mi><mi mathvariant="normal">⊤</mi></msup><mi>G</mi><mo separator="true">,</mo><mspace width="2em"></mspace><mfrac><mrow><mi mathvariant="normal">∂</mi><mi>L</mi></mrow><mrow><mi mathvariant="normal">∂</mi><mi>W</mi></mrow></mfrac><mo>=</mo><mi>G</mi><msup><mi>x</mi><mi mathvariant="normal">⊤</mi></msup><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">\frac{\partial L}{\partial x}=W^\top G,\qquad \frac{\partial L}{\partial W}=Gx^\top.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:2.0574em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3714em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord" style="margin-right:0.05556em;">∂</span><span class="mord mathnormal">x</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord" style="margin-right:0.05556em;">∂</span><span class="mord mathnormal">L</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0574em;vertical-align:-0.686em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">W</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8991em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span><span class="mord mathnormal">G</span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3714em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord" style="margin-right:0.05556em;">∂</span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord" style="margin-right:0.05556em;">∂</span><span class="mord mathnormal">L</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8991em;"></span><span class="mord mathnormal">G</span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8991em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<p>输出切分时，各卡得到对<strong>同一个完整输入 x</strong> 的不同贡献，需要求和。例如 [2,4]+[3,4]=[5,8]。</p>
+<p>输入切分时，各卡得到<strong>不同输入元素</strong>的梯度，若需要完整 dX 则拼接。例如 W 两列为 [1,3]、[2,4]，G=[1,2]：GPU 0 的 dX₀=1×1+3×2=7，GPU 1 的 dX₁=2×1+4×2=10，完整输入梯度是 [7,10]。</p>
+<p>判断通信的办法是先标注每个数代表哪个位置：相同位置的贡献求和，不同位置的结果拼接。不能只凭“在不同 GPU 上”就决定求平均。</p>
+<h2 id="9-pp-按层分工-用-micro-batch-填流水线">9. PP：按层分工，用 micro-batch 填流水线</h2>
+<h3 id="9-1-stage-边界传什么">9.1 stage 边界传什么</h3>
+<p>假设 GPU 0 负责 L₁、L₂，GPU 1 负责 L₃、L₄。前向 GPU 0 将边界激活 A 发给 GPU 1；反向 GPU 1 将 ∂L/∂A 发回 GPU 0。GPU 0 再通过链式法则计算 L₂、L₁ 的梯度。L₃、L₄ 的权重梯度由 GPU 1 保留，不需要当作边界输入梯度发给 GPU 0。</p>
+<iframe class="transformer-interactive" data-widget="pipeline-single-microbatch" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/pipeline-single-microbatch.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="单 micro-batch 流水线的激活与输入梯度传递"></iframe>
+<p><a href="/content/interactive/distributed-training/pipeline-single-microbatch.html?v=height-v2">单独打开此图</a></p>
+<h3 id="9-2-利用率公式的前提">9.2 利用率公式的前提</h3>
+<p>把一个训练 batch 拆成 m 个 micro-batch，在 p 个 stage 之间错开执行。理想 GPipe 示意中，各 stage 平衡，前向与反向各占一个单位槽，忽略通信与其他开销：总长度 2(m+p−1)，每卡忙碌 2m。</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>U</mi><mo>=</mo><mfrac><mi>m</mi><mrow><mi>m</mi><mo>+</mo><mi>p</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>f</mi><mrow><mi>b</mi><mi>u</mi><mi>b</mi><mi>b</mi><mi>l</mi><mi>e</mi></mrow></msub><mo>=</mo><mfrac><mrow><mi>p</mi><mo>−</mo><mn>1</mn></mrow><mrow><mi>m</mi><mo>+</mo><mi>p</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">U=\frac{m}{m+p-1},\qquad f_{bubble}=\frac{p-1}{m+p-1}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.10903em;">U</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.988em;vertical-align:-0.8804em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.1076em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">m</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal">p</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">m</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.8804em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10764em;">f</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.1076em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">b</span><span class="mord mathnormal mtight">u</span><span class="mord mathnormal mtight">bb</span><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.2019em;vertical-align:-0.8804em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">m</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal">p</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">p</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.8804em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span>
+<p>这里气泡占比的分母是实际时间。某些材料给出 (p−1)/m，分母是理想计算时间，不能与上式当作同一个比例。</p>
+<p>p=4、m=8 时 U=8/11，气泡 3/11。m 不变而 p=8 时 U=8/15。更多 stage 不自动让这个调度更高效；增加 micro-batch 可摊薄填充排空开销，但会影响激活、启动次数及单个 micro-batch 的算子效率。</p>
+<iframe class="transformer-interactive" data-widget="pipeline-microbatch-overlap" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/pipeline-microbatch-overlap.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="多 micro-batch 的流水线填充与排空"></iframe>
+<p><a href="/content/interactive/distributed-training/pipeline-microbatch-overlap.html?v=height-v2">单独打开此图</a></p>
+<h3 id="9-3-gpipe-与同步-1f1b">9.3 GPipe 与同步 1F1B</h3>
+<p>GPipe 先完成这一批全部前向，再做反向，许多 micro-batch 的激活需要同时保留。同步 1F1B 在预热后交替执行一个前向、一个反向，尽早释放使用完的激活，最后排空。</p>
+<p>图中 2 stage、4 micro-batch 的等时案例，两种调度总长都是 10 槽、每卡忙 8 槽；GPipe 的激活份数峰值为 [4,4]，1F1B 为 [2,1]。这些份数由图中排程决定，不是任意模型的 GB 显存预测。普通 1F1B 的主要收益是降低激活驻留，不保证消除气泡。<a href="https://docs.pytorch.org/tutorials/intermediate/pipelining_tutorial.html">PyTorch PP 教程</a>、<a href="https://developer.nvidia.com/blog/scaling-language-model-training-to-a-trillion-parameters-using-megatron/">NVIDIA Megatron 调度说明</a></p>
+<p><strong>1F1B 不意味着每做完一个 micro-batch 的反向就 step。</strong> 当前同步题设要等本轮 micro-batch 的梯度完成累积，再统一更新；否则其他 micro-batch 可能用旧参数前向、新参数反向，破坏参数版本一致性。</p>
+<iframe class="transformer-interactive" data-widget="pipeline-gpipe-one-f-one-b" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/pipeline-gpipe-one-f-one-b.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="GPipe 与同步 1F1B 的调度和激活驻留"></iframe>
+<p><a href="/content/interactive/distributed-training/pipeline-gpipe-one-f-one-b.html?v=height-v2">单独打开此图</a></p>
+<h2 id="10-activation-checkpointing-少保存-反向时重算">10. Activation Checkpointing：少保存，反向时重算</h2>
+<p>保存区段输入与必要信息，而不保留全部内部激活；反向需要时重新执行必要的前向，重建中间张量，再完成反向。减少的是保存的激活，代价是额外前向计算，不是“把反向再执行一遍”。</p>
+<p>它与保存到磁盘、用于恢复训练的 checkpoint 不同。后者可以保存模型、优化器、随机状态、步数等；前者改变单次训练过程的内存与计算安排。</p>
+<p>若区段包含 Dropout，重算必须与原前向的随机行为一致。一般需要保存、恢复 RNG 状态；只设置一次相同种子不等于恢复到当前随机序列位置。PyTorch checkpoint 默认处理相关 RNG 状态，但设备迁移、状态变化和具体模式仍需遵守 API 条件。非重入实现可在必要重算完成后提前停止，并非总是完整重跑整个区段。<a href="https://docs.pytorch.org/docs/stable/checkpoint.html">checkpoint API</a></p>
+<iframe class="transformer-interactive" data-widget="activation-checkpoint-recompute" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/activation-checkpoint-recompute.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="激活保存与反向时的前向重计算"></iframe>
+<p><a href="/content/interactive/distributed-training/activation-checkpoint-recompute.html?v=height-v2">单独打开此图</a></p>
+<p>这与相邻推理模块讨论的“历史 KV 按需重算”共享以计算换驻留空间的思想，但重建对象与生命周期不同。训练 checkpoint 重建反向需要的激活；推理 KV 重算重建当前 Attention 所需的历史状态。二者都要评估重算阶段的临时峰值，不能只比较长期保存量。</p>
+<h2 id="11-混合精度与数值稳定-范围-精度-缩放分开">11. 混合精度与数值稳定：范围、精度、缩放分开</h2>
+<h3 id="11-1-fp16-bf16-fp32">11.1 FP16、BF16、FP32</h3>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th align="right">符号位</th>
+<th align="right">指数位</th>
+<th align="right">显式小数位</th>
+<th>主要特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FP16</td>
+<td align="right">1</td>
+<td align="right">5</td>
+<td align="right">10</td>
+<td>常见正常范围内比 BF16 精细，最大有限值 65504</td>
+</tr>
+<tr>
+<td>BF16</td>
+<td align="right">1</td>
+<td align="right">8</td>
+<td align="right">7</td>
+<td>数值范围接近 FP32，尾数较粗</td>
+</tr>
+<tr>
+<td>FP32</td>
+<td align="right">1</td>
+<td align="right">8</td>
+<td align="right">23</td>
+<td>范围大，尾数精度更高</td>
+</tr>
+</tbody></table>
+<p>100000 在 FP16 中可能溢出，BF16 可表示为附近的 99840；1.001 在 FP16 中约为 1.0009765625，BF16 则会舍入到 1。范围更大不等于小数更精细。极小数可能 underflow 或舍入为 0；超范围可能成为 Inf；Inf/Inf、0/0 等可能生成 NaN。<a href="https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html">NVIDIA 精度说明</a></p>
+<p>autocast 根据算子选择合适 dtype，不应简单理解为所有张量都转成 FP16。是否用主参数、梯度 dtype 与优化器布局需要另查。<a href="https://docs.pytorch.org/docs/stable/amp.html">PyTorch AMP 文档</a></p>
+<iframe class="transformer-interactive" data-widget="floating-point-range-precision" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/floating-point-range-precision.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="浮点范围与有效精度比较"></iframe>
+<p><a href="/content/interactive/distributed-training/floating-point-range-precision.html?v=height-v2">单独打开此图</a></p>
+<h3 id="11-2-loss-scaling-必须发生在梯度丢失之前">11.2 Loss Scaling 必须发生在梯度丢失之前</h3>
+<p>对 loss 乘 S 后再反向，链式法则使梯度也乘 S，帮助小梯度在 FP16 计算过程中保持可表示；更新前再 unscale。已经舍入为 0 的梯度事后乘 S 仍是 0，信息无法恢复。</p>
+<p>S 过大会让其他梯度溢出。动态 GradScaler 会检测非有限梯度，必要时跳过更新并调整 scale。BF16 常因范围较大而不需要同样的缩放策略，但它仍不能修复公式本身的数值问题。<a href="https://docs.pytorch.org/tutorials/recipes/recipes/amp_recipe.html">AMP 实践教程</a></p>
+<iframe class="transformer-interactive" data-widget="loss-scaling-gradient-range" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/loss-scaling-gradient-range.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="Loss Scaling：反向前放大与更新前还原"></iframe>
+<p><a href="/content/interactive/distributed-training/loss-scaling-gradient-range.html?v=height-v2">单独打开此图</a></p>
+<h3 id="11-3-先还原-再裁剪-先正确聚合-再做非线性处理">11.3 先还原，再裁剪；先正确聚合，再做非线性处理</h3>
+<p>梯度 g=[3,4]、scale=10、裁剪阈值 1：先 unscale，再裁剪得到 [0.6,0.8]。若对 [30,40] 先裁剪成 [0.6,0.8]，再除以 10，会错误得到 [0.06,0.08]。</p>
+<p>梯度裁剪与 micro-batch 平均也不交换。g₁=[3,0]、g₂=[0,4]：平均为 [1.5,2]，范数 2.5，裁剪为 [0.6,0.8]；若先各自裁剪，再平均则是 [0.5,0.5]，方向与大小都变了。</p>
+<p>分片训练还要使用适合分布式布局的全局 norm 计算，不能只把某卡梯度分片的 norm 当作整个模型的 norm。逻辑上先得到本轮目标所需的聚合梯度、还原 scale，再按定义裁剪并更新；具体通信可以与反向重叠。</p>
+<h3 id="11-4-不同有效-token-数-需要不同权重">11.4 不同有效 token 数，需要不同权重</h3>
+<p>两个 micro-batch 有效 token 数为 2、8，各自 mean loss 的梯度为 6、2。全局 token 平均目标应使用：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>g</mi><mo>=</mo><mfrac><mrow><mn>2</mn><mo>×</mo><mn>6</mn><mo>+</mo><mn>8</mn><mo>×</mo><mn>2</mn></mrow><mrow><mn>2</mn><mo>+</mo><mn>8</mn></mrow></mfrac><mo>=</mo><mn>2.8.</mn></mrow><annotation encoding="application/x-tex">g=\frac{2\times6+8\times2}{2+8}=2.8.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">g</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0908em;vertical-align:-0.7693em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">8</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">6</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">8</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.7693em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2.8.</span></span></span></span></span>
+<p>直接 <code>(6+2)/2=4</code> 把只占 20% token 的第一批赋予 50% 权重。跨 rank 也一样：先明确是 token 平均、样本平均还是其他目标，处理 mask 与总计数，再决定归一化。并行计算中的“sum”与 loss 目标中的“mean”是两个层次。</p>
+<h3 id="11-5-softmax-稳定计算不能靠换-bf16-代替">11.5 Softmax 稳定计算不能靠换 BF16 代替</h3>
+<p>手写 <code>exp(z)/sum(exp(z))</code>，在 FP32 下对 [100,102] 直接计算指数也会溢出，随后 Inf/Inf 得到 NaN。稳定算法先减去最大值 m：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mi>i</mi></msub><mo>=</mo><mfrac><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>i</mi></msub><mo>−</mo><mi>m</mi></mrow></msup><mrow><munder><mo>∑</mo><mi>j</mi></munder><msup><mi>e</mi><mrow><msub><mi>z</mi><mi>j</mi></msub><mo>−</mo><mi>m</mi></mrow></msup></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mi>m</mi><mo>=</mo><munder><mrow><mi>max</mi><mo>⁡</mo></mrow><mi>j</mi></munder><msub><mi>z</mi><mi>j</mi></msub><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">p_i=\frac{e^{z_i-m}}{\sum_j e^{z_j-m}},\qquad m=\max_j z_j.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal">p</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.5701em;vertical-align:-1.1218em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.4483em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mop"><span class="mop op-symbol small-op" style="position:relative;top:0em;">∑</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.162em;"><span style="top:-2.4003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.4358em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7134em;"><span style="top:-3.0051em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.04398em;">z</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3281em;"><span style="top:-2.357em;margin-left:-0.044em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2819em;"><span></span></span></span></span></span></span><span class="mbin mtight">−</span><span class="mord mathnormal mtight">m</span></span></span></span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">e</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7713em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.04398em;">z</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3281em;"><span style="top:-2.357em;margin-left:-0.044em;margin-right:0.0714em;"><span class="pstrut" style="height:2.5em;"></span><span class="sizing reset-size3 size1 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.143em;"><span></span></span></span></span></span></span><span class="mbin mtight">−</span><span class="mord mathnormal mtight">m</span></span></span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.1218em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:2em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">m</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.2943em;vertical-align:-0.8638em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.4306em;"><span style="top:-2.3723em;margin-left:0em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span><span class="mop">max</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.8638em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.04398em;">z</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.044em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<p>减去公共常数不改变数学结果，指数输入不大于 0，避免这里的正向指数溢出。[200,203] 应变为 [-3,0]。BF16 的范围接近 FP32，直接算 e²⁰⁰ 仍会溢出。</p>
+<p>这是手写公式的教学示例，不是在说 PyTorch 内置 Softmax 对这些正常有限输入会采用不稳定实现。若输入本身已有 Inf、NaN 或 mask 导致整行无有效位置，仍要按实际算法处理；减最大值不是所有异常的通用修复。排查时定位第一个产生非有限值的算子。Loss Scaling 无法修复前向已经生成的 NaN。</p>
+<iframe class="transformer-interactive" data-widget="softmax-numerical-stability" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/softmax-numerical-stability.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="直接指数与减最大值的 Softmax"></iframe>
+<p><a href="/content/interactive/distributed-training/softmax-numerical-stability.html?v=height-v2">单独打开此图</a></p>
+<h2 id="12-sp-让每个本地-token-保有完整-hidden">12. SP：让每个本地 token 保有完整 hidden</h2>
+<h3 id="12-1-先认清-layernorm-的统计轴">12.1 先认清 LayerNorm 的统计轴</h3>
+<p>常见 LayerNorm(H) 对每个 token 的 hidden 向量计算均值与方差，统计轴是 H，不是 batch 或序列。x=[1,3] 时均值 2、总体方差 1，忽略 epsilon 且 γ=1、β=0，结果为 [-1,1]。<a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html">LayerNorm API</a></p>
+<p>如果按 hidden 切分，各卡只有一个元素，不能仅凭本地均值方差得到正确全向量的统计量；需要跨卡合并统计信息。无需因此断言一定要把整份激活 AllGather，统计量归约也可能足够。</p>
+<p>若按序列切分，每张卡拥有部分 token 的完整 hidden，各 token 的 LayerNorm 前向就可独立完成。归一化统计是局部的，不意味着共享 γ、β 的参数梯度永远不需要同步。</p>
+<iframe class="transformer-interactive" data-widget="sequence-parallel-layernorm-axis" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/sequence-parallel-layernorm-axis.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="LayerNorm hidden 轴与序列分片"></iframe>
+<p><a href="/content/interactive/distributed-training/sequence-parallel-layernorm-axis.html?v=height-v2">单独打开此图</a></p>
+<h3 id="12-2-本文-sp-的具体范围">12.2 本文 SP 的具体范围</h3>
+<p>这里讨论常见 Megatron 风格、配合 TP 的 Sequence Parallel：在 LayerNorm、Dropout 等区段按序列保存激活，减少 TP rank 上的重复驻留。进入相关 TP 计算前 AllGather 序列激活；输出投影产生同位置的部分贡献后，用 ReduceScatter 求和并重新按序列分片。<a href="https://docs.pytorch.org/tutorials/intermediate/TP_tutorial.html">PyTorch TP 与 SP 教程</a></p>
+<p>完整激活形状 [B,S,H]=[2,8,4096]，4 卡沿 S 均匀切分，局部是 [2,2,4096]：每条序列 2 个 token，batch 有 2 条，总计本卡 4 个位置。不是 [2,8,1024]，后者切了 hidden。</p>
+<iframe class="transformer-interactive" data-widget="sequence-parallel-tp-communication" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/sequence-parallel-tp-communication.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="SP 与 TP 的 AllGather、ReduceScatter 布局转换"></iframe>
+<p><a href="/content/interactive/distributed-training/sequence-parallel-tp-communication.html?v=height-v2">单独打开此图</a></p>
+<h2 id="13-cp-attention-也持续按序列分工">13. CP：Attention 也持续按序列分工</h2>
+<h3 id="13-1-本地-query-为什么需要远端-k-v">13.1 本地 Query 为什么需要远端 K/V</h3>
+<p>Context Parallel 将序列分布到不同 rank，Attention 中保留本地 Query，交换计算所需的其他位置 K/V。与上一节的 SP 布局不同，这里 Attention 的序列计算本身也分布执行。<a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/features/context_parallel.html">Megatron Core CP 说明</a></p>
+<p>设序列位置 1、2 在 GPU 0，位置 3、4 在 GPU 1。因果 Attention 下：Q₄ 需要 K/V₁…₄，GPU 1 仅有 3、4 不够；Q₁ 只需要 K/V₁，不需要未来位置。全局位置与 causal mask 必须正确，不能按物理卡上的局部编号重新定义可见性。</p>
+<p>简图可以用 AllGather KV 说明需要的信息；实际可用环形、分块点对点交换，边传边算，避免一次复制全部 KV。</p>
+<iframe class="transformer-interactive" data-widget="context-parallel-local-query" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/context-parallel-local-query.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="CP 本地 Query 与远端 K/V 的因果可见性"></iframe>
+<p><a href="/content/interactive/distributed-training/context-parallel-local-query.html?v=height-v2">单独打开此图</a></p>
+<h3 id="13-2-kv-反向要合并各-query-的贡献">13.2 KV 反向要合并各 Query 的贡献</h3>
+<p>同一个 K₁ 被不同 rank 的 Query 使用后，它的梯度来自这些 Query 的贡献。若本地贡献为 [2,1]、远端为 [4,3]，且均已包含目标 loss 的归一化系数，则 K₁ 的拥有者应得到 [6,4]，不能再次平均成 [3,2]。这是链式法则的贡献合并。</p>
+<h3 id="13-3-因果计算量为什么容易不均">13.3 因果计算量为什么容易不均</h3>
+<p>以有效 Query–Key 配对数作简化工作量代理，长度 8 的位置 i 需要看 i 个 key。连续分配 1…4 与 5…8 时，计数为 10 与 26；首尾配对 1、2、7、8 与 3、4、5、6 时，都是 18。</p>
+<p>首尾配对在这个代理上更均衡，但不能据此保证实际耗时严格相同。kernel 的 tile、padding、通信、MLP 与硬件状态都会影响性能。重新分配不改变原 token 的全局位置或因果关系。</p>
+<iframe class="transformer-interactive" data-widget="context-parallel-causal-balance" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/context-parallel-causal-balance.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="CP 因果工作量：连续与首尾配对分配"></iframe>
+<p><a href="/content/interactive/distributed-training/context-parallel-causal-balance.html?v=height-v2">单独打开此图</a></p>
+<h2 id="14-回到-7b-任务-把显存与一次-step-连起来">14. 回到 7B 任务：把显存与一次 step 连起来</h2>
+<h3 id="14-1-8-张-24-gb-卡的容量判定">14.1 8 张 24 GB 卡的容量判定</h3>
+<p>ZeRO-2 持久状态 26.25 GB/卡，不能放入题设的 24 GB。ZeRO-3 持久状态 14 GB/卡，状态账本能放下。若<strong>同一时刻</strong>还有 3 GB 额外参数聚合、6 GB 保存激活、2 GB 通信与其他 buffer，则峰值为：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>14</mn><mo>+</mo><mn>3</mn><mo>+</mo><mn>6</mn><mo>+</mo><mn>2</mn><mo>=</mo><mn>25</mn><mtext> GB</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">14+3+6+2=25\text{ GB}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">14</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">3</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">6</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord">25</span><span class="mord text"><span class="mord"> GB</span></span><span class="mord">.</span></span></span></span></span>
+<p>仍然不够。若 checkpoint 将该时刻激活从 6 GB 降到 2 GB，其他项不变，则峰值为 21 GB。ZeRO-3 改变模型状态冗余，checkpoint 改变激活保存量，因此两者可以组合。这只是在给定预算表下通过，不保证真实实现里未列出的开销为零。</p>
+<h3 id="14-2-一次可讲给面试官的完整训练时序">14.2 一次可讲给面试官的完整训练时序</h3>
+<p>本轮先按数据并行分配本地 micro-batch，明确全局 loss 权重。在每个 block 前，FSDP AllGather 当前 block 参数；前向处理本地数据。对 checkpoint 区段只保留必要输入与随机状态；普通区段保留所需激活。前向后按题设释放完整参数。</p>
+<p>反向逆序遍历 block：重新聚合必要参数，重算 checkpoint 区段的前向，计算本地数据对完整 block 的参数梯度和输入梯度。就绪的梯度参与 ReduceScatter，合并相同参数位置的跨数据贡献并保留分片。完成本轮累积后，正确 unscale、计算分布式全局 norm、按需裁剪，再由各 rank 更新自己的分片。下一轮聚合新的参数值。</p>
+<p>若单层算子还太大，可以在 block 内引入 TP；若按层分布整模型，可以增加 PP；长序列可引入 SP/CP。这些是后续配置分支，不表示刚才“8 rank 全做 FSDP”的数字还能直接照搬。</p>
+<p>例如简单、互不重叠的 64 卡设备网格可以取 DP=4、TP=4、PP=2、CP=2。此时 TP/PP/CP rank 合作处理同一份数据，真正独立的数据副本数是 4。若 FSDP 在这 4 个 DP rank 间分片，显存账本先考虑 PP 分层、TP 算子分片，再按实际 FSDP 组分摊；不能直接把任意状态都除以 64。实际 hybrid sharding 或共享通信组还要以框架设备网格为准。</p>
+<h2 id="15-从-8-卡到-64-卡-看吞吐-再找关键路径">15. 从 8 卡到 64 卡：看吞吐，再找关键路径</h2>
+<h3 id="15-1-扩展效率怎么计算">15.1 扩展效率怎么计算</h3>
+<p>有效 tokens/s=每 step 全局有效 token 数÷step 秒数。例子中，8 卡每步 8192 token、1 秒，吞吐 8192 tokens/s；64 卡每步 65536 token、2 秒，吞吐 32768 tokens/s。吞吐提高 4 倍，GPU 数提高 8 倍，扩展效率为 4/8=50%。</p>
+<p>64 卡 step 更慢，但每步工作量变大，吞吐仍提高。比较时必须区分固定全局工作量的 strong scaling 与固定每卡工作量的 weak scaling；不能把两种测试口径混为一谈。</p>
+<p>还应记录模型与训练算法、精度、GPU 和网络拓扑、序列长度分布、有效 token 与 padding、每卡 micro-batch、累积次数、DP/TP/PP/CP/FSDP 组配置。固定 global batch 时，增加 DP 数通常要调整每卡 batch 或累积次数；固定后两者时，global batch 则增大。“batch 和并发都相同”不是足够清楚的口径。</p>
+<h3 id="15-2-原始通信更短-不保证-step-更短">15.2 原始通信更短，不保证 step 更短</h3>
+<p>只对这张简化时间线，可写 step=准备+计算+没有被隐藏的通信。准备 100 ms，计算 800 ms：A 总通信 1200 ms，重叠 300 ms，step=1800 ms；B 总通信 1400 ms，重叠 700 ms，step=1600 ms。</p>
+<p>B 总通信更长，却减少了关键路径上的暴露通信。在实际 trace 中不能把所有 NCCL 事件时长简单相加或机械减去一个“重叠比例”，要根据依赖、不同 stream 和各 rank 时间轴识别真正延长 step 的部分。</p>
+<iframe class="transformer-interactive" data-widget="training-communication-overlap" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/training-communication-overlap.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="原始通信、重叠与关键路径中的暴露通信"></iframe>
+<p><a href="/content/interactive/distributed-training/training-communication-overlap.html?v=height-v2">单独打开此图</a></p>
+<h3 id="15-3-通信记录长-也可能是在等其他-rank">15.3 通信记录长，也可能是在等其他 rank</h3>
+<p>设时间轴已对齐：GPU 0 在 100 ms 梯度就绪并进入 AllReduce，GPU 1 到 300 ms 才就绪，均在 330 ms 完成。GPU 0 的记录长 230 ms，但不能宣布网络传输了 230 ms；其中可能包含等待 GPU 1。</p>
+<table>
+<thead>
+<tr>
+<th>观察证据</th>
+<th>优先调查</th>
+<th>可验证的优化与指标</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>输入晚就绪，之后计算正常</td>
+<td>读取、预处理、H2D 与预取</td>
+<td>改善输入供给；输入等待下降、吞吐上升</td>
+</tr>
+<tr>
+<td>输入相近，但某卡计算更长</td>
+<td>工作量、算子形状/调用次数、执行效率</td>
+<td>均衡实际工作或优化已定位算子；计算与就绪差距缩小</td>
+</tr>
+<tr>
+<td>各卡同时就绪，通信仍长</td>
+<td>拓扑、通信实现、带宽、消息大小</td>
+<td>独立通信测试与端到端比较；暴露通信下降</td>
+</tr>
+<tr>
+<td>一卡早进通信，其他卡晚进</td>
+<td>追查慢 rank 的上游阶段</td>
+<td>修复等待来源；等待下降且 step 缩短</td>
+</tr>
+</tbody></table>
+<p>可用 PyTorch Profiler 标记数据、前向、反向区段，记录 CPU/CUDA 活动、算子形状和调用次数，导出 trace 并对照各 rank。跨主机比较需确保时钟或时间轴对齐。<a href="https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html">Profiler 教程</a></p>
+<iframe class="transformer-interactive" data-widget="rank-timeline-bottleneck-diagnosis" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/distributed-training/rank-timeline-bottleneck-diagnosis.html?v=height-v2" style="display:block;width:100%;height:650px;border:0" title="同样 step 耗时下的数据、计算与通信瓶颈"></iframe>
+<p><a href="/content/interactive/distributed-training/rank-timeline-bottleneck-diagnosis.html?v=height-v2">单独打开此图</a></p>
+<p>图中三种原因都得到 step=230 ms，GPU 0 的通信记录也都是 130 ms，但分别由输入慢、计算不均、通信阶段长造成。灰色等待是依据就绪时间解释的教学区段，不代表 profiler 必然输出一个独立、准确同名的事件。</p>
+<h3 id="15-4-优化慢卡-而不是要求每张卡都更快">15.4 优化慢卡，而不是要求每张卡都更快</h3>
+<p>两卡数据准备各 20 ms，通信在两卡计算完成后耗时 30 ms。原计算耗时 [80,180] ms，step=230 ms；重新分配为 [130,130] ms，step=180 ms。</p>
+<p>GPU 0 自己变慢，但整体关键路径缩短，固定工作量吞吐提高 230/180≈1.28 倍。负载均衡的目标是降低最慢路径与等待，不是每个 rank 都独立刷新最快时间。“相同 token 数”也不一定等于相同 Attention 工作量。</p>
+<p>面试回答可以按“<strong>观察 → 假设原因 → 验证 → 优化 → 端到端复测</strong>”组织。优化前先确认因果证据，优化后报告 step、有效吞吐、就绪差距、暴露通信和峰值显存的变化。最终训练效率还应考虑数值正确性、收敛与达到目标质量所需的总时间。</p>
+<h2 id="16-我的错误回答与不够完整的地方">16. 我的错误回答与不够完整的地方</h2>
+<p>下表保留真实学习过程。后来答对的题不再列为“仍不会”，只是留下复习检查点。</p>
+<table>
+<thead>
+<tr>
+<th>当时的回答或遗漏</th>
+<th>问题在哪里</th>
+<th>现在的准确表述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>micro-batch 缩成 1/8 后，认为梯度和“优化器保留的激活”也缩成 1/8</td>
+<td>混淆参数状态与激活；优化器状态不是通常所说的前向激活</td>
+<td>稠密参数梯度与状态形状不变，主要减少保存激活</td>
+</tr>
+<tr>
+<td>ReduceScatter 平均 <code>[2,4]</code> 与 <code>[6,8]</code>，答 3、7</td>
+<td>平均了同 rank 的不同参数</td>
+<td>对齐相同位置跨 rank 归约，得到 4、6</td>
+</tr>
+<tr>
+<td>说 ReduceScatter 后各卡保留部分“参数”</td>
+<td>没说清此次通信的张量类型</td>
+<td>梯度通信改变梯度布局；ZeRO-2 参数仍完整</td>
+</tr>
+<tr>
+<td>ZeRO-2 前向可以，反向只能算自己保留那部分</td>
+<td>把保存/更新责任等同于本地贡献的计算范围</td>
+<td>本地数据对完整模型的贡献都要计算，再归约分片</td>
+</tr>
+<tr>
+<td>ZeRO-3 只给出 <code>7×16/8</code></td>
+<td>状态账本正确，尚未回答能否保证运行</td>
+<td>14 GB 不是峰值，还需聚合参数、激活与临时空间</td>
+</tr>
+<tr>
+<td>TP 输入切分反向答 <code>[2,6]</code>、<code>[2,4]</code>，再求和 <code>[4,10]</code></td>
+<td>套用前向元素运算，未先写 dX=WᵀG；混淆不同输入位置</td>
+<td>两列与 G 点积得到 7、10；不同位置拼接为 <code>[7,10]</code></td>
+</tr>
+<tr>
+<td>PP 利用率答 4/5，但解释只说“首次要激活最开始阶段”</td>
+<td>数值正确，填充、排空与总槽数解释不完整</td>
+<td>先写 2(m+p−1) 与 2m，再说明气泡来源</td>
+</tr>
+<tr>
+<td>扩卡比较认为 batch、并发都相同</td>
+<td>没区分 global 与 per-rank，也没说明 strong/weak scaling</td>
+<td>记录 global batch、micro-batch、累积、并行组和有效 token</td>
+</tr>
+<tr>
+<td>各 rank 时序如何区分瓶颈，答“不太讲得清楚”</td>
+<td>缺少逐阶段就绪证据</td>
+<td>比较输入、算子计算、梯度就绪、通信启动与完成</td>
+</tr>
+<tr>
+<td>通信重叠、负载均衡方向正确，但未给验证指标</td>
+<td>优化建议尚未形成闭环</td>
+<td>暴露通信/等待下降，并用相同工作量下 step 与有效吞吐验证</td>
+</tr>
+<tr>
+<td>计算不均时提出让序列长度相等、优化算子</td>
+<td>可作为候选，但 trace 尚未证明具体原因</td>
+<td>先对照实际工作量、形状与算子调用；再采取对应优化</td>
+</tr>
+</tbody></table>
+<p>后续已经能正确回答：FSDP 完整生命周期、TP 输入梯度、loss 缩放与裁剪顺序、CP 因果负载、8→64 卡吞吐，以及 ZeRO-3 与 checkpoint 的峰值组合题。下一步源码与真实多卡实践可以继续检验这些原理是否能用于实际系统。</p>
+<h2 id="17-我主动追问的几个问题">17. 我主动追问的几个问题</h2>
+<h3 id="没看懂-fsdp-具体怎么分-以及计算过程怎样">“没看懂 FSDP 具体怎么分，以及计算过程怎样”</h3>
+<p>关键是把两层概念分开：参数平时以分片形式驻留；计算当前单元前聚合完整参数。block 分组控制参数通信的集合与调度，不意味着每个 rank 只算半个 block。小矩阵示例的输出 <code>[3,7]</code> 是本地样本的完整输出。梯度归约后才保留拥有者的分片。</p>
+<h3 id="是不是输出维度按行切-算完拼接-输入维度按列切-算完融合">“是不是输出维度按行切，算完拼接；输入维度按列切，算完融合”</h3>
+<p>在本文 y=Wx、W[out,in] 约定下成立。但“融合”应具体说成对相同输出位置的线性贡献求和；不能任意使用平均或其他函数。框架若用 Y=XW，图上的行列方向会反转，应该用输入/输出轴说明。</p>
+<h3 id="relu-能在各卡独立处理-第二层直接用对应-hidden-再求和吗">“ReLU 能在各卡独立处理，第二层直接用对应 hidden，再求和吗”</h3>
+<p>第一层输出切分时，每个 hidden 元素已完整，逐元素 ReLU 可以本地执行；第二层输入切分与本地 hidden 匹配，可直接计算贡献并求和。若第一层本身只是同一元素的部分贡献，则必须先恢复完整值再做 ReLU。</p>
+<h3 id="这里说的应该是-attention-计算吧">“这里说的应该是 Attention 计算吧”</h3>
+<p>是。CP 中 Q₄ 缺少远端 K/V 的讨论发生在 Attention；LayerNorm、逐 token MLP 对序列其他位置没有同样的读取要求。因果 mask 限定可见位置，Q₁ 无需未来 KV，而 Q₄ 必须得到前面位置的信息。</p>
+<h3 id="从相邻会话延伸-重计算是不是不可行的删缓存">从相邻会话延伸：重计算是不是不可行的删缓存</h3>
+<p>在推理模块，我曾提出保留最新 KV、历史 KV 按需重建；最终澄清这是可行的计算换显存思路，不是删除历史语义。这里训练 checkpoint 也遵循“需要时正确重建”的原则。但训练激活与推理 KV 的依赖和用途不同，应分别计算额外工作与临时峰值。</p>
+<h2 id="18-从浅到深自测-先作答-再展开">18. 从浅到深自测：先作答，再展开</h2>
+<h3 id="a-训练状态与显存">A. 训练状态与显存</h3>
+<p><strong>1. 已执行 backward，但还没 step，参数是否改变？</strong></p>
+<details><summary>答案</summary>
+<p>通常尚未改变。backward 计算并累积梯度；optimizer.step 才执行参数更新。</p>
+</details>
+<p><strong>2. 两次 backward 的梯度分别是 −10 与 −6，未清理时得到多少？只保留后一次要怎样做？</strong></p>
+<details><summary>答案</summary>
+<p>得到 −16。若不希望累积，应在第二次 backward 前清理 <code>.grad</code>；只得到 −6。</p>
+</details>
+<p><strong>3. 100 万可训练参数，micro-batch 从 8 变为 1，梯度元素变成多少？</strong></p>
+<details><summary>答案</summary>
+<p>普通稠密梯度仍有 100 万元素。micro-batch 改变数据与激活，不改变参数形状。</p>
+</details>
+<p><strong>4. 本文 7B Adam 状态总量是多少？8 卡 DDP 每卡多少？</strong></p>
+<details><summary>答案</summary>
+<p>16×7=112 GB。DDP 复制完整状态，每卡仍为 112 GB，不是 14 GB。</p>
+</details>
+<p><strong>5. 4 卡 ZeRO-1、ZeRO-2 的状态量分别是多少？</strong></p>
+<details><summary>答案</summary>
+<p>ZeRO-1：14+14+84/4=49 GB；ZeRO-2：14+14/4+84/4=38.5 GB。</p>
+</details>
+<p><strong>6. 8 张 24 GB 卡，ZeRO-2 与 ZeRO-3 是否通过持久状态容量检查？</strong></p>
+<details><summary>答案</summary>
+<p>ZeRO-2 为 26.25 GB，不能；ZeRO-3 为 14 GB，持久状态能放下，但尚不能保证运行峰值。</p>
+</details>
+<p><strong>7. ZeRO-3 状态 14 GB，同一时刻聚合 3 GB、激活 6 GB、其他 2 GB，峰值多少？checkpoint 使激活降到 2 GB 后呢？</strong></p>
+<details><summary>答案</summary>
+<p>原峰值 25 GB，超 24 GB；新峰值 21 GB。状态仍 14 GB。分片与重计算作用在不同项目上。</p>
+</details>
+<h3 id="b-归约与-fsdp">B. 归约与 FSDP</h3>
+<p><strong>8. <code>[2,4]</code> 与 <code>[6,8]</code> 跨卡平均并 ReduceScatter，一卡负责一列，各得什么？</strong></p>
+<details><summary>答案</summary>
+<p>GPU 0 得 4，GPU 1 得 6。跨卡对齐相同参数位置，而不是平均一张卡内部的两个不同位置。</p>
+</details>
+<p><strong>9. <code>[1,10]</code> 与 <code>[5,2]</code>，同样的操作结果呢？会把参数也分片吗？</strong></p>
+<details><summary>答案</summary>
+<p>分别 3、6。若通信对象是梯度，就只改变归约后梯度的布局，不会自动切分参数。</p>
+</details>
+<p><strong>10. ZeRO-2 中一个参数由 GPU 1 更新，GPU 0 能跳过本地数据对它的梯度吗？</strong></p>
+<details><summary>答案</summary>
+<p>不能。否则缺少 GPU 0 样本的贡献，更新不再代表目标全局数据。</p>
+</details>
+<p><strong>11. FSDP 以 block 聚合且前向后 reshard，反向需要输入梯度，讲出生命周期。</strong></p>
+<details><summary>答案</summary>
+<p>分片驻留→前向前 AllGather→完整参数计算本地前向并保存必要激活→前向后释放完整参数→反向前再次 AllGather→计算本地数据对完整 block 的参数梯度与输入梯度→ReduceScatter 正确归约并保存梯度分片→用完后释放完整参数/激活→本轮累积结束后更新自己的分片。其他策略与预取可能调整驻留时机。</p>
+</details>
+<p><strong>12. FSDP 的通信单元越小就一定越快吗？</strong></p>
+<details><summary>答案</summary>
+<p>不一定。可能降低临时参数量，但增加 collective 启动与调度次数；需要比较暴露通信、step 与显存峰值。</p>
+</details>
+<h3 id="c-tp-与反向">C. TP 与反向</h3>
+<p><strong>13. y=Wx、W[out,in]，输出切分与输入切分分别切哪里，怎样恢复完整输出？</strong></p>
+<details><summary>答案</summary>
+<p>输出切分切行，结果是不同输出位置，需要完整输出时拼接；输入切分切列，结果是同一输出的部分贡献，求和恢复。</p>
+</details>
+<p><strong>14. FSDP 和 TP 都切了权重，计算过程区别是什么？</strong></p>
+<details><summary>答案</summary>
+<p>本文 FSDP 聚合当前单元完整参数后，各卡计算各自数据的完整算子；TP 各卡用参数子矩阵合作计算同一算子。</p>
+</details>
+<p><strong>15. 两层 TP MLP 为什么可以不在中间拼出完整 hidden？</strong></p>
+<details><summary>答案</summary>
+<p>第一层输出切分后各 hidden 元素完整，逐元素函数可本地执行；第二层输入切分匹配本地 hidden，直接算部分输出贡献，最后求和。</p>
+</details>
+<p><strong>16. 部分贡献 <code>[2,−3]</code> 和 <code>[−1,4]</code>，ReLU 是否与相加交换？</strong></p>
+<details><summary>答案</summary>
+<p>不交换。先加再 ReLU 为 [1,1]；先 ReLU 再加为 [2,4]。</p>
+</details>
+<p><strong>17. 只按 Attention head 切分，GPU 0 的 Head 1 是否一定缺少远端 token 的 K/V？</strong></p>
+<details><summary>答案</summary>
+<p>不是。题设未按序列切分，它持有本地 head 的完整序列 Q/K/V；其他 head 的 KV 不用于这个 head 的 Attention。</p>
+</details>
+<p><strong>18. 输出切分反向，各卡对同一输入贡献为 <code>[2,4]</code> 和 <code>[3,4]</code>，完整 dX 是什么？</strong></p>
+<details><summary>答案</summary>
+<p>求和为 [5,8]，不除以 2。这是同一输入位置的链式法则贡献合并。</p>
+</details>
+<p><strong>19. 输入切分 W 两列为 <code>[1,3]</code> 与 <code>[2,4]</code>，G=[1,2]，完整 dX 是什么？</strong></p>
+<details><summary>答案</summary>
+<p>各卡计算 W 的本地列与 G 的点积：7 与 10，对应不同输入元素，拼接成 [7,10]。</p>
+</details>
+<h3 id="d-pp-与重计算">D. PP 与重计算</h3>
+<p><strong>20. 后 stage 应向前 stage 发送自己的权重梯度，还是边界激活的梯度？</strong></p>
+<details><summary>答案</summary>
+<p>发送 ∂L/∂A，供前 stage 继续链式反向。后 stage 自己保存其权重梯度。</p>
+</details>
+<p><strong>21. 理想 GPipe，p=4、m=8，利用率与按实际时长算的气泡比例？p=8 时呢？</strong></p>
+<details><summary>答案</summary>
+<p>p=4：8/11、3/11；p=8：8/15、7/15。前提是平衡、前后向等时、忽略通信。</p>
+</details>
+<p><strong>22. 同步 1F1B 的主要显存收益是什么？每个 micro-batch 完成反向后可以立即 step 吗？</strong></p>
+<details><summary>答案</summary>
+<p>更早使用并释放保存激活，减少在途激活数量。通常要完成本轮所有累积再更新，避免前后向参数版本不一致。</p>
+</details>
+<p><strong>23. checkpoint 省模型参数和 Adam 状态吗？重算的是反向吗？</strong></p>
+<details><summary>答案</summary>
+<p>通常不减少这些状态。它少保存内部激活，反向需要时重算必要的前向，再进行反向。</p>
+</details>
+<p><strong>24. checkpoint 中含 Dropout，只设一次相同 seed 就一定保证重算一致吗？</strong></p>
+<details><summary>答案</summary>
+<p>不一定。需要恢复到原前向相应的 RNG 状态位置，并保证其他影响计算的状态一致。</p>
+</details>
+<h3 id="e-精度与-loss-归一化">E. 精度与 loss 归一化</h3>
+<p><strong>25. 100000 与 1.001，BF16 和 FP16 各有什么优势？</strong></p>
+<details><summary>答案</summary>
+<p>100000 用 BF16 更不易溢出，FP16 超过最大有限值；1.001 用 FP16 保留更细，BF16 在此会舍入到 1。</p>
+</details>
+<p><strong>26. 极小梯度已经变成 0，再乘 1024 能救回来吗？</strong></p>
+<details><summary>答案</summary>
+<p>不能。应在 backward 前放大 loss，使梯度形成时就处于较可表示范围，更新前再还原。</p>
+</details>
+<p><strong>27. g=[3,4]、scale=10、裁剪阈值 1，两种先后顺序各得到什么？</strong></p>
+<details><summary>答案</summary>
+<p>先还原再裁剪为 [0.6,0.8]；先裁剪放大梯度再还原为 [0.06,0.08]。应使用前者。</p>
+</details>
+<p><strong>28. g₁=[3,0]、g₂=[0,4]，阈值 1，先均值再裁剪与先裁剪再均值是否相同？</strong></p>
+<details><summary>答案</summary>
+<p>不相同，分别 [0.6,0.8] 与 [0.5,0.5]。裁剪是非线性处理。</p>
+</details>
+<p><strong>29. 两批有效 token 数 2、8，本地 mean 梯度 6、2，全局 token mean 梯度多少？</strong></p>
+<details><summary>答案</summary>
+<p>(2×6+8×2)/10=2.8。直接平均为 4，会过度加权第一批。</p>
+</details>
+<p><strong>30. <code>[200,203]</code> 稳定 Softmax 的平移是什么？直接换 BF16 可以代替吗？</strong></p>
+<details><summary>答案</summary>
+<p>减最大值 203 得 [-3,0]，概率约 [0.047426,0.952574]。不能用 BF16 替代稳定计算，直接指数仍会溢出。</p>
+</details>
+<h3 id="f-sp-与-cp">F. SP 与 CP</h3>
+<p><strong>31. x=[1,3] 的 LayerNorm 均值、总体方差、归一化结果？忽略 epsilon 和仿射参数。</strong></p>
+<details><summary>答案</summary>
+<p>2、1、[-1,1]。按 hidden 切分时需要合并统计信息，按 token 切分保留完整 hidden 时可本地计算。</p>
+</details>
+<p><strong>32. <code>[2,8,4096]</code> 在 4 卡沿 sequence 切分，本地形状是什么？每卡总共多少 token 位置？</strong></p>
+<details><summary>答案</summary>
+<p>[2,2,4096]，每条序列 2 个位置、batch 2，总共 4 个本地位置。</p>
+</details>
+<p><strong>33. SP 配合 TP 的输出投影为何用 ReduceScatter 求和而不是平均？</strong></p>
+<details><summary>答案</summary>
+<p>各卡是相同输出位置的线性部分贡献，应求和恢复，再沿序列散布。它不是多份独立完整输出的平均。</p>
+</details>
+<p><strong>34. CP，GPU 0 存 1、2，GPU 1 存 3、4。Q₄ 只用本地 KV 是否足够？Q₁ 需要远端吗？</strong></p>
+<details><summary>答案</summary>
+<p>Q₄ 不够，缺少位置 1、2；因果 Attention 的 Q₁ 仅需位置 1，不需要未来远端 KV。</p>
+</details>
+<p><strong>35. 已归一化的 K₁ 梯度贡献 <code>[2,1]</code>、<code>[4,3]</code>，最终多少？</strong></p>
+<details><summary>答案</summary>
+<p>[6,4]，求和，不重复平均。</p>
+</details>
+<p><strong>36. 长度 8 的因果配对代理，连续 1…4 / 5…8 与首尾 1、2、7、8 / 3、4、5、6 的工作量各多少？</strong></p>
+<details><summary>答案</summary>
+<p>连续 10/26，首尾 18/18。代理更均衡不等于真实 kernel 耗时一定完全相等。</p>
+</details>
+<h3 id="g-扩卡与诊断">G. 扩卡与诊断</h3>
+<p><strong>37. 8 卡：8192 token、1 s/step；64 卡：65536 token、2 s/step。吞吐、加速、扩展效率？</strong></p>
+<details><summary>答案</summary>
+<p>8192 与 32768 tokens/s，加速 4 倍，效率 50%。step 慢不等于吞吐低。</p>
+</details>
+<p><strong>38. 固定每卡 micro-batch 与累积次数，DP 从 8 到 64，global batch 还能固定吗？</strong></p>
+<details><summary>答案</summary>
+<p>不能，在纯 DP 中会扩大 8 倍。固定 global batch 就要调整每卡 micro-batch 或累积次数等。</p>
+</details>
+<p><strong>39. 准备 100 ms、计算 800 ms；A 通信 1200、重叠 300；B 通信 1400、重叠 700。谁快？</strong></p>
+<details><summary>答案</summary>
+<p>A 为 1800 ms，B 为 1600 ms。B 的暴露通信更少。公式只适用于给定简化时间线。</p>
+</details>
+<p><strong>40. GPU 0 在 100 ms 进入归约，GPU 1 在 300 ms，均于 330 ms 完成，能断言网络用了 230 ms 吗？</strong></p>
+<details><summary>答案</summary>
+<p>不能。GPU 0 可能在等 GPU 1。优先调查 GPU 1 输入或前后向为何晚就绪，再分析实际传输。</p>
+</details>
+<p><strong>41. 计算 <code>[80,180]</code> 变为 <code>[130,130]</code>，准备 20、后续通信 30，优化失败了吗？</strong></p>
+<details><summary>答案</summary>
+<p>没有。step 从 230 到 180 ms，固定工作量吞吐提高约 1.28 倍。单卡变慢不等于整体退化。</p>
+</details>
+<p><strong>42. 用一两分钟回答：64 卡吞吐只达到 8 卡的 4 倍，怎么查？</strong></p>
+<details><summary>答案</summary>
+<p>先明确 strong/weak scaling、模型与精度、硬件拓扑、global batch、micro-batch、累积、序列分布和有效 token；计算吞吐与扩展效率。对齐各 rank trace，检查输入、算子、梯度就绪、通信启动和完成，区分输入慢、计算不均、真实通信长和等待。根据证据改善输入预取、按实际工作量均衡、优化具体算子、调整通信粒度/拓扑或提高重叠。最后在清楚的工作量口径下复测 step、有效 tokens/s、等待与暴露通信，并检查峰值显存、数值和训练质量。</p>
+</details>
+<h2 id="19-复习时保留的判断方法">19. 复习时保留的判断方法</h2>
+<p>每遇到一种并行方案，先问：切的是数据、层、特征、序列，还是驻留状态？每张卡本地拿到的张量代表完整结果、不同位置，还是同位置的部分贡献？然后才能判断使用 AllGather、拼接、求和或平均。</p>
+<p>显存题写出 dtype 与字节数，再区分持久状态和同一时刻的额外占用。性能题先固定比较口径，从各 rank 的时序找到整体关键路径。能说清“省了哪项显存、增加哪项通信或计算、如何验证最终收益”，比只背策略名称更有用。</p>
+<h2 id="参考资料">参考资料</h2>
+<ul>
+<li><a href="https://docs.pytorch.org/tutorials/beginner/basics/autogradqs_tutorial.html">PyTorch Autograd</a>：训练状态与梯度累积。</li>
+<li><a href="https://www.deepspeed.ai/tutorials/zero/">DeepSpeed ZeRO 教程</a> 与 <a href="https://arxiv.org/abs/1910.02054">ZeRO 论文</a>：状态分片的阶段划分。</li>
+<li><a href="https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html">PyTorch FSDP2</a>：分片、聚合、预取与混合精度策略。</li>
+<li><a href="https://docs.pytorch.org/tutorials/intermediate/TP_tutorial.html">PyTorch TP/SP</a>：线性层、Attention 与序列布局。</li>
+<li><a href="https://docs.pytorch.org/tutorials/intermediate/pipelining_tutorial.html">PyTorch PP</a>：阶段划分与流水线调度。</li>
+<li><a href="https://developer.nvidia.com/blog/scaling-language-model-training-to-a-trillion-parameters-using-megatron/">NVIDIA Megatron</a>：同步 1F1B 与激活驻留。</li>
+<li><a href="https://docs.pytorch.org/docs/stable/checkpoint.html">PyTorch Activation Checkpoint</a>：重计算、随机状态与实现差异。</li>
+<li><a href="https://docs.pytorch.org/docs/stable/amp.html">PyTorch AMP</a> 与 <a href="https://docs.pytorch.org/tutorials/recipes/recipes/amp_recipe.html">AMP 实践</a>：autocast、GradScaler 与裁剪顺序。</li>
+<li><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/features/context_parallel.html">Megatron Core CP</a>：KV 通信与因果负载。</li>
+<li><a href="https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html">NCCL Collectives</a>：集合通信的结果布局。</li>
+<li><a href="https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html">PyTorch Profiler</a>：算子与时间轴证据。</li>
+</ul>
+<script defer="" src="/js/transformer-interactives.js"></script>
+<style>
+@media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
+</style>
+]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Distributed Training</tag><tag>ZeRO</tag><tag>FSDP</tag><tag>Model Parallelism</tag><tag>Memory Optimization</tag><tag>Performance Measurement</tag></tags></entry>
 <entry>
       <title>Becoming an LLM Engineer: A Learning Roadmap from Scratch</title>
       <link href="/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/"/>

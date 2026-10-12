@@ -199,6 +199,14 @@
         "Serving"
       ],
       "summary": "A worked GQA serving example connecting KV memory, paging, prefix reuse, batching, prefill/decode separation, speculative decoding, FlashAttention and fair benchmarking, with 18 interactive diagrams and 36 answered self-check questions."
+    },
+    "distributed-training": {
+      "title": "Distributed Training and Memory Optimization: From One Step to 64 GPUs",
+      "coverTitle": [
+        "Distributed",
+        "Training"
+      ],
+      "summary": "A worked 7B training task connecting gradient accumulation, DDP, ZeRO/FSDP, tensor and pipeline parallelism, SP/CP, checkpointing, precision and scaling diagnosis, with 27 interactive diagrams and 42 answered self-check questions."
     }
   },
   "collections": {

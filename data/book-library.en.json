@@ -600,6 +600,32 @@
         "Speculative Decoding",
         "Performance Measurement"
       ]
+    },
+    {
+      "id": "distributed-training",
+      "collection": "infra",
+      "volume": "IX",
+      "title": "Distributed Training and Memory Optimization: From One Step to 64 GPUs",
+      "coverTitle": [
+        "Distributed",
+        "Training"
+      ],
+      "english": "SHARDS TO SCALING",
+      "path": "/2026/10/12/distributed-training/",
+      "date": "2026-10-12",
+      "summary": "A worked 7B training task connecting gradient accumulation, DDP, ZeRO/FSDP, tensor and pipeline parallelism, SP/CP, checkpointing, precision and scaling diagnosis, with 27 interactive diagrams and 42 answered self-check questions.",
+      "art": "/img/books/distributed-training.png",
+      "source": "content/posts/distributed-training.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "Distributed Training",
+        "ZeRO",
+        "FSDP",
+        "Model Parallelism",
+        "Memory Optimization",
+        "Performance Measurement"
+      ]
     }
   ]
 }

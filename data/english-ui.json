@@ -134,5 +134,8 @@
   "多模态": "Multimodal",
   "分布式推理": "Distributed Inference",
   "GPU架构": "GPU Architecture",
-  "Sun Yunfei 与 Levius-Fubuki 的双面身份卡，单击翻面、长按拖拽、右键复位": "Sun Yunfei and Levius-Fubuki identity card. Click to flip, hold to drag, right-click to reset."
+  "Sun Yunfei 与 Levius-Fubuki 的双面身份卡，单击翻面、长按拖拽、右键复位": "Sun Yunfei and Levius-Fubuki identity card. Click to flip, hold to drag, right-click to reset.",
+  "分布式训练": "Distributed Training",
+  "模型并行": "Model Parallelism",
+  "显存优化": "Memory Optimization"
 }
