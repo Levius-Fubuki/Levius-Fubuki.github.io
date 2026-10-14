@@ -626,6 +626,31 @@
         "显存优化",
         "性能测量"
       ]
+    },
+    {
+      "id": "p800-numa-pipeline-topology",
+      "collection": "infra",
+      "volume": "X",
+      "title": "从 NUMA 到流水线：P800 三机部署 Kimi-K3 的拓扑与瓶颈笔记",
+      "coverTitle": [
+        "P800 拓扑",
+        "流水线等待"
+      ],
+      "english": "THREE NODES, SHARED WORK",
+      "path": "/2026/10/14/p800-numa-pipeline-topology/",
+      "date": "2026-10-14",
+      "updated": "2026-10-14T10:56:06+08:00",
+      "summary": "从三台八卡 P800 的实际拓扑出发，解释 socket、NUMA、主机内存与显存，分析 Kimi-K3 的 TP8×PP3 分配、流水线等待和完整通信路径；保留可点击拓扑与后续瓶颈检测、优化验收方法。",
+      "art": "/img/books/p800-numa-pipeline-topology.png",
+      "source": "content/posts/p800-numa-pipeline-topology.md",
+      "tags": [
+        "AI Infra",
+        "GPU架构",
+        "分布式推理",
+        "性能测量",
+        "NUMA",
+        "P800"
+      ]
     }
   ]
 }

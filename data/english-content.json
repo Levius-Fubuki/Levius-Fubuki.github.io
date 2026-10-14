@@ -207,6 +207,14 @@
         "Training"
       ],
       "summary": "A worked 7B training task connecting gradient accumulation, DDP, ZeRO/FSDP, tensor and pipeline parallelism, SP/CP, checkpointing, precision and scaling diagnosis, with 27 interactive diagrams and 42 answered self-check questions."
+    },
+    "p800-numa-pipeline-topology": {
+      "title": "P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks",
+      "coverTitle": [
+        "P800 Topology",
+        "Pipeline Waits"
+      ],
+      "summary": "A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap."
     }
   },
   "collections": {

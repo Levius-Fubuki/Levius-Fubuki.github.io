@@ -626,6 +626,31 @@
         "Memory Optimization",
         "Performance Measurement"
       ]
+    },
+    {
+      "id": "p800-numa-pipeline-topology",
+      "collection": "infra",
+      "volume": "X",
+      "title": "P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks",
+      "coverTitle": [
+        "P800 Topology",
+        "Pipeline Waits"
+      ],
+      "english": "THREE NODES, SHARED WORK",
+      "path": "/2026/10/14/p800-numa-pipeline-topology/",
+      "date": "2026-10-14",
+      "updated": "2026-10-14T10:56:06+08:00",
+      "summary": "A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap.",
+      "art": "/img/books/p800-numa-pipeline-topology.png",
+      "source": "content/posts/p800-numa-pipeline-topology.md",
+      "tags": [
+        "AI Infra",
+        "GPU Architecture",
+        "Distributed Inference",
+        "Performance Measurement",
+        "NUMA",
+        "P800"
+      ]
     }
   ]
 }

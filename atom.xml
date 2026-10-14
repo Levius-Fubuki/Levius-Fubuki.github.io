@@ -6,7 +6,7 @@
   <link href="https://leviusspace.top/atom.xml" rel="self"/>
   
   <link href="https://leviusspace.top/"/>
-  <updated>2026-10-13T07:08:30+08:00</updated>
+  <updated>2026-10-14T10:56:06+08:00</updated>
   <id>https://leviusspace.top/</id>
   
   <author>
@@ -676,7 +676,7 @@ q_next = q_actual + v_safe × dt
 <p>如果上游模型可以感知过滤结果，可以返回结构化反馈：哪些约束触发、实际执行多少、从哪里开始偏离目标。它可能帮助上游重规划，但不能让模型自己取消执行层的约束。权限和约束仍应由确定的控制路径维护。</p>
 <p>这个项目最终形成了一个清楚的分工：上游提出目标，执行层根据约定的模型检查下一步，回放器记录真正发生的状态，测试用反例审查每一条保证。把这些边界说清楚，才有可能逐步扩大模型和硬件范围，同时知道新增能力需要补什么证据。</p>
 ]]></content><summary type="text">Software robot-arm replay as a guide to action semantics, whole-body geometry checks, speed scaling, and the limits of discrete validation.</summary></entry>
-<entry><title>Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</title><link href="https://leviusspace.top/2026/10/02/inference-evidence/"/><id>https://leviusspace.top/2026/10/02/inference-evidence/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-13T07:08:30+08:00</updated><content type="html"><![CDATA[<h1 id="inference-evidence">推理优化怎样形成可信结论：从算子实验到服务验收</h1>
+<entry><title>Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</title><link href="https://leviusspace.top/2026/10/02/inference-evidence/"/><id>https://leviusspace.top/2026/10/02/inference-evidence/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-13T07:08:30+08:00</updated><content type="html"><![CDATA[<h1 id="inference-evidence">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</h1>
 <p>推理优化最容易留下的是一张速度表，最容易丢失的是这张表成立的条件。模型版本、输入长度、缓存是否预热、失败请求怎样计数，只要其中一项变了，两个数字就可能已经不在回答同一个问题。</p>
 <p>这篇文章把算子学习、推理实验和公开开源贡献中反复出现的问题，整理成一套可以落实到文件与请求记录的工作方法。公开案例包括我参与的 vLLM-Omni 基准客户端修复和 System1-Omni Graph 实验，相关案例按各自日期核验；2026-10-13 更新 SDPA 输出布局与验证范围，并补充基准异常恢复案例。文中的小规模算例是教学示例；项目效果只引用已公开且说明范围的证据。</p>
 <h2 id="一条性能结论至少包含什么">一条性能结论至少包含什么</h2>
@@ -4961,6 +4961,423 @@ GPU 1：[[ 8, 4], [20,10]]
 @media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
 </style>
 ]]></content><summary type="text">A worked 7B training task connecting gradient accumulation, DDP, ZeRO/FSDP, tensor and pipeline parallelism, SP/CP, checkpointing, precision and scaling diagnosis, with 27 interactive diagrams and 42 answered self-check questions.</summary></entry>
+<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/"/><id>https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/</id><published>2026-10-14T00:00:00+08:00</published><updated>2026-10-14T10:56:06+08:00</updated><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</h1>
+<p>这次排查从两个看似简单的问题开始：一台 P800 服务器里的卡是不是都通过 PCIe 通信？如果三台机器的加速器活动率差别很大，是不是模型层分配错了？</p>
+<p>把设备拓扑、CPU/NUMA 归属和推理时间线放到一起后，我发现，这两个问题都不能只靠一张利用率截图回答。机内有专用的 XPULink，也有 PCIe 和跨 NUMA 路径；模型层数可以平均，等待方式却可能完全不同。</p>
+<p>这篇笔记记录三台八卡 P800 运行 Kimi-K3 的结构，以及从已有实验中能得出什么、还不能得出什么。硬件核查时间是 2026 年 10 月 14 日；性能数字来自 10 月 13 日不同阶段的诊断与短测。为了保留工程关系而不暴露访问地址，文中使用节点 53、55、57 作为服务器编号。</p>
+<h2 id="一-先认识-p800-软件接口与实际硬件要分开看">一、先认识 P800：软件接口与实际硬件要分开看</h2>
+<p>P800 是昆仑芯的 AI 加速器，采用 XPU-P 架构。官方介绍中的 P800 OAM 模组依据 OCP-OAM 标准设计，支持通过 IB 或 RoCE 构建集群。这里讨论的是现场三台服务器的实际连接关系，而不是把厂商宣传中的某种超节点配置直接套进来。<a href="https://www.kunlunxin.com/news/4720.html">架构介绍</a>、<a href="https://www.kunlunxin.com/news/4791.html">OAM 与互连介绍</a>。</p>
+<p>现场每台有八张 P800，每卡显存 96 GiB。使用中的软件栈包含 vLLM、昆仑插件、XPU SDK 和 BKCL 通信库。环境里能看到 <code>nvidia-smi</code>、<code>torch.cuda</code>、CUDA 风格的 stream 和 graph 接口，但这些接口名字不能作为 NVIDIA GPU 或 NVLink 硬件的证明。分析性能时，要沿着实际加载的昆仑实现追踪。</p>
+<p>这也解释了为什么排查时必须核对运行路径：改了工作区代码，不代表安装包中的插件已经更新。之前一次“四补丁评估”就因为改动没有进入实际执行路径而撤回。随后 P1 补丁才在真正加载的安装包中完成验证。</p>
+<h2 id="二-交互式拓扑-从设备点击到模型分配">二、交互式拓扑：从设备点击到模型分配</h2>
+<p>下面保留了本次讨论中的交互图。可以切换完整 CPU/NUMA/PCIe、XPULink 和卡对矩阵，也可以切换三机互联与 Kimi-K3 分配。点击 CPU、NUMA、P800 或网口，会显示归属、内存和连接细节。</p>
+<iframe class="transformer-interactive" data-widget="p800-topology" height="1120" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/p800-numa-pipeline-topology/topology.html?v=height-v2" style="display:block;width:100%;height:1120px;border:0" title="P800 三机 CPU、NUMA、XPULink、RoCE 与 Kimi-K3 分配交互图" width="100%"></iframe>
+<p><a href="/content/interactive/p800-numa-pipeline-topology/topology.html?v=height-v2">单独打开交互图</a></p>
+<p>图中交换网络是抽象节点。交换机数量、型号、布线和实际选路尚未核实，不能把四个 400G 端口解释成四条独立交换平面。真实网络地址已省略，设备和并行关系保持不变。</p>
+<h2 id="三-2-sockets-8-numa-为什么图中曾经只有四个分支">三、2 sockets、8 NUMA，为什么图中曾经只有四个分支？</h2>
+<p>一台服务器有两颗物理 CPU，也就是 <strong>2 sockets</strong>。三台都是双路 Hygon C86 P455，每颗 64 核、128 线程，整机合计 128 核、256 线程。</p>
+<p>NUMA 不是 CPU 插槽的另一种叫法。它是操作系统描述 CPU 核和内存就近关系的局部域。同一颗物理 CPU 可以划分成多个 NUMA 节点。</p>
+<p>实际 <code>lscpu</code> 映射确认：</p>
+<ul>
+<li>socket 0 包含 NUMA 0、1、2、3。</li>
+<li>socket 1 包含 NUMA 4、5、6、7。</li>
+<li>每个 NUMA 都有 16 核、32 线程及对应的主机内存。</li>
+</ul>
+<p>之前只画了 P800 和 400G 网卡所在的 NUMA 1、3、5、7，所以看起来像整机只有四个 NUMA。完整图补齐了其他四个节点，并加入 NUMA 0 上的管理网卡 eth0。</p>
+<table>
+<thead>
+<tr>
+<th align="right">NUMA</th>
+<th align="right">Socket</th>
+<th>CPU 逻辑编号</th>
+<th align="right">主机 RAM，约 GiB</th>
+<th>本图涉及的设备</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">0</td>
+<td align="right">0</td>
+<td>0–15, 128–143</td>
+<td align="right">187.9</td>
+<td>eth0，100G</td>
+</tr>
+<tr>
+<td align="right">1</td>
+<td align="right">0</td>
+<td>16–31, 144–159</td>
+<td align="right">188.5</td>
+<td>XPU0/1、eth1</td>
+</tr>
+<tr>
+<td align="right">2</td>
+<td align="right">0</td>
+<td>32–47, 160–175</td>
+<td align="right">188.5</td>
+<td>CPU / 主机内存</td>
+</tr>
+<tr>
+<td align="right">3</td>
+<td align="right">0</td>
+<td>48–63, 176–191</td>
+<td align="right">188.5</td>
+<td>XPU2/3、eth2</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td align="right">1</td>
+<td>64–79, 192–207</td>
+<td align="right">188.5</td>
+<td>CPU / 主机内存</td>
+</tr>
+<tr>
+<td align="right">5</td>
+<td align="right">1</td>
+<td>80–95, 208–223</td>
+<td align="right">188.5</td>
+<td>XPU4/5、eth3</td>
+</tr>
+<tr>
+<td align="right">6</td>
+<td align="right">1</td>
+<td>96–111, 224–239</td>
+<td align="right">188.5</td>
+<td>CPU / 主机内存</td>
+</tr>
+<tr>
+<td align="right">7</td>
+<td align="right">1</td>
+<td>112–127, 240–255</td>
+<td align="right">184.5</td>
+<td>XPU6/7、eth4</td>
+</tr>
+</tbody></table>
+<p>表中的逻辑 CPU 编号包含 SMT 线程，不能把 32 个逻辑编号读成 32 个物理核。</p>
+<h3 id="相对距离描述什么">相对距离描述什么？</h3>
+<p>以 NUMA 4 为例，到 NUMA 0–7 的距离为：</p>
+<pre><code class="language-text">目标节点：  0   1   2   3   4   5   6   7
+相对距离： 25  27  27  27  10  15  15  15
+</code></pre>
+<p>从 NUMA 4 的 CPU 核出发，访问本节点内存的距离是 10；访问同一颗 CPU 内其他节点的内存是 15；跨到另一颗 CPU 是 25 或 27。</p>
+<p>这些数值是固件报告的相对访问距离。它们不是纳秒、带宽，也不能说明实际延迟就是本地访问的 2.7 倍。它们描述的是 CPU 与主机内存的关系，不是 P800 的 XPULink 速度。</p>
+<h3 id="memtotal-与显存为什么必须分开">MemTotal 与显存为什么必须分开？</h3>
+<p>NUMA 的 <code>MemTotal</code> 是操作系统报告的主机 RAM 总容量，不是当前剩余可用内存，也不是加速器显存。OS 管理的容量可能略少于内存条的标称容量。</p>
+<p>例如 NUMA 5 有约 188.5 GiB 主机 RAM，附近的 XPU4、XPU5 又各有 96 GiB 显存。这些是不同的内存资源。模型加载通常涉及主机到设备的数据传输，设备计算主要使用卡上的显存，不能把这些数字直接当作一块统一的高速内存池。</p>
+<h3 id="numa-2-4-6-是否没用到">NUMA 2、4、6 是否没用到？</h3>
+<p>没有挂接本图中的 P800 或 400G 网卡，不等于没有工作。它们仍可运行分词、请求调度、模型加载、后台进程，也可承载主机内存分配。</p>
+<p>如果没有限制线程与内存归属，Linux 可能使用这些节点。它们在某次推理中到底用了多少，要看 worker 绑定、线程位置和 <code>numa_maps</code>。对性能更有意义的问题是：频繁与 P800 交换数据的 CPU 线程和缓冲区，是否靠近对应的加速器？</p>
+<h2 id="四-卡间是不是都走-pcie">四、卡间是不是都走 PCIe？</h2>
+<p>三台卡间矩阵一致，机内存在两类需要区分的连接：</p>
+<ol>
+<li><strong>XPULink 路径。</strong> XPU0–3 组内全连接，XPU4–7 组内全连接，跨组还有 0↔4、1↔5、2↔6、3↔7。</li>
+<li><strong>PCIe / NUMA 路径。</strong> 工具将其余部分卡对报告为 SYS；GPU 与近端网卡之间则报告 PIX。</li>
+</ol>
+<p>八卡共有 16 个 XL 卡对，每卡四个 XL 邻居；其他 12 个卡对报告 SYS。</p>
+<table>
+<thead>
+<tr>
+<th>标签</th>
+<th>工具报告的含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>XL</td>
+<td>路径经过 XPULink</td>
+</tr>
+<tr>
+<td>PIX</td>
+<td>路径至多经过一个 PCIe bridge</td>
+</tr>
+<tr>
+<td>SYS</td>
+<td>路径经过 PCIe 与跨 NUMA 的 CPU 互连</td>
+</tr>
+</tbody></table>
+<p>这个矩阵告诉我们设备的连接条件，却不能直接告诉我们 BKCL 一次 all-reduce 的真实选路。部分卡对显示 SYS，不等于 TP8 的所有通信都经过 CPU。集体通信可能沿其他 XL 连接组成 Ring 或 Tree。</p>
+<p>例如拓扑允许一条全 XL 的环：</p>
+<pre><code class="language-text">0 → 1 → 5 → 4 → 6 → 7 → 3 → 2 → 0
+</code></pre>
+<p>这里只证明有可行路径，没有证明运行时采用了它。真正的优化依据需要来自 BKCL 实际选路、各 rank 就绪时间和完成时间。</p>
+<h2 id="五-三台之间如何通信-网卡配对是否合理">五、三台之间如何通信，网卡配对是否合理？</h2>
+<p>每台 eth0 是 100 Gb/s 管理/API 网口，eth1–4 各是 400 Gb/s，RoCE 端口报告 ACTIVE / LINK_UP。四组 P800 与网卡的就近关系为：</p>
+<table>
+<thead>
+<tr>
+<th>P800</th>
+<th align="right">NUMA</th>
+<th>400G NIC</th>
+<th>RDMA 设备</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>XPU0/1</td>
+<td align="right">1</td>
+<td>eth1</td>
+<td>mlx5_1</td>
+</tr>
+<tr>
+<td>XPU2/3</td>
+<td align="right">3</td>
+<td>eth2</td>
+<td>mlx5_2</td>
+</tr>
+<tr>
+<td>XPU4/5</td>
+<td align="right">5</td>
+<td>eth3</td>
+<td>mlx5_3</td>
+</tr>
+<tr>
+<td>XPU6/7</td>
+<td align="right">7</td>
+<td>eth4</td>
+<td>mlx5_4</td>
+</tr>
+</tbody></table>
+<p>启动记录中的映射与此一致：</p>
+<pre><code class="language-text">BKCL_RDMA_NICS=eth1,eth1,eth2,eth2,eth3,eth3,eth4,eth4
+</code></pre>
+<p>因此没有发现明显的 GPU/NIC 配错问题。两张卡共用一个 400G 端口，仍需要查看同时传输时的表现；端口标称速率不能替代实际有效吞吐。</p>
+<p>报告还区分了控制流与大张量数据：请求数据走 mlx5_1–4，Gloo 控制通信有使用 eth0 的启动记录。看到控制流停在 <code>recv</code> 时，应先问数据或调度信息有没有准备好，而不是立刻认为 100G 管理网太慢。</p>
+<h2 id="六-kimi-k3-为什么采用-tp8-pp3">六、Kimi-K3 为什么采用 TP8×PP3？</h2>
+<p>目标模型有 93 层，hidden size 为 7168，包含 24 层 MLA 与 69 层 KDA。MoE 配置包含 896 个 routed experts，每 token 选择 16 个，另有两个 shared experts。W4A16 主要覆盖指定的 routed expert 权重，不等于整模型所有权重和状态都变成了 4 bit。</p>
+<p>每台的八张卡执行 TP8，三台之间组成 PP3。一份模型实例使用 24 张卡：</p>
+<table>
+<thead>
+<tr>
+<th>节点</th>
+<th align="right">阶段</th>
+<th>层号，从 1 开始</th>
+<th>MLA / KDA</th>
+<th>附加工作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>53</td>
+<td align="right">PP0</td>
+<td>1–31</td>
+<td>7 / 24</td>
+<td>Embedding，发送 3 个残差块</td>
+</tr>
+<tr>
+<td>55</td>
+<td align="right">PP1</td>
+<td>32–62</td>
+<td>8 / 23</td>
+<td>发送 6 个残差块</td>
+</tr>
+<tr>
+<td>57</td>
+<td align="right">PP2</td>
+<td>63–93</td>
+<td>9 / 22</td>
+<td>8 个残差块，最终 norm 与输出头</td>
+</tr>
+</tbody></table>
+<p>代码中的层号从 0 开始，所以对应 0–30、31–61、62–92。TP rank 0–7 分摊每层张量；不能理解为同一台服务器中每张卡各自拿到不同的 31 层。当前记录没有启用独立 EP 分组。</p>
+<p>TP 通信在层执行过程中发生得比较频繁，PP 则集中在阶段边界。因此，把 TP 留在机内、让跨机网络承担 PP 传递，是合理的起点。<a href="https://docs.vllm.ai/en/latest/serving/parallelism_scaling/">vLLM 的常见多机部署方式</a>也采用“每机 GPU 数作为 TP、节点数作为 PP”的组合。</p>
+<p>但“31 层均分”只是层数均衡。尾段 MLA 更多，还有输出头和不同的状态开销。早间服务快照中，每卡显存占用约为 83.6、89.1、92.4 GiB，尾段更紧。这些占用包含缓存、缓冲区与运行时分配，不能全部归为模型权重。</p>
+<p>报告提出 32/32/29 作为候选，可以将 MLA 分成 8/8/8，并减少尾段层数。不过，前两段也会增加显存和工作量，只有真实阶段耗时和显存验收才能判断是否值得改。</p>
+<h2 id="七-活动率很不均-为什么不能直接搬层">七、活动率很不均，为什么不能直接搬层？</h2>
+<p>原诊断中，节点 53 的活动率接近 97%，节点 55、57 明显较低。直觉上容易认为前段过载、后段空闲。</p>
+<p>设备时间线和 CPU 栈给出了更细的解释：前段的设备活动中有大量 stream wait；后段主线程可能停在 Gloo 接收，设备则没有任务。不同等待方式会产生不同的活动率表现。</p>
+<p>P1 后的一段约 15.08 秒 decode trace，以采样的 XPU0 为例：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th align="right">任务覆盖</th>
+<th align="right">显式 stream-wait 覆盖</th>
+<th align="right">不与显式等待重叠的任务时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PP0</td>
+<td align="right">约 100%</td>
+<td align="right">约 70%</td>
+<td align="right">4.54 s</td>
+</tr>
+<tr>
+<td>PP1</td>
+<td align="right">约 75.5%</td>
+<td align="right">约 42.6%</td>
+<td align="right">4.96 s</td>
+</tr>
+<tr>
+<td>PP2</td>
+<td align="right">约 39.6%</td>
+<td align="right">约 7.2%</td>
+<td align="right">4.88 s</td>
+</tr>
+</tbody></table>
+<p>后两段主线程约 62%–63% 的采样停在 <code>recv</code>。扣除显式等待后的任务时间明显比活动率更接近。</p>
+<p>这仍然不是纯计算均衡的证明：任务中还可能包含通信与其他工作，trace 只采了部分卡，跨机时间对齐也有误差。但它足以阻止一个过强判断：不能按活动率比例把模型层从前段搬到后段。</p>
+<h2 id="八-当前通信瓶颈更像哪里">八、当前通信瓶颈更像哪里？</h2>
+<h3 id="prefill-占据了大部分首-token-延迟">Prefill 占据了大部分首 token 延迟</h3>
+<p>原部署在 1024 输入 / 32 输出、零前缀命中、零新增抢占条件下：</p>
+<table>
+<thead>
+<tr>
+<th align="right">并发</th>
+<th align="right">服务端 TTFT</th>
+<th align="right">Prefill 阶段</th>
+<th align="right">排队</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">16</td>
+<td align="right">8.724 s</td>
+<td align="right">8.101 s</td>
+<td align="right">约 0.000055 s</td>
+</tr>
+<tr>
+<td align="right">32</td>
+<td align="right">15.971 s</td>
+<td align="right">15.217 s</td>
+<td align="right">约 0.131 s</td>
+</tr>
+</tbody></table>
+<p>Prefill 阶段占 TTFT 约 93%–95%。这个指标包含计算、设备依赖和流水线等待，不能直接读成算子用了 15 秒。但它说明，仅优化 API 排队不足以解释和解决主要延迟。</p>
+<h3 id="裸传输是毫秒级-完整路径仍可能卡住">裸传输是毫秒级，完整路径仍可能卡住</h3>
+<p>单卡、单 TP 分片的隔离 BKCL 微测中，PP0→PP1 的 84 MiB 接收中位时间约 3.25 ms，PP1→PP2 的 147 MiB 约 5.52 ms，并有数值校验。网络采样没有发现明显错误、重传或带宽耗尽证据。</p>
+<p>这说明该尺寸的裸传输本身没有测出秒级耗时，却不能替代完整八 rank 测量。实际阶段传递还包括：</p>
+<pre><code class="language-text">CPU 准备与上游就绪
+    → Gloo 元数据握手
+    → TP 分片跨机发送
+    → 接收端机内 all-gather
+    → 下游 forward
+    → 尾段采样及结果/token 返回
+</code></pre>
+<p>发送前等上游、接收后等 all-gather、下一步等 token 返回，都可能让三台不能充分重叠。当前更有依据的方向是缩短这些依赖等待，而不是先加网卡。</p>
+<p>PP 的数据量也不是只传一份 hidden。当前路径发送 <code>hidden_states</code> 与多个 <code>residual</code> 块，再在接收端重建。三块与六块残差分别约对应四份与七份 hidden 大小的数据，后边界约是前边界的 1.75 倍。即使层数相同，通信和临时状态也会不同。</p>
+<h3 id="缓存补丁有小幅收益-但没有解决全部等待">缓存补丁有小幅收益，但没有解决全部等待</h3>
+<p>P1 在实际安装包中缓存了设备上的 <code>block_sizes</code>，避免每步创建小设备张量时发生隐式同步。1024/1024 的四档单波短测输出吞吐增加约 3%–5%，但秒级 prefill/PP 等待仍然存在。</p>
+<p>后续同为 1024/1024、32 并发的调度对照也很有启发：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th align="right">平均 TTFT</th>
+<th align="right">输出吞吐</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>异步 P1 基线</td>
+<td align="right">15.85 s</td>
+<td align="right">212.21 tokens/s</td>
+</tr>
+<tr>
+<td>同步 groups=0 控制组</td>
+<td align="right">11.23 s</td>
+<td align="right">211.39 tokens/s</td>
+</tr>
+</tbody></table>
+<p>首 token 更早，不等于总完成时间更短。以上是单波观测，尚不能宣称稳定的因果收益；记录中也没有 groups=3 微批次均衡的正式性能结果。</p>
+<h2 id="九-下一轮检测具体看哪些模块">九、下一轮检测具体看哪些模块？</h2>
+<p>下一轮先找最长停顿所在的环节，再按证据决定优化。下面的入口来自已有源码快照，采集前要核对实际加载文件，尤其是独立的 DSpark 运行版本。</p>
+<table>
+<thead>
+<tr>
+<th align="right">顺序</th>
+<th>模块</th>
+<th>重点入口或对象</th>
+<th>要回答的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1</td>
+<td>PP 控制流与图重放</td>
+<td><code>send_object/recv_object</code>、<code>send_tensor_dict/recv_tensor_dict</code>、SDK <code>replay</code>、结果/token 返回</td>
+<td>后段在等上游、元数据、设备依赖还是传输？</td>
+</tr>
+<tr>
+<td align="right">2</td>
+<td>输入准备与缓存状态</td>
+<td><code>_prepare_inputs</code>、<code>_build_attention_metadata</code>、<code>_get_slot_mappings</code>、KDA metadata</td>
+<td>CPU 准备是否隐式等待之前的设备工作？</td>
+</tr>
+<tr>
+<td align="right">3</td>
+<td>TP / PP 数据通信</td>
+<td>八 rank 的 all-reduce、all-gather、send/recv</td>
+<td>谁最晚就绪、谁最晚完成，是否有通信拖尾？</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td>调度与执行器</td>
+<td><code>schedule</code>、<code>step_with_batch_queue</code>、RPC/future</td>
+<td>是否形成了能交错运行的独立批次？</td>
+</tr>
+<tr>
+<td align="right">5</td>
+<td>CPU/NUMA 与主机缓冲</td>
+<td>绑定列表、线程位置、<code>numa_maps</code></td>
+<td>高频交换数据的线程和缓冲是否靠近 GPU？</td>
+</tr>
+<tr>
+<td align="right">6</td>
+<td>模型实际计算</td>
+<td>KDA、MLA、MoE、残差处理、最终输出头</td>
+<td>去掉等待后，哪个阶段或算子最慢？</td>
+</tr>
+</tbody></table>
+<p>输入准备尤其要检查每步的新建设备小张量、<code>.cpu()</code>、<code>.item()</code>、同步 copy 和重复分配。P1 已缓存的对象应确认持续复用，而不是反复把它当成未完成优化。KDA prefill 获取 CPU <code>query_start_loc</code> 是另一个重点候选，但必须确认真实执行分支。</p>
+<p>通信测量应覆盖 decode 小张量与 prefill 大张量，并记录接收端 TP 重建。以前的单卡裸传输不能排除两 rank 共用 NIC、八卡集体通信或某个慢 rank 的影响。</p>
+<p>调度应记录每步 prefill/decode token 数、请求数和在途批次。<code>max_concurrent_batches=3</code> 是容量设置，不是“已经有三个阶段持续计算”的证明。</p>
+<h2 id="十-怎样组织一次能解释问题的检测">十、怎样组织一次能解释问题的检测？</h2>
+<p>核心产物应该是一条能按 <code>batch_id</code> 关联的三机时间线，而不是再截三张活动率图。</p>
+<p>每个事件至少带上 run、batch、PP stage、TP rank、主机、prefill/decode 类型、token 数、张量形状与字节数、stream 和时间戳。关联以下事件：</p>
+<ol>
+<li>调度产生批次，执行器发出任务。</li>
+<li>CPU 输入和 metadata 准备完成。</li>
+<li>上游中间状态就绪，PP 元数据交换完成。</li>
+<li>PP 数据提交以及设备侧完成。</li>
+<li>接收端 TP all-gather 完成。</li>
+<li>当前阶段 forward 的设备开始与完成。</li>
+<li>中间状态发送，或尾段采样完成。</li>
+<li>结果/token 返回，下一步具备调度条件。</li>
+</ol>
+<p>CPU 调用返回不一定代表设备传输完成。跨机时间要校准，不能在时钟误差大于目标事件间隔时硬做毫秒级先后判断。重叠事件不能直接相加成 TTFT，也不能在每个测量边界强制全设备同步，破坏原本想观察的重叠。</p>
+<p>功能与性能验收要分开。Prefill 定位可使用 1024/32；生成吞吐对照使用已约定的 1024/1024、并发 1/8/16/32。正式吞吐应在 profiler 退出后测量，同一组提示词、缓存策略、到达方式与运行参数下重复比较。</p>
+<p>输出吞吐的口径是实际生成 token 总数除以第一请求发起到最后请求完成的整批时间。同时保留 TTFT 均值/P95、最后首 token、TPOT/ITL、错误、抢占、缓存命中和显存变化。一次波次中的 32 个请求不能当作 32 次独立重复实验。</p>
+<h2 id="十一-优化顺序与仍待验证的判断">十一、优化顺序与仍待验证的判断</h2>
+<p>接下来的优化顺序是：先消减输入准备和控制流同步，再验证 PP/TP/计算重叠与批次形状，之后检查 NUMA 与 BKCL 选路，最后按真实工作时间评估重分层。</p>
+<p><code>max_num_batched_tokens=16384</code> 可与 8192、6144 作单变量对照，但小批次也会增加调度和通信次数。官方调优文档将该参数视作延迟与吞吐之间的权衡，不能将“小一点”直接等同于“更快”。<a href="https://docs.vllm.ai/en/latest/configuration/optimization/">vLLM 调优说明</a>。</p>
+<p>NUMA 的目标 GPU worker 归属是 <code>1,1,3,3,5,5,7,7</code>。先看实际绑定与内存分布，再判断是否需要改变；一般 CPU 后台工作仍可利用其他节点。<a href="https://docs.vllm.ai/en/latest/configuration/optimization/#numa-binding-for-multi-socket-gpu-nodes">NUMA 绑定说明</a>。</p>
+<p>32/32/29 和 TP4×PP6 都属于候选，尚未验证收益。前者试图改善层类型与尾段工作量，后者试图利用四卡 XL 组，但都必须同时验收计算、通信、显存和功能正确性。异步优化也不能简单删除等待，需要保持张量生命周期、stream 依赖和结果顺序。</p>
+<p>DSpark 要另设同版本 baseline/spec 对照。接受率统计需要排除 bonus token，并同时记录草稿、目标验证、通信和状态处理时间。高接受率不能自动推出高吞吐；只有新增成本被多 token 接受抵消，端到端指标才会改善。本文没有把尚未获得的新版本端到端数据写成收益结论。</p>
+<h2 id="十二-这次排查留下的几条判断习惯">十二、这次排查留下的几条判断习惯</h2>
+<p>对我而言，最有用的变化是把几个经常混在一起的概念拆开：</p>
+<ul>
+<li>socket 是物理 CPU；NUMA 是 CPU/内存访问域，两者数量不必相同。</li>
+<li>主机 RAM 与 P800 显存分别计量，<code>MemTotal</code> 也不等于空闲容量。</li>
+<li>XL/PIX/SYS 描述拓扑条件，真实集体通信选路需要运行证据。</li>
+<li>GPU 活动率包含不同形式的等待，不能直接用于分层。</li>
+<li>接收调用的等待时间与裸数据传输时间要分别测。</li>
+<li>更低 TTFT 与更高输出吞吐是不同目标，必须分别验收。</li>
+<li>能够指出“哪个批次、哪个 rank、在哪条依赖上卡住”，才有足够依据选择下一项优化。</li>
+</ul>
+<p>本文的工程依据包括原瓶颈报告、模型配置与分层记录、实际安装包 P1 验证、decode 时间线、调度单波对照，以及三机硬件核查。单波收益、部分设备采样和未确认的交换机布线，都保留了它们的证据边界。</p>
+<h2 id="延伸阅读">延伸阅读</h2>
+<ul>
+<li><a href="/2026/10/02/kimi-architecture/">Kimi K3 架构笔记：KDA、深度残差与稀疏专家</a></li>
+<li><a href="/2026/10/02/kimi-systems/">Kimi K3 系统笔记：长上下文训练、专家调度与混合缓存</a></li>
+<li><a href="/2026/10/08/inference-serving/">从 KV Cache 到有效吞吐：推理引擎与服务优化</a></li>
+</ul>
+<script defer="" src="/js/transformer-interactives.js"></script>
+<style>
+@media (max-width: 560px) {
+  body:has(#p800-numa-pipeline-topology) #post-meta .post-meta-date {
+    display: inline-grid;
+    grid-template-columns: max-content max-content;
+    gap: 0 8px;
+    white-space: normal;
+  }
+  body:has(#p800-numa-pipeline-topology) #post-meta .post-meta-date > .post-meta-separator {
+    display: none;
+  }
+}
+</style>
+]]></content><summary type="text">A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap.</summary></entry>
 <entry>
     <title>Becoming an LLM Engineer: A Learning Roadmap from Scratch</title>
     <link href="https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/"/>
