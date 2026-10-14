@@ -629,8 +629,8 @@
     },
     {
       "id": "p800-numa-pipeline-topology",
-      "collection": "infra",
-      "volume": "X",
+      "collection": "engineering",
+      "volume": "V",
       "title": "从 NUMA 到流水线：P800 三机部署 Kimi-K3 的拓扑与瓶颈笔记",
       "coverTitle": [
         "P800 拓扑",

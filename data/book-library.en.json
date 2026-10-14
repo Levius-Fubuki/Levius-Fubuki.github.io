@@ -629,8 +629,8 @@
     },
     {
       "id": "p800-numa-pipeline-topology",
-      "collection": "infra",
-      "volume": "X",
+      "collection": "engineering",
+      "volume": "V",
       "title": "P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks",
       "coverTitle": [
         "P800 Topology",
