@@ -122,3 +122,7 @@ TP2 block0、sequence length 4096 的分解中，SDPA 约 0.485–0.489 秒；�
 资料来自《Qwen Image 2.1 GR308 Test》（2026-09-21）、独立工作树《Qwen Image 2.1 Omni FANT Test》（09-22）与对应算子调查工作区。公开的模型框架入口可参考 [Diffusers](https://github.com/huggingface/diffusers)。本文所有 GR308 数值均来自本地历史实验，不代表 Diffusers 上游的性能声明。
 
 继续实验时还需固定计时是否包含首次缓存建立。首次执行可能分配缓冲区、构建位置编码或初始化通信；稳定步骤则复用这些状态。若一个候选记录首轮、另一个只记录暖运行，比较就会把生命周期成本误归给计算实现。当前文章保持每份报告原有的阶段范围，没有把这些未对齐成本强行补成统一总延迟。
+
+## 公开工程与恢复版本的边界
+
+2026-10-18 已核对公开的 [GR308 Lab 固定修订](https://github.com/KunyuanComputing/gr308-lab/tree/51a0d34beab550c484492c36fc09a143df9624b4)。当前适配器与报告位于其 `projects/qwen-image21-omni-fant/`；[历史恢复说明](https://github.com/KunyuanComputing/gr308-lab/blob/51a0d34beab550c484492c36fc09a143df9624b4/archive/recovered/README.md)另列出 23 个文件名、25 个历史版本。恢复版本保留失败尝试与替代路径，不能把多个 VAE 补丁无条件顺序运行，也不能从“代码找回”推断 TP2 完整 40 步质量门已经通过。后续复现先按代码导航选择与报告对应的版本，本文数值仍是原有历史测量。

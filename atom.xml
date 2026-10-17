@@ -6,7 +6,7 @@
   <link href="https://leviusspace.top/atom.xml" rel="self"/>
   
   <link href="https://leviusspace.top/"/>
-  <updated>2026-10-14T10:56:06+08:00</updated>
+  <updated>2026-10-18T07:04:16+08:00</updated>
   <id>https://leviusspace.top/</id>
   
   <author>
@@ -103,7 +103,7 @@
 <p>验证顺序则从小到大：单机 tiny model 数值对照、两 rank 短 forward、连续 cache 更新、短生成、长 prompt、长 decode，再到真实服务入口。每一层都补充新的故障面。模型列表接口只能证明进程响应了请求，长生成才会暴露另一部分问题。</p>
 <p>这项实验留下的价值，是一条从错误日志到架构与执行粒度的可解释路径：用独立节点预算确定权重分配，用阶段边界控制通信频率，用实际求值边界限制提交规模，最后用有范围的请求记录定义成功。后续若要服务化，仍需补足重启后的复验、质量测试、长生成与运维恢复；这些可以沿着现有证据继续做，而不用重新猜测之前的选择。</p>
 ]]></content><summary type="text">A public two-Mac experiment explained through pipeline partitioning, weight packing, lazy execution, and the limits of context-length validation.</summary></entry>
-<entry><title>Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</title><link href="https://leviusspace.top/2026/10/02/gr308-language/"/><id>https://leviusspace.top/2026/10/02/gr308-language/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-02T00:00:00+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-language">Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</h1>
+<entry><title>Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</title><link href="https://leviusspace.top/2026/10/02/gr308-language/"/><id>https://leviusspace.top/2026/10/02/gr308-language/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-18T07:04:16+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-language">GR308 语言模型调优复盘：并行拓扑、MTP、Graph 与真实验收</h1>
 <p>同样是把模型放到 GR308 上，9B 模型适合把两个逻辑芯片拆成独立副本，30B MoE 在测试中关闭专家并行反而更快，80B 模型则需要四路张量并行。27B 的一次大幅加速，后来又被冷启动对照修正了归因。调优最有价值的部分，正是这些选择怎样被实验逐步筛出来。</p>
 <p>本文整理 2026 年 9 月的本地报告、指标 CSV 与对应 Codex 工作区记录。10 月 2 日进行的是证据整理，没有重新运行设备实验。型号沿用各报告的模型标识；不同 checkpoint、驱动、容器与请求长度各自成组，不把它们拼成硬件排行榜。多模态分支另见 <a href="/2026/10/02/gr308-image/">Qwen Image 实现复盘</a> 和 <a href="/2026/10/02/gr308-video/">Wan / H3 报告</a>。</p>
 <h2 id="先定义一张卡-一个副本与一个成绩">先定义一张卡、一个副本与一个成绩</h2>
@@ -258,8 +258,11 @@
 <p>Graph 也必须检查实际捕获与命中。不同 batch bucket 占用额外内存，不能只在命令里添加更大的尺寸就认为所有请求都会更快。状态索引不连续、后端静默回退或启动申请失败，会让一个表面相同的配置走到不同执行路径。文章保留这些失败，是为了让后来读者知道应该在哪里确认真实行为。</p>
 <p>最终，配置记录应与模型修订、软件栈、请求长度和测量窗口共同保存。只留下启动参数，无法解释某个开关为何被选中；只留下最高吞吐，无法知道付出了多少首 token 延迟或稳定性代价。本文的表格与失败矩阵正是同一份结果的两面，后续新增实验也应沿这些条件更新。</p>
 <p>相关 GRServe 工作区另有“可移植核心与 Fant 首个后端”的设计规格，讨论 Backend ABI、能力协商、执行计划、兼容与原生两条路径。这一部分目前属于设计证据，不能把计划中的 KV、TP、Graph 或跨厂商性能目标算进上述已经取得的模型结果。后续若形成真实实现和同口径验收，应以独立工程文章记录，而不是借用现有 vLLM 基线替它证明完成。</p>
+<h2 id="公开代码归档与测量入口">公开代码归档与测量入口</h2>
+<p>2026-10-18 核验时，历史工程已整理为公开的 <a href="https://github.com/KunyuanComputing/gr308-lab/tree/51a0d34beab550c484492c36fc09a143df9624b4">GR308 Lab 固定修订</a>，实验主要发生在九月，十月整理不是一次新性能测试。归档同时提供报告、指标 CSV 和代码导航；当前文章的 9B/30B 正式结果、35B/80B 短测分类保持不变。</p>
+<p><a href="https://github.com/KunyuanComputing/gr308-lab/blob/51a0d34beab550c484492c36fc09a143df9624b4/REPRODUCIBILITY.md">复现说明</a>特别区分了报告值与现存入口：35B 的最优值对应 MTP4 D 组，通用 final 脚本中的 MTP3 是较早配置；现存 80B MTP3 脚本用于 C32，不能直接冒充 C16 255.93 tok/s 的原始入口。那个 C16 结果有报告与指标数据支持，但独立测量脚本尚未确认。公开一份可运行脚本并不自动补齐另一组结果的来源链。归档中的兼容层和第三方实现也按原许可注明，不都属于本人从零实现。</p>
 ]]></content><summary type="text">Parallel topologies, MTP, graphs, and quantization for Qwen and DeepSeek, distinguishing full tests, short runs, and failure boundaries.</summary></entry>
-<entry><title>Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE</title><link href="https://leviusspace.top/2026/10/02/gr308-image/"/><id>https://leviusspace.top/2026/10/02/gr308-image/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-02T00:00:00+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-image">Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE</h1>
+<entry><title>Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE</title><link href="https://leviusspace.top/2026/10/02/gr308-image/"/><id>https://leviusspace.top/2026/10/02/gr308-image/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-18T07:04:16+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-image">Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE</h1>
 <p>Qwen Image 2.1 的 GR308 实验经历了三次目标变化：先让完整链路真正生成图片，再把解码阶段压下来，最后把 DiT 的计算拆到两个逻辑芯片。三步分别解决兼容性、阶段瓶颈和计算并行，不能用一个总加速比抹平中间发生的变化。</p>
 <p>本文以 2026-09-21 主目录测试记录和 09-22 独立工作树报告为依据，补充对应 Codex 工作区最后的算子定位。10 月 2 日只整理既有证据，没有重跑 GPU 实验。最新工作区仍在探索原生 SDPA，没有完成新的融合注意力验收。</p>
 <h2 id="第一阶段-把模型框架与设备后端接起来">第一阶段：把模型框架与设备后端接起来</h2>
@@ -383,8 +386,10 @@
 <p>当前最值得继续验证的是 TP2 完整 40 步出图，以及原生 SDPA 是否能在固定 shape、正确性和数值门下胜过通用分解。已有记录足以说明实现过程和短测效果，却还不支持把全部候选默认打开并称为稳定服务。</p>
 <p>资料来自《Qwen Image 2.1 GR308 Test》（2026-09-21）、独立工作树《Qwen Image 2.1 Omni FANT Test》（09-22）与对应算子调查工作区。公开的模型框架入口可参考 <a href="https://github.com/huggingface/diffusers">Diffusers</a>。本文所有 GR308 数值均来自本地历史实验，不代表 Diffusers 上游的性能声明。</p>
 <p>继续实验时还需固定计时是否包含首次缓存建立。首次执行可能分配缓冲区、构建位置编码或初始化通信；稳定步骤则复用这些状态。若一个候选记录首轮、另一个只记录暖运行，比较就会把生命周期成本误归给计算实现。当前文章保持每份报告原有的阶段范围，没有把这些未对齐成本强行补成统一总延迟。</p>
+<h2 id="公开工程与恢复版本的边界">公开工程与恢复版本的边界</h2>
+<p>2026-10-18 已核对公开的 <a href="https://github.com/KunyuanComputing/gr308-lab/tree/51a0d34beab550c484492c36fc09a143df9624b4">GR308 Lab 固定修订</a>。当前适配器与报告位于其 <code>projects/qwen-image21-omni-fant/</code>；<a href="https://github.com/KunyuanComputing/gr308-lab/blob/51a0d34beab550c484492c36fc09a143df9624b4/archive/recovered/README.md">历史恢复说明</a>另列出 23 个文件名、25 个历史版本。恢复版本保留失败尝试与替代路径，不能把多个 VAE 补丁无条件顺序运行，也不能从“代码找回”推断 TP2 完整 40 步质量门已经通过。后续复现先按代码导航选择与报告对应的版本，本文数值仍是原有历史测量。</p>
 ]]></content><summary type="text">From single-GPU Qwen Image generation and tiled VAE to TP2 DiT: implementation details, numerical differences, and outstanding acceptance tests.</summary></entry>
-<entry><title>Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks</title><link href="https://leviusspace.top/2026/10/02/gr308-video/"/><id>https://leviusspace.top/2026/10/02/gr308-video/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-02T00:00:00+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-video">Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks</h1>
+<entry><title>Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks</title><link href="https://leviusspace.top/2026/10/02/gr308-video/"/><id>https://leviusspace.top/2026/10/02/gr308-video/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-18T07:04:16+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-video">GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门</h1>
 <p>视频模型移植最容易出现的误判，是把“某一层跑完”“某个短样本生成成功”和“完整模型达到交付标准”当作一件事。Wan2.2 与 MiniMax-H3 两条 GR308 分支恰好走到了不同阶段：前者有短视频和混合精度结果，完整长视频仍受阻；后者优化了固定输入 DiT 的权重处理，但音频数值门没有通过，尚无视频成品。</p>
 <p>本文根据 2026 年 9 月的实验报告及对应工作树、Codex 工作区整理，保留有效改进，也保留失败。10 月 2 日没有重跑设备。两组实验采用不同的模型、输入、并行方式与计时边界，所有秒数都在各自实验内部解释。</p>
 <h2 id="wan-先把目标和短测条件分清">Wan：先把目标和短测条件分清</h2>
@@ -522,6 +527,9 @@
 <p>如果以后要继续这两条支线，最有价值的新增材料也很明确：Wan 需要完整帧数和多样本的时序质量，H3 需要音频误差根因、合格的完整 DiT 与实际媒体输出。无需再次用下载完成、HTTP 成功或单层正确去代替这些缺口。</p>
 <p>本文依据《风华 GR308 Wan2.2 视频生成性能测试与调优报告》（2026-09-18）、H3 独立工作树诊断报告与《部署 MiniMax H3 性能测试》《wan2.2》工作区后续记录。所有运行时、精度和形状条件按各自记录保留；本轮没有启动远端实验，也没有把未完成方案计为交付成果。</p>
 <p>结果文件也应保留对应参数和参考身份。相同文件名如果被后续实验覆盖，就可能把新候选的图片与旧基线的指标错误配对。报告中的阶段时间、精度矩阵与质量对照应作为同一次运行的证据共同读取，而不是从不同目录各取一个最优数字重新拼表。</p>
+<h2 id="公开归档不等于完整运行时已经恢复">公开归档不等于完整运行时已经恢复</h2>
+<p>2026-10-18 核验的 <a href="https://github.com/KunyuanComputing/gr308-lab/tree/51a0d34beab550c484492c36fc09a143df9624b4">GR308 Lab 固定修订</a>公开了 Wan 工具、H3 平台工程和报告。<a href="https://github.com/KunyuanComputing/gr308-lab/blob/51a0d34beab550c484492c36fc09a143df9624b4/archive/recovered/README.md">恢复清单</a>说明：H3 有五个历史文件的原始哈希与旧索引一致，但仍缺 31 个顶层 Python 文件；完整 DiT 探针仅有前 300 行，在 <code>finally</code> 中途截断，不能执行。公开整理版另有脱敏后的哈希，不能拿它与原始哈希混比。</p>
+<p>因此，归档改善了代码和证据的可访问性，没有补成一次新 GPU 验收，也没有消除音频误差门、实际媒体输出及长视频质量缺口。历史证据包是否仍存在尚未确认。通信方面，本轮相关会话也明确没有同芯/跨卡大消息带宽实测；P2P 可访问、单元素 collective 正常、显存带宽或 PCIe 理论上限，都不能写成已测的卡间有效带宽。</p>
 ]]></content><summary type="text">Wan2.2 mixed-precision paths and H3 decoder weight caching, including measured gains, quality checks, and long-video blockers.</summary></entry>
 <entry><title>Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries</title><link href="https://leviusspace.top/2026/10/02/heartbeat-agent/"/><id>https://leviusspace.top/2026/10/02/heartbeat-agent/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-10-02T00:00:00+08:00</updated><content type="html"><![CDATA[<h1 id="heartbeat-agent">Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries</h1>
 <p>一个桌面 Agent 如果只能等用户输入，它的控制流通常很清楚：收到消息，构造上下文，调用模型，返回结果。让它主动开口之后，问题变多了。什么时候值得调用模型？一次观察要保存多久？同一件事怎样避免反复提醒？切换人格时，哪些信息可以共享？</p>
@@ -4961,10 +4969,10 @@ GPU 1：[[ 8, 4], [20,10]]
 @media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
 </style>
 ]]></content><summary type="text">A worked 7B training task connecting gradient accumulation, DDP, ZeRO/FSDP, tensor and pipeline parallelism, SP/CP, checkpointing, precision and scaling diagnosis, with 27 interactive diagrams and 42 answered self-check questions.</summary></entry>
-<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/"/><id>https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/</id><published>2026-10-14T00:00:00+08:00</published><updated>2026-10-14T10:56:06+08:00</updated><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</h1>
+<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/"/><id>https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/</id><published>2026-10-14T00:00:00+08:00</published><updated>2026-10-18T07:04:16+08:00</updated><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">从 NUMA 到流水线：P800 三机部署 Kimi-K3 的拓扑与瓶颈笔记</h1>
 <p>这次排查从两个看似简单的问题开始：一台 P800 服务器里的卡是不是都通过 PCIe 通信？如果三台机器的加速器活动率差别很大，是不是模型层分配错了？</p>
 <p>把设备拓扑、CPU/NUMA 归属和推理时间线放到一起后，我发现，这两个问题都不能只靠一张利用率截图回答。机内有专用的 XPULink，也有 PCIe 和跨 NUMA 路径；模型层数可以平均，等待方式却可能完全不同。</p>
-<p>这篇笔记记录三台八卡 P800 运行 Kimi-K3 的结构，以及从已有实验中能得出什么、还不能得出什么。硬件核查时间是 2026 年 10 月 14 日；性能数字来自 10 月 13 日不同阶段的诊断与短测。为了保留工程关系而不暴露访问地址，文中使用节点 53、55、57 作为服务器编号。</p>
+<p>这篇笔记记录三台八卡 P800 运行 Kimi-K3 的结构，以及从已有实验中能得出什么、还不能得出什么。硬件核查时间是 2026 年 10 月 14 日；性能数字来自 10 月 13 日不同阶段的诊断与短测。2026 年 10 月 18 日补充了 10 月 16 日 Eagle3 全量验证的修复、验收与恢复结果。为了保留工程关系而不暴露访问地址，文中使用节点 53、55、57 作为服务器编号。</p>
 <h2 id="一-先认识-p800-软件接口与实际硬件要分开看">一、先认识 P800：软件接口与实际硬件要分开看</h2>
 <p>P800 是昆仑芯的 AI 加速器，采用 XPU-P 架构。官方介绍中的 P800 OAM 模组依据 OCP-OAM 标准设计，支持通过 IB 或 RoCE 构建集群。这里讨论的是现场三台服务器的实际连接关系，而不是把厂商宣传中的某种超节点配置直接套进来。<a href="https://www.kunlunxin.com/news/4720.html">架构介绍</a>、<a href="https://www.kunlunxin.com/news/4791.html">OAM 与互连介绍</a>。</p>
 <p>现场每台有八张 P800，每卡显存 96 GiB。使用中的软件栈包含 vLLM、昆仑插件、XPU SDK 和 BKCL 通信库。环境里能看到 <code>nvidia-smi</code>、<code>torch.cuda</code>、CUDA 风格的 stream 和 graph 接口，但这些接口名字不能作为 NVIDIA GPU 或 NVLink 硬件的证明。分析性能时，要沿着实际加载的昆仑实现追踪。</p>
@@ -5345,6 +5353,46 @@ GPU 1：[[ 8, 4], [20,10]]
 <p>NUMA 的目标 GPU worker 归属是 <code>1,1,3,3,5,5,7,7</code>。先看实际绑定与内存分布，再判断是否需要改变；一般 CPU 后台工作仍可利用其他节点。<a href="https://docs.vllm.ai/en/latest/configuration/optimization/#numa-binding-for-multi-socket-gpu-nodes">NUMA 绑定说明</a>。</p>
 <p>32/32/29 和 TP4×PP6 都属于候选，尚未验证收益。前者试图改善层类型与尾段工作量，后者试图利用四卡 XL 组，但都必须同时验收计算、通信、显存和功能正确性。异步优化也不能简单删除等待，需要保持张量生命周期、stream 依赖和结果顺序。</p>
 <p>DSpark 要另设同版本 baseline/spec 对照。接受率统计需要排除 bonus token，并同时记录草稿、目标验证、通信和状态处理时间。高接受率不能自动推出高吞吐；只有新增成本被多 token 接受抵消，端到端指标才会改善。本文没有把尚未获得的新版本端到端数据写成收益结论。</p>
+<h2 id="补记-eagle3-全量验证通过正确性门-仍未通过性能门">补记：Eagle3 全量验证通过正确性门，仍未通过性能门</h2>
+<p>10 月 16 日完成的 r16 验证，把上文的“继续寻找投机路径”推进到了一个可以明确决策的阶段：完整目标权重成功加载，功能与 API 检查通过，但两轮正式输出吞吐都低于预设历史门槛，因此恢复了未开启 Eagle3 的 P1。这里的失败指性能保留条件没有满足，不是把之前的初始化失败或随机权重检查当成了完整模型结果。</p>
+<h3 id="从-pp-所有权修到真实状态语义">从 PP 所有权修到真实状态语义</h3>
+<p>接入草稿模型时，不能假设所有 PP rank 都拥有同一个对象。目标模型在三个阶段都有工作，草稿侧的 Graph key 和 attention backend 却由实际拥有 drafter 的阶段初始化。修复必须同时保留每段目标模型的初始化，避免为了让非尾段“不报属性不存在”而跳过它自己的状态；真正应该拥有 drafter 的尾段缺失该对象时，仍应报错。这个区别让检查针对资源归属，而不是用宽泛的异常捕获把错误吞掉。</p>
+<p>随后暴露的是多 token 路径的状态问题。一次验证多个候选 token 时，attention 的真实上下文长度、有效 token 行与 KDA 的递归状态和卷积历史必须互相对应。CPU 上的容量上界只能用于分配和调度，不能直接冒充每行在 GPU 上的精确有效长度。固定输入的 Q4 或 Graph replay 恰好通过，也不能代替纯 prefill、混合批次和长前缀的检查。</p>
+<p>原生卷积对照进一步区分了两种问题：非连续的状态索引向量会错误寻址；带已有状态的长 prefill，则只在最前面三个输出位置出现差异，后面的输出和最终历史可以正常。候选先把索引规范为连续格式，再在受限定的候选路径中，用独立保存的输入与历史、沿 Q1 更新原语重算受影响的前缀输出。最终缓存仍由原路径完成更新。把历史打包成三个紧凑位置的替代尝试没有解决长前缀问题，因此未进入保留方案。</p>
+<p>这不是“给整个模型改成高精度”的处理，也不是绕过差异比较。r16 在加载真实目标权重之前，先覆盖全部 24 rank 的完整 KDA 顺序 Q1 对照、输出与最终状态/历史检查、Graph 波次和原生卷积参照。报告分别保留 216 次完整 KDA 检查、72 次 KDA Graph 波次、960 个 greedy verifier 案例和 168 次直接卷积对照；它们验证不同边界，不能相加成同一种独立样本数。早期失败与未执行的诊断分支也保留在记录中，没有被后来的绿灯覆盖。</p>
+<h3 id="三层检查不能互相替代">三层检查不能互相替代</h3>
+<p>原生门通过后，还有一次完整架构的 dummy 启动。它使用随机目标权重和真实草稿权重，只能证明初始化、协议与执行路径能够衔接，不能产生目标模型语义质量或性能结论。</p>
+<p>随后才加载真实目标模型的全部 94 个分片，完成同一次启动中的 API 前检，再跑两轮冻结的 C32、每轮 160 请求、每请求 1024 输入与 1024 输出的正式负载，最后执行 API 后检和恢复检查。TP8×PP3、1M 上下文、请求默认值与既定协议保持约束；本轮没有为了让候选过门而重跑或重选历史基线。</p>
+<table>
+<thead>
+<tr>
+<th>记录</th>
+<th align="right">输出吞吐，tokens/s</th>
+<th>完成与证据范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>历史冻结基线</td>
+<td align="right">223.9508</td>
+<td>本轮未重跑，作为预设保留门槛</td>
+</tr>
+<tr>
+<td>Eagle3 B1</td>
+<td align="right">115.0334</td>
+<td>160/160，请求输出共 163,840 tokens</td>
+</tr>
+<tr>
+<td>Eagle3 B2</td>
+<td align="right">115.7638</td>
+<td>160/160，请求输出共 163,840 tokens</td>
+</tr>
+</tbody></table>
+<p>吞吐仍按整批输出 token 数除以第一请求开始至最后请求完成的时间计算。两轮分别约为 1424.28 和 1415.30 秒；各自是一次批次测量，不是 160 次独立重复实验。正式负载没有前缀命中或抢占，API 前后合计 40/40 通过，冻结正确性检查合计 88/88 通过。这些有限检查支持本次验收，不证明所有输入与原模型逐位等价。</p>
+<p>草稿 token 接受率约为 46.71% 和 47.23%，也没有换来更高吞吐。接受一个以上草稿 token，只说明目标验证能一次推进多个位置；草稿计算、多 token 验证、状态整理与流水线控制的新增成本仍然存在。本次报告能确定的是候选没有达到保留门槛，尚不能仅凭这张表把退化全部归因到某一项通信或算子开销。</p>
+<h3 id="为什么最后恢复原方案">为什么最后恢复原方案</h3>
+<p>相对历史基线，两轮观测值约低 48.63% 和 48.31%。由于历史基线没有在本轮重新执行，这不是随机交错 A/B，也不是对未来所有负载的因果或显著性结论；它足以支持事先约定的保留决策：两轮有效结果都没有超过门槛，候选不留在服务中。</p>
+<p>最终记录为 <code>CLOSED_RESTORED</code>：恢复原 P1 后，健康检查、服务身份、实际源文件与依赖、1M 上下文均复核，三节点证据包已取回并校验。后续其他调优会话仍可能继续工作，因此这里描述的是这次已闭合实验的终态，而不是宣称现场从此不再变化。本次博客维护只读核对结果、修复差异与会话，没有连接服务器或重跑这些实验。</p>
+<p>这段过程补齐了工程实践中的另一半：功能正确允许候选进入性能评估，性能门决定是否保留；恢复完成则需要自己的健康与身份验证。任何一个阶段都不能由前一阶段的“通过”代替。</p>
 <h2 id="十二-这次排查留下的几条判断习惯">十二、这次排查留下的几条判断习惯</h2>
 <p>对我而言，最有用的变化是把几个经常混在一起的概念拆开：</p>
 <ul>

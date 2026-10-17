@@ -695,5 +695,12 @@
   "十、怎样组织一次能解释问题的检测？": "Building a Trace That Explains the Bottleneck",
   "十一、优化顺序与仍待验证的判断": "Optimization Order and Open Questions",
   "十二、这次排查留下的几条判断习惯": "Reasoning Habits from This Investigation",
-  "延伸阅读": "Further Reading"
+  "延伸阅读": "Further Reading",
+  "补记：Eagle3 全量验证通过正确性门，仍未通过性能门": "Update: Eagle3 Passes Correctness but Misses the Performance Gate",
+  "从 PP 所有权修到真实状态语义": "From Pipeline Ownership to Runtime State Semantics",
+  "三层检查不能互相替代": "Three Validation Layers Serve Different Purposes",
+  "为什么最后恢复原方案": "Why the Original Deployment Was Restored",
+  "公开代码归档与测量入口": "Public Code Archive and Measurement Entry Points",
+  "公开工程与恢复版本的边界": "Public Implementation and Recovered-Version Boundaries",
+  "公开归档不等于完整运行时已经恢复": "Public Archives and Remaining Runtime Gaps"
 }
