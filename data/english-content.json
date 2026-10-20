@@ -215,6 +215,14 @@
         "Pipeline Waits"
       ],
       "summary": "A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap."
+    },
+    "gpu-cuda": {
+      "title": "GPU, CUDA and Operator Optimization",
+      "coverTitle": [
+        "GPU / CUDA",
+        "Optimization"
+      ],
+      "summary": "One attention sublayer connects execution, memory, GEMM, reduction, stable softmax, FlashAttention, normalization, fusion, streams, graphs and profiling, with 50 interactive diagrams, complete CUDA teaching examples and 48 answered self-checks."
     }
   },
   "collections": {

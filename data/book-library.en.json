@@ -639,7 +639,7 @@
       "english": "THREE NODES, SHARED WORK",
       "path": "/2026/10/14/p800-numa-pipeline-topology/",
       "date": "2026-10-14",
-      "updated": "2026-10-14T10:56:06+08:00",
+      "updated": "2026-10-18T07:04:16+08:00",
       "summary": "A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap.",
       "art": "/img/books/p800-numa-pipeline-topology.png",
       "source": "content/posts/p800-numa-pipeline-topology.md",
@@ -650,6 +650,32 @@
         "Performance Measurement",
         "NUMA",
         "P800"
+      ]
+    },
+    {
+      "id": "gpu-cuda",
+      "collection": "infra",
+      "volume": "X",
+      "title": "GPU, CUDA and Operator Optimization",
+      "coverTitle": [
+        "GPU / CUDA",
+        "Optimization"
+      ],
+      "english": "THREADS TO ATTENTION",
+      "path": "/2026/10/20/gpu-cuda/",
+      "date": "2026-10-20",
+      "updated": "2026-10-20",
+      "summary": "One attention sublayer connects execution, memory, GEMM, reduction, stable softmax, FlashAttention, normalization, fusion, streams, graphs and profiling, with 50 interactive diagrams, complete CUDA teaching examples and 48 answered self-checks.",
+      "art": "/img/books/gpu-cuda.png",
+      "source": "content/posts/gpu-cuda.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "GPU Architecture",
+        "Kernel Optimization",
+        "Attention",
+        "Normalization",
+        "Performance Measurement"
       ]
     }
   ]
