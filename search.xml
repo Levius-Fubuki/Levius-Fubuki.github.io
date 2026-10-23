@@ -669,7 +669,7 @@ q_next = q_actual + v_safe × dt
 <p>如果上游模型可以感知过滤结果，可以返回结构化反馈：哪些约束触发、实际执行多少、从哪里开始偏离目标。它可能帮助上游重规划，但不能让模型自己取消执行层的约束。权限和约束仍应由确定的控制路径维护。</p>
 <p>这个项目最终形成了一个清楚的分工：上游提出目标，执行层根据约定的模型检查下一步，回放器记录真正发生的状态，测试用反例审查每一条保证。把这些边界说清楚，才有可能逐步扩大模型和硬件范围，同时知道新增能力需要补什么证据。</p>
 ]]></content><categories><category>AI Agents</category></categories><tags><tag>Robotics</tag><tag>Safe Execution</tag></tags></entry>
-<entry><title>Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</title><link href="/2026/10/02/inference-evidence/"/><url>/2026/10/02/inference-evidence/</url><content type="html"><![CDATA[<h1 id="inference-evidence">Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</h1>
+<entry><title>Reliable Evidence for Inference Optimization: From Kernel Experiments to Service Acceptance</title><link href="/2026/10/02/inference-evidence/"/><url>/2026/10/02/inference-evidence/</url><content type="html"><![CDATA[<h1 id="inference-evidence">推理优化怎样形成可信结论：从算子实验到服务验收</h1>
 <p>推理优化最容易留下的是一张速度表，最容易丢失的是这张表成立的条件。模型版本、输入长度、缓存是否预热、失败请求怎样计数，只要其中一项变了，两个数字就可能已经不在回答同一个问题。</p>
 <p>这篇文章把算子学习、推理实验和公开开源贡献中反复出现的问题，整理成一套可以落实到文件与请求记录的工作方法。公开案例包括我参与的 vLLM-Omni 基准客户端修复和 System1-Omni Graph 实验，相关案例按各自日期核验；2026-10-13 更新 SDPA 输出布局与验证范围，并补充基准异常恢复案例。文中的小规模算例是教学示例；项目效果只引用已公开且说明范围的证据。</p>
 <h2 id="一条性能结论至少包含什么">一条性能结论至少包含什么</h2>
@@ -723,7 +723,7 @@ q_next = q_actual + v_safe × dt
 <p>它特意把通过全部门槛写成“可进入评审”，而非“自动上线”。部署还可能需要版本回滚、监控、业务负载和恢复测试。具体项目可以精简流程，但不应让一个通用汇总器的 PASS 取代所有尚未验证的条件。</p>
 <h2 id="执行路径声明也要接受验证">执行路径声明也要接受验证</h2>
 <p>“使用 SDPA”仍然只是后端名称，无法说明一次调用实际走了哪条分支。我提交的 <a href="https://github.com/vllm-project/vllm-omni/pull/7895">vLLM-Omni PR #7895</a> 补充了构造后的 CUDA 执行路径说明：Q 与 K/V 头数相同、原生 GQA，以及先展开 K/V 再调用 SDPA。这几种实现会影响实际工作量与中间张量，测量记录只写一个后端名称，会丢掉解释结果所需的条件。</p>
-<p>这项修改依赖的执行契约框架来自其他贡献者的 <a href="https://github.com/vllm-project/vllm-omni/pull/7379">PR #7379</a>，该 PR 已于 2026-10-02 合并。我的工作是后续 SDPA 适配，不能把上游 FA4 原型或其验证结果计入自己的实现。截至 <strong>2026-10-13</strong>，#7895 仍开放、非草稿，提交为 <code>88a1389826d4e696a446e0597ee46a90c65ec627</code>。当前版本在推理 fullgraph 支持上继续调整了输出布局；10 月 3 日的 eager-only 版本，以及后续 <code>e089dec16</code> 的连续 BHSD 边界，都属于历史阶段。</p>
+<p>这项修改依赖的执行契约框架来自其他贡献者的 <a href="https://github.com/vllm-project/vllm-omni/pull/7379">PR #7379</a>，该 PR 已于 2026-10-02 合并。我的工作是后续 SDPA 适配，不能把上游 FA4 原型或其验证结果计入自己的实现。<strong>2026-10-23 核验时，#7895 已于 10 月 18 日合并</strong>，最终 head 为 <code>4754c2763b8cdaf05fea90331f049128394ec706</code>，合并提交为 <code>2cefeddc8f54ec19a1a46668583b20c2139c2c62</code>。下文布局实测绑定的是较早的 <code>88a1389826d4e696a446e0597ee46a90c65ec627</code>；10 月 3 日的 eager-only 版本，以及 <code>e089dec16</code> 的连续 BHSD 边界，也分别保留为历史阶段。</p>
 <p>实现里容易漏掉的是：负责说明路径的 resolver，必须观察到与真正 forward 相同的输入。外部输入布局为 <code>[B, S, H, D]</code>，探测时转为 SDPA 使用的 <code>[B, H, S, D]</code>；padding mask 也要按同样规则归一化。若 resolver 用原始 mask 探测、forward 用展开后的 mask 探测，两边可能选出不同结论。此时日志虽然详细，却在描述一条没有实际执行的路径。</p>
 <p>补丁因此把 GQA 分支判断提取为共享函数，并在测试中记录两次探测的张量地址、形状、stride、dtype、device、mask 内容和 causal 参数，确认两者一致。数值用例以显式展开 K/V 后的 SDPA 作为参考，覆盖 FP16/BF16、相同与不同头数、batch 1/2、head dimension 64/512、Q/K 长度相同与不同，以及有无 padding mask。这个参考验证具体路径与展开语义，不能代替模型输出或 FP32 真值检查。</p>
 <p><a href="https://github.com/vllm-project/vllm-omni/pull/7895#issuecomment-5955775205">后续评审</a>提出 fullgraph 要求后，问题从“能不能准确描述路径”扩展到了“编译器能不能处理这条路径”。同头数分支把 <code>enable_gqa</code> 变成明确的 Python 布尔值，避免直接把符号头数比较传给 SDPA；CUDA GQA 推理分支则使用 custom op，把运行时后端选择放在编译边界内。它没有凭空消除选择过程，而是改变了编译器观察该过程的方式。</p>
@@ -766,7 +766,9 @@ q_next = q_actual + v_safe × dt
 <p>这次公开报告把新 GPU 验证绑定到 <code>e089dec16</code>：RTX 4090、SM89、驱动 595.71.05、Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。原实现的 <strong>12 个 fullgraph 用例失败</strong>，候选的同组 <strong>12 个通过</strong>；用例使用 <code>fullgraph=True, dynamic=True</code>，覆盖三种头数/维度配置、两种精度、有无 mask，并在每组中执行两种 Q/K 长度。完整聚焦套件 <strong>137 passed</strong>，包含实际 <code>Attention.forward</code>、schema/fake/dynamic、autocast 与梯度回退；CI 标记筛选得到 <strong>95 passed</strong>，隐藏 CUDA 后为 <strong>95 skipped</strong>。95 项是筛选口径，不能与 137 相加；L4 标记用于 CI 路由，实际报告的硬件是 RTX 4090。</p>
 <p>旧版的 99/57 项记录继续作为历史证据，不能与新报告拼接成一个测试总数。评审者的 GH200 结果也不属于我的 RTX 4090 运行。这些记录不自动覆盖后续布局改动。本轮博客维护只读核对公开报告、补丁和工作区代码，没有重新运行 GPU。</p>
 <p><a href="https://github.com/vllm-project/vllm-omni/pull/7895#discussion_r4193615192">布局建议</a>已在 <code>88a138982</code> 实现并<a href="https://github.com/vllm-project/vllm-omni/pull/7895#discussion_r4237226573">回复评审</a>。custom op 直接返回连续 BSHD，调用方无需先取得连续 BHSD 再排列；沿最后两个轴展开 heads 时与输出共享存储。fake 的形状和 stride 同步修改，才能让编译器得到与真实执行一致的布局。这里支持的是“后续 flatten 为 view”的具体性质；SDPA kernel 本身的输出转成连续 BSHD 仍可能需要复制，不能简称“消除了所有复制”。</p>
-<p>这次布局验证另用 <strong>A800 80GB PCIe、SM80</strong>，绑定 <code>88a138982</code>，软件为 Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。旧布局在新增四项 CPU 布局用例中全部失败，改后完整聚焦套件 <strong>145 passed</strong>；其中包括 12 项动态 Inductor fullgraph、六项生产 <code>Attention.forward</code> 和八项 schema/fake/dynamic-AOT <code>opcheck</code>。CI 标记筛选为 <strong>99 passed</strong>，隐藏 CUDA 为 <strong>99 skipped</strong>。这些子集不能再加到 145 上，也不能把 RTX 4090 与 A800 两次成绩拼成一次跨设备实验。当前 head 已返回的 pre-commit、Python 3.11/3.12 构建和 DCO 检查均成功；这并不代表补丁已合并或所有未返回检查已完成。</p>
+<p>这次布局验证另用 <strong>A800 80GB PCIe、SM80</strong>，绑定 <code>88a138982</code>，软件为 Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。旧布局在新增四项 CPU 布局用例中全部失败，改后完整聚焦套件 <strong>145 passed</strong>；其中包括 12 项动态 Inductor fullgraph、六项生产 <code>Attention.forward</code> 和八项 schema/fake/dynamic-AOT <code>opcheck</code>。CI 标记筛选为 <strong>99 passed</strong>，隐藏 CUDA 为 <strong>99 skipped</strong>。这些子集不能再加到 145 上，也不能把 RTX 4090 与 A800 两次成绩拼成一次跨设备实验。</p>
+<p>合并前，分支先合入了新的 main，再增加 FP32 additive bias 的 fullgraph 回归用例，形成最终 <code>4754c2763</code>。这次核对五个相关文件时，普通 SDPA 测试与 CUDA 契约测试和 <code>88a138982</code> 相同，编译测试与生产 backend 则已有变化。因此，旧 A800 的 145/99 项只能继续归属旧提交；最终 head 的 CodeQL、Python 3.11/3.12 构建、pre-commit 和 DCO 成功，也不能替代新 GPU 运行报告。</p>
+<p>新增用例覆盖低精度 Q/K/V 配 FP32 的四维浮点 bias，分别检查同头数与 GQA 的 eager／compiled 输出，对照 FP32 数学参考并保留 BF16 输出。它与“二维布尔 padding mask”不是同一个输入条件：不能为了让 fused kernel 接受输入就随意降低 bias 精度。合入 main 后的 backend 包含保留浮点 bias 精度并选择 math 路径的处理；合并进来的生产修改也不能全部算作本 PR 的原创贡献。这项用例扩大了回归目标，没有产生新的性能成绩，也没有自动扩大执行契约对外承诺的支持范围。</p>
 <p>结论仍有明确上限：这是选定输入的推理 fullgraph 和布局验证，不是训练 fullgraph、CUDA Graph capture、多卡、模型 E2E 或性能基准。没有布局复制的性能测量，也没有任意形状只编译一个图的保证。更新文章时，把旧观察、已实施改动、当前验证与待验证收益分别写清楚，比给旧报告追加一个更大的测试总数更有用。</p>
 <h2 id="基准程序的异常恢复也要验收">基准程序的异常恢复也要验收</h2>
 <p>优化代码正确，测量脚本仍可能污染下一组结果。我提交的 <a href="https://github.com/vllm-project/vllm-omni/pull/8722">SeedVR2 缓存 PR #8722</a>包含一个配对短测程序：关闭/开启 DiT 缓存分别预热，随后用 AB/BA 交替顺序测量，固定输入、seed、精度和 attention 路径，并在计时结束后核对完整 DiT 张量与最终 RGB。缓存复用窗口行索引和 RoPE 表，没有改变窗口边界或精度。</p>
@@ -4954,10 +4956,10 @@ GPU 1：[[ 8, 4], [20,10]]
 @media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
 </style>
 ]]></content><categories><category>AI Infra</category></categories><tags><tag>AI Infra</tag><tag>Distributed Training</tag><tag>ZeRO</tag><tag>FSDP</tag><tag>Model Parallelism</tag><tag>Memory Optimization</tag><tag>Performance Measurement</tag></tags></entry>
-<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="/2026/10/14/p800-numa-pipeline-topology/"/><url>/2026/10/14/p800-numa-pipeline-topology/</url><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</h1>
+<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="/2026/10/14/p800-numa-pipeline-topology/"/><url>/2026/10/14/p800-numa-pipeline-topology/</url><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">从 NUMA 到流水线：P800 三机部署 Kimi-K3 的拓扑与瓶颈笔记</h1>
 <p>这次排查从两个看似简单的问题开始：一台 P800 服务器里的卡是不是都通过 PCIe 通信？如果三台机器的加速器活动率差别很大，是不是模型层分配错了？</p>
 <p>把设备拓扑、CPU/NUMA 归属和推理时间线放到一起后，我发现，这两个问题都不能只靠一张利用率截图回答。机内有专用的 XPULink，也有 PCIe 和跨 NUMA 路径；模型层数可以平均，等待方式却可能完全不同。</p>
-<p>这篇笔记记录三台八卡 P800 运行 Kimi-K3 的结构，以及从已有实验中能得出什么、还不能得出什么。硬件核查时间是 2026 年 10 月 14 日；性能数字来自 10 月 13 日不同阶段的诊断与短测。2026 年 10 月 18 日补充了 10 月 16 日 Eagle3 全量验证的修复、验收与恢复结果。为了保留工程关系而不暴露访问地址，文中使用节点 53、55、57 作为服务器编号。</p>
+<p>这篇笔记记录三台八卡 P800 运行 Kimi-K3 的结构，以及从已有实验中能得出什么、还不能得出什么。硬件核查时间是 2026 年 10 月 14 日；前半篇保留 10 月 13 日的诊断、短测与当时的优化计划。后续补记分别记录 10 月 16 日 Eagle3 的负结果、10 月 18 日执行栈优化后的正式复测，以及截至 10 月 22 日仍未闭合的一致性问题；这些属于不同版本，不能互相覆盖。为了保留工程关系而不暴露访问地址，文中使用节点 53、55、57 作为服务器编号。</p>
 <h2 id="一-先认识-p800-软件接口与实际硬件要分开看">一、先认识 P800：软件接口与实际硬件要分开看</h2>
 <p>P800 是昆仑芯的 AI 加速器，采用 XPU-P 架构。官方介绍中的 P800 OAM 模组依据 OCP-OAM 标准设计，支持通过 IB 或 RoCE 构建集群。这里讨论的是现场三台服务器的实际连接关系，而不是把厂商宣传中的某种超节点配置直接套进来。<a href="https://www.kunlunxin.com/news/4720.html">架构介绍</a>、<a href="https://www.kunlunxin.com/news/4791.html">OAM 与互连介绍</a>。</p>
 <p>现场每台有八张 P800，每卡显存 96 GiB。使用中的软件栈包含 vLLM、昆仑插件、XPU SDK 和 BKCL 通信库。环境里能看到 <code>nvidia-smi</code>、<code>torch.cuda</code>、CUDA 风格的 stream 和 graph 接口，但这些接口名字不能作为 NVIDIA GPU 或 NVLink 硬件的证明。分析性能时，要沿着实际加载的昆仑实现追踪。</p>
@@ -5378,6 +5380,68 @@ GPU 1：[[ 8, 4], [20,10]]
 <p>相对历史基线，两轮观测值约低 48.63% 和 48.31%。由于历史基线没有在本轮重新执行，这不是随机交错 A/B，也不是对未来所有负载的因果或显著性结论；它足以支持事先约定的保留决策：两轮有效结果都没有超过门槛，候选不留在服务中。</p>
 <p>最终记录为 <code>CLOSED_RESTORED</code>：恢复原 P1 后，健康检查、服务身份、实际源文件与依赖、1M 上下文均复核，三节点证据包已取回并校验。后续其他调优会话仍可能继续工作，因此这里描述的是这次已闭合实验的终态，而不是宣称现场从此不再变化。本次博客维护只读核对结果、修复差异与会话，没有连接服务器或重跑这些实验。</p>
 <p>这段过程补齐了工程实践中的另一半：功能正确允许候选进入性能评估，性能门决定是否保留；恢复完成则需要自己的健康与身份验证。任何一个阶段都不能由前一阶段的“通过”代替。</p>
+<h2 id="后续-从依赖修复到正式复测-成绩必须绑定具体版本">后续：从依赖修复到正式复测，成绩必须绑定具体版本</h2>
+<p>10 月 18 日的完整记录，使“先减少等待，再判断算子”的路线有了更具体的实现与结果。早期 r16 未通过性能门的事实仍然成立；随后恢复异步执行、修复依赖和验证其他候选，才得到新的阶段成绩。实验编号也有不同序列：10 月 16 日的完整权重 r16，与后来的 relay r16 逐层观测不是同一轮。</p>
+<h3 id="调度和保留页依赖怎样影响流水线">调度和保留页依赖怎样影响流水线</h3>
+<p>真实 Scheduler / EngineCore 回放中，V1 异步路径能够形成单批 32，某些同步配置则形成 16＋16。批次拆分会改变权重复用与通信次数，不能只看有效 token 总数。真实 MoE 组件在同为 32 个有效 token 时，单批约 1.033 ms，两批约 1.553 ms，三批约 2.011 ms；这些是组件观测，不是整模每步时间。</p>
+<p>异步恢复还涉及 PP 的反馈和对象生命周期。后台 transport 需要正确的推理执行上下文，反馈 future 必须归属实际批次；设备调用与 Graph capture 的互斥也不能把 Gloo 或 Future 的等待包在锁里，否则本来可以交错的工作又会串行。前文缓存 slot mapping 小张量的 P1 保留在这条路径中，没有把已完成的缓存优化再算成新收益。</p>
+<p>另一处直接修复发生在 NULL 保留页。独立请求共享保留页标记时，旧 fence 把它当作真实共享块，额外建立跨批次依赖。补丁过滤非正块 ID，同时继续追踪真实共享页。合成 TP8／PP3 流水线组件测得约 2.54 倍完成速度，后续整模两轮为 239.1221／243.6445 tokens/s。组件倍率只描述那个合成实验；整模还包含目标计算、草稿、输入准备和状态管理，不能照搬倍率。</p>
+<h3 id="共享-kda-graph-跑通以后-为什么仍不能直接宣称单项加速">共享 KDA Graph 跑通以后，为什么仍不能直接宣称单项加速</h3>
+<p>混合 prefill 会改变边界和页映射，Graph 的 key、输入指针、状态所有权和回退都需要覆盖。早期 r22 虽通过 API 与有限数值检查，正式 160 请求只成功 33 条：冷 capture 先在页映射构造处报错，随后出现 PP 行序保护报错并退出。该轮无有效吞吐，删掉后出现的保护也不能解决前面的错误。</p>
+<p>后续候选让私有 Graph 创建与 PP 反馈设备调用共享 RLock，阻塞等待留在锁外。测试隔离也经历过修正：显存拒绝测试先碰到了已耗尽的 capture 数量上限，不能把这一退出写成整套通过；换用独立 manager 验证各自拒绝条件后，八 rank 才全部正常退出。这里修复的是测试条件，没有把同一份生产保护算作第二次优化。</p>
+<p>r25 B 使用合格组件完成同一次启动下的两轮正式测试，吞吐为 <strong>247.5310／247.5436 tokens/s</strong>，各 160/160 请求、44/44 固定答案，合并口径为 247.5373。24 个 worker 都记录到共享 Graph 命中，共 73,968 次层调用。约 160.13 MiB/worker 的统计只覆盖私有子 Graph，不是进程显存。</p>
+<p>但配对 A 恢复后未通过 NUM36，A1/A2 没有执行。A 对应原 EAGLE3 D3，也不是未开启投机的 P1。因此，这两轮能证明候选在已测窗口完成工作，不能独立量化“共享 Graph 带来多少收益”。后面的 r30 又关闭了该子 Graph，转而诊断有界投影；它首轮有五项不等价，未测正式吞吐，也不能继承 r25 的成绩。</p>
+<h3 id="最终单轮-251-9460-tokens-s-的配置和口径">最终单轮 251.9460 tokens/s 的配置和口径</h3>
+<p>最后一次正式复测绑定恢复后的原 <strong>R6 EAGLE3 D3</strong>，TP8／PP3、FP16、24 张 P800。它没有叠加 r25 共享 KDA 子 Graph、新 native MLA、串行 Q1或后续数值候选。测前后三机源树和 24 个 worker 身份保持一致，窗口内没有切换服务或修改源码。</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th align="right">10 月 18 日正式单轮</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>闭环并发／请求数</td>
+<td align="right">32／160</td>
+</tr>
+<tr>
+<td>每请求输入／输出</td>
+<td align="right">1024／1024 tokens</td>
+</tr>
+<tr>
+<td>成功请求／输出总数</td>
+<td align="right">160/160／163,840 tokens</td>
+</tr>
+<tr>
+<td>第一请求发起至最后完成</td>
+<td align="right">650.298010 s</td>
+</tr>
+<tr>
+<td>实例输出吞吐</td>
+<td align="right"><strong>251.946027 tokens/s</strong></td>
+</tr>
+<tr>
+<td>平均 TTFT／平均 TPOT</td>
+<td align="right">3.958300 s／116.345714 ms</td>
+</tr>
+<tr>
+<td>固定答案检查</td>
+<td align="right">测前 38＋测后 6，44/44</td>
+</tr>
+<tr>
+<td>HTTP 错误／prefix hits／抢占增量</td>
+<td align="right">0／0／0</td>
+</tr>
+</tbody></table>
+<p>吞吐可直接复算为 <code>163840 / 650.298010</code>。独立核对覆盖 SQLite 的 160 条成功记录、逐条输入输出计数、160 个 SSE 的 usage 与完成原因，以及服务端生成计数增量。质量请求没有混入正式计时。某条 SSE 仅含 reasoning 输出，按既定解析规则计数，不能误判为空响应后又重复补发。</p>
+<p>这次指定工作簿的历史 C32、1k／1k 行给出 207.01 tokens/s、TTFT 10.43963 s、TPOT 144.47 ms。相对它，吞吐观测值增加 21.71%，TTFT 降低 62.08%，TPOT 降低 19.47%。原工作簿的请求数没有保留在公开提取字段中，也未在本轮重跑，因此这是历史工程对照，不是随机交错 A/B。前文 r16 的保留门使用另一历史值 223.9508；两处分母必须分别保留，不能为了增幅好看而互换。</p>
+<p>全部 160 请求的平均 TTFT 也不代表首批突发体验。该轮最先发起的 32 条平均 TTFT 为 14.650208 s，是同一轮的子集，不是一次独立压测。正式单轮高于历史 r25 合并值约 1.78%，但启动、版本和测量时点不同，不能据此判断共享 Graph 没有价值。</p>
+<h3 id="组件反例与后续状态仍然影响下一轮选择">组件反例与后续状态仍然影响下一轮选择</h3>
+<p>MLA 的原生 Q4 组件曾通过普通输入波次，却在端点毒化时与顺序 Q1 出现 59 个元素差异，最大绝对差约 3.81e-6。同一波 Graph 与 eager 相同，说明至少不能把这组反例归为 Graph replay 不稳定。固定容差通过与要求逐字节一致，是两种验收目标。</p>
+<p>串行 native Q1 回退随后通过 10 配置、58 波输入变化与生命周期检查，但 C32／Q4 的 1K、8K 核心成本比紧凑旧 Q1 分别高约 8.88% 和 11.07%。私有入口还有 metadata 与数据准备成本，不能只挑宽表旧实现作对照，也不能继承 native Q4 的核心倍率。通信四臂的单机 TP8 链测试同样没有确认实用收益，不能写成三机通信已解决。</p>
+<p>截至 10 月 22 日的较新封存记录中，r160 只通过 35/36 一致性检查；它没有新吞吐成绩。另一条 R6 非投机底座的 DSpark 适配线也未完成整模资格：固定答案能返回，不代表普通／teacher-forced／投机输出已经等价。CPU 状态契约、原生小张量与 Graph 组件通过，只能支持继续集成。缺少真实权重的后续阶段更不能补出性能结果。</p>
+<p>后续准备的 C32、32 请求、1024 输入／128 输出是短测窗口，不能与这里 C32、160 请求、1024／1024 的正式成绩拼接成“达到 300 tokens/s”。同理，服务配置保留 1,048,576 上下文上限，并不证明已经执行过 1M 长请求。251.9460 是可追溯的历史单轮成绩，44 题也只是有限答案检查；本轮未重新执行完整 NUM36、独立 P1 逐 token 等价或长期服务验收。</p>
+<p>这组结果的价值在于把具体修复和可用结论对应起来：NULL 依赖、批次形状与反馈交接有直接实现依据；Graph 候选有自己的命中和失败记录；最终性能绑定恢复后的 R6。新的实验只能带着自己的正确性、负载与版本证据向前推进。</p>
 <h2 id="十二-这次排查留下的几条判断习惯">十二、这次排查留下的几条判断习惯</h2>
 <p>对我而言，最有用的变化是把几个经常混在一起的概念拆开：</p>
 <ul>

@@ -100,7 +100,7 @@ def candidate_status(functional, quality, performance, resources):
 
 “使用 SDPA”仍然只是后端名称，无法说明一次调用实际走了哪条分支。我提交的 [vLLM-Omni PR #7895](https://github.com/vllm-project/vllm-omni/pull/7895) 补充了构造后的 CUDA 执行路径说明：Q 与 K/V 头数相同、原生 GQA，以及先展开 K/V 再调用 SDPA。这几种实现会影响实际工作量与中间张量，测量记录只写一个后端名称，会丢掉解释结果所需的条件。
 
-这项修改依赖的执行契约框架来自其他贡献者的 [PR #7379](https://github.com/vllm-project/vllm-omni/pull/7379)，该 PR 已于 2026-10-02 合并。我的工作是后续 SDPA 适配，不能把上游 FA4 原型或其验证结果计入自己的实现。截至 **2026-10-13**，#7895 仍开放、非草稿，提交为 `88a1389826d4e696a446e0597ee46a90c65ec627`。当前版本在推理 fullgraph 支持上继续调整了输出布局；10 月 3 日的 eager-only 版本，以及后续 `e089dec16` 的连续 BHSD 边界，都属于历史阶段。
+这项修改依赖的执行契约框架来自其他贡献者的 [PR #7379](https://github.com/vllm-project/vllm-omni/pull/7379)，该 PR 已于 2026-10-02 合并。我的工作是后续 SDPA 适配，不能把上游 FA4 原型或其验证结果计入自己的实现。**2026-10-23 核验时，#7895 已于 10 月 18 日合并**，最终 head 为 `4754c2763b8cdaf05fea90331f049128394ec706`，合并提交为 `2cefeddc8f54ec19a1a46668583b20c2139c2c62`。下文布局实测绑定的是较早的 `88a1389826d4e696a446e0597ee46a90c65ec627`；10 月 3 日的 eager-only 版本，以及 `e089dec16` 的连续 BHSD 边界，也分别保留为历史阶段。
 
 实现里容易漏掉的是：负责说明路径的 resolver，必须观察到与真正 forward 相同的输入。外部输入布局为 `[B, S, H, D]`，探测时转为 SDPA 使用的 `[B, H, S, D]`；padding mask 也要按同样规则归一化。若 resolver 用原始 mask 探测、forward 用展开后的 mask 探测，两边可能选出不同结论。此时日志虽然详细，却在描述一条没有实际执行的路径。
 
@@ -126,7 +126,11 @@ custom op 还必须使 fake 输出与真实输出的形状、dtype 和 stride �
 
 [布局建议](https://github.com/vllm-project/vllm-omni/pull/7895#discussion_r4193615192)已在 `88a138982` 实现并[回复评审](https://github.com/vllm-project/vllm-omni/pull/7895#discussion_r4237226573)。custom op 直接返回连续 BSHD，调用方无需先取得连续 BHSD 再排列；沿最后两个轴展开 heads 时与输出共享存储。fake 的形状和 stride 同步修改，才能让编译器得到与真实执行一致的布局。这里支持的是“后续 flatten 为 view”的具体性质；SDPA kernel 本身的输出转成连续 BSHD 仍可能需要复制，不能简称“消除了所有复制”。
 
-这次布局验证另用 **A800 80GB PCIe、SM80**，绑定 `88a138982`，软件为 Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。旧布局在新增四项 CPU 布局用例中全部失败，改后完整聚焦套件 **145 passed**；其中包括 12 项动态 Inductor fullgraph、六项生产 `Attention.forward` 和八项 schema/fake/dynamic-AOT `opcheck`。CI 标记筛选为 **99 passed**，隐藏 CUDA 为 **99 skipped**。这些子集不能再加到 145 上，也不能把 RTX 4090 与 A800 两次成绩拼成一次跨设备实验。当前 head 已返回的 pre-commit、Python 3.11/3.12 构建和 DCO 检查均成功；这并不代表补丁已合并或所有未返回检查已完成。
+这次布局验证另用 **A800 80GB PCIe、SM80**，绑定 `88a138982`，软件为 Python 3.12.3、PyTorch 2.13.0+cu130、vLLM 0.30.0。旧布局在新增四项 CPU 布局用例中全部失败，改后完整聚焦套件 **145 passed**；其中包括 12 项动态 Inductor fullgraph、六项生产 `Attention.forward` 和八项 schema/fake/dynamic-AOT `opcheck`。CI 标记筛选为 **99 passed**，隐藏 CUDA 为 **99 skipped**。这些子集不能再加到 145 上，也不能把 RTX 4090 与 A800 两次成绩拼成一次跨设备实验。
+
+合并前，分支先合入了新的 main，再增加 FP32 additive bias 的 fullgraph 回归用例，形成最终 `4754c2763`。这次核对五个相关文件时，普通 SDPA 测试与 CUDA 契约测试和 `88a138982` 相同，编译测试与生产 backend 则已有变化。因此，旧 A800 的 145/99 项只能继续归属旧提交；最终 head 的 CodeQL、Python 3.11/3.12 构建、pre-commit 和 DCO 成功，也不能替代新 GPU 运行报告。
+
+新增用例覆盖低精度 Q/K/V 配 FP32 的四维浮点 bias，分别检查同头数与 GQA 的 eager／compiled 输出，对照 FP32 数学参考并保留 BF16 输出。它与“二维布尔 padding mask”不是同一个输入条件：不能为了让 fused kernel 接受输入就随意降低 bias 精度。合入 main 后的 backend 包含保留浮点 bias 精度并选择 math 路径的处理；合并进来的生产修改也不能全部算作本 PR 的原创贡献。这项用例扩大了回归目标，没有产生新的性能成绩，也没有自动扩大执行契约对外承诺的支持范围。
 
 结论仍有明确上限：这是选定输入的推理 fullgraph 和布局验证，不是训练 fullgraph、CUDA Graph capture、多卡、模型 E2E 或性能基准。没有布局复制的性能测量，也没有任意形状只编译一个图的保证。更新文章时，把旧观察、已实施改动、当前验证与待验证收益分别写清楚，比给旧报告追加一个更大的测试总数更有用。
 

@@ -759,5 +759,10 @@
   "17.4 归一化、融合与异步执行": "17.4 Normalization, Fusion and Asynchronous Execution",
   "17.5 Graph、profiling 与整体验证": "17.5 Graphs, Profiling and End-to-End Validation",
   "18. 复习时怎样把它讲成一次完整优化": "18. Explain One Complete Optimization During Revision",
-  "19. 延伸资料与互动图说明": "19. Further Reading and Interactive Diagram Notes"
+  "19. 延伸资料与互动图说明": "19. Further Reading and Interactive Diagram Notes",
+  "后续：从依赖修复到正式复测，成绩必须绑定具体版本": "Follow-up: Dependency Fixes and Version-Bound Formal Results",
+  "调度和保留页依赖怎样影响流水线": "How Scheduling and Reserved-Page Dependencies Affect the Pipeline",
+  "共享 KDA Graph 跑通以后，为什么仍不能直接宣称单项加速": "Shared KDA Graph Results and the Missing Paired Control",
+  "最终单轮 251.9460 tokens/s 的配置和口径": "The Configuration and Scope of the 251.9460 tokens/s Run",
+  "组件反例与后续状态仍然影响下一轮选择": "Component Counterexamples and Later Qualification Gaps"
 }
