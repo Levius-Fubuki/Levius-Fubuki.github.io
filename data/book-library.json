@@ -639,7 +639,7 @@
       "english": "THREE NODES, SHARED WORK",
       "path": "/2026/10/14/p800-numa-pipeline-topology/",
       "date": "2026-10-14",
-      "updated": "2026-10-18T07:04:16+08:00",
+      "updated": "2026-10-23T08:51:34+08:00",
       "summary": "从三台八卡 P800 的实际拓扑出发，解释 socket、NUMA、主机内存与显存，分析 Kimi-K3 的 TP8×PP3 分配、流水线等待和完整通信路径；保留可点击拓扑与后续瓶颈检测、优化验收方法。",
       "art": "/img/books/p800-numa-pipeline-topology.png",
       "source": "content/posts/p800-numa-pipeline-topology.md",
@@ -676,6 +676,31 @@
         "Attention",
         "归一化",
         "性能测量"
+      ]
+    },
+    {
+      "id": "performance-analysis",
+      "collection": "infra",
+      "volume": "XI",
+      "title": "从关键路径到达标吞吐：大模型性能分析与实验方法复习笔记",
+      "coverTitle": [
+        "性能分析",
+        "实验方法"
+      ],
+      "english": "FROM TRACE TO GOODPUT",
+      "path": "/2026/10/23/performance-analysis/",
+      "date": "2026-10-23",
+      "updated": "2026-10-23",
+      "summary": "用一个流式服务案例串起关键路径、Roofline、异步计时、缓存与队列、分布式通信、显存生命周期、质量和达标吞吐；保留真实答题复盘、17张互动图与63道附答案自测。",
+      "art": "/img/books/performance-analysis.png",
+      "source": "content/posts/performance-analysis.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "性能测量",
+        "GPU架构",
+        "显存优化",
+        "分布式训练"
       ]
     }
   ]

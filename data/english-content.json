@@ -223,6 +223,14 @@
         "Optimization"
       ],
       "summary": "One attention sublayer connects execution, memory, GEMM, reduction, stable softmax, FlashAttention, normalization, fusion, streams, graphs and profiling, with 50 interactive diagrams, complete CUDA teaching examples and 48 answered self-checks."
+    },
+    "performance-analysis": {
+      "title": "Performance Analysis and Experimental Methods for LLM Systems",
+      "coverTitle": [
+        "Performance",
+        "Analysis"
+      ],
+      "summary": "A streaming-service case connects critical paths, Roofline, asynchronous timing, caches, queues, distributed communication, memory lifetimes, quality and goodput, with a personal learning review, 17 interactive diagrams and 63 answered self-checks."
     }
   },
   "collections": {

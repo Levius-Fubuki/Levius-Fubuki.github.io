@@ -639,7 +639,7 @@
       "english": "THREE NODES, SHARED WORK",
       "path": "/2026/10/14/p800-numa-pipeline-topology/",
       "date": "2026-10-14",
-      "updated": "2026-10-18T07:04:16+08:00",
+      "updated": "2026-10-23T08:51:34+08:00",
       "summary": "A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap.",
       "art": "/img/books/p800-numa-pipeline-topology.png",
       "source": "content/posts/p800-numa-pipeline-topology.md",
@@ -676,6 +676,31 @@
         "Attention",
         "Normalization",
         "Performance Measurement"
+      ]
+    },
+    {
+      "id": "performance-analysis",
+      "collection": "infra",
+      "volume": "XI",
+      "title": "Performance Analysis and Experimental Methods for LLM Systems",
+      "coverTitle": [
+        "Performance",
+        "Analysis"
+      ],
+      "english": "FROM TRACE TO GOODPUT",
+      "path": "/2026/10/23/performance-analysis/",
+      "date": "2026-10-23",
+      "updated": "2026-10-23",
+      "summary": "A streaming-service case connects critical paths, Roofline, asynchronous timing, caches, queues, distributed communication, memory lifetimes, quality and goodput, with a personal learning review, 17 interactive diagrams and 63 answered self-checks.",
+      "art": "/img/books/performance-analysis.png",
+      "source": "content/posts/performance-analysis.md",
+      "math": true,
+      "tags": [
+        "AI Infra",
+        "Performance Measurement",
+        "GPU Architecture",
+        "Memory Optimization",
+        "Distributed Training"
       ]
     }
   ]

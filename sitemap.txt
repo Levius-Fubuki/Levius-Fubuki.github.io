@@ -90,3 +90,4 @@ https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/
 https://leviusspace.top/tags/NUMA/
 https://leviusspace.top/tags/P800/
 https://leviusspace.top/2026/10/20/gpu-cuda/
+https://leviusspace.top/2026/10/23/performance-analysis/
