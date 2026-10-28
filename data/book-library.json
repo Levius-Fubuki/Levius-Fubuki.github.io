@@ -702,6 +702,29 @@
         "显存优化",
         "分布式训练"
       ]
+    },
+    {
+      "id": "ouro-rollout-publication",
+      "collection": "engineering",
+      "volume": "VI",
+      "title": "把循环模型接入 RL 框架：Ouro 的轨迹重放、权重发布与恢复",
+      "coverTitle": [
+        "Ouro 循环模型",
+        "重放与恢复"
+      ],
+      "english": "REPLAY · PUBLISH · RESTORE",
+      "path": "/2026/10/29/ouro-rollout-publication/",
+      "date": "2026-10-29",
+      "updated": "2026-10-29T07:09:49+08:00",
+      "summary": "从循环深度与 last-exited KV 的可微重放出发，记录 Ouro-1.4B 接入 verl 的完整权重发布、双卡训练恢复和单卡 Ray 生命周期验证；保留 N+2 无收益结果与完整训练器尚未验收的边界。",
+      "art": "/img/books/ouro-rollout-publication.png",
+      "source": "content/posts/ouro-rollout-publication.md",
+      "tags": [
+        "分布式训练",
+        "分布式推理",
+        "强化学习",
+        "显存优化"
+      ]
     }
   ]
 }

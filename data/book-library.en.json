@@ -702,6 +702,29 @@
         "Memory Optimization",
         "Distributed Training"
       ]
+    },
+    {
+      "id": "ouro-rollout-publication",
+      "collection": "engineering",
+      "volume": "VI",
+      "title": "Ouro RL: Recurrent Replay, Weight Publication and Recovery",
+      "coverTitle": [
+        "Ouro RL",
+        "Replay & Restore"
+      ],
+      "english": "REPLAY · PUBLISH · RESTORE",
+      "path": "/2026/10/29/ouro-rollout-publication/",
+      "date": "2026-10-29",
+      "updated": "2026-10-29T07:09:49+08:00",
+      "summary": "A version-pinned engineering account of recurrent trace replay, full-weight publication, two-GPU training recovery and one-GPU Ray service validation, including the negative N+2 result and remaining trainer integration boundaries.",
+      "art": "/img/books/ouro-rollout-publication.png",
+      "source": "content/posts/ouro-rollout-publication.md",
+      "tags": [
+        "Distributed Training",
+        "Distributed Inference",
+        "Reinforcement Learning",
+        "Memory Optimization"
+      ]
     }
   ]
 }

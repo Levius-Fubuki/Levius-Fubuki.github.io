@@ -231,6 +231,14 @@
         "Analysis"
       ],
       "summary": "A streaming-service case connects critical paths, Roofline, asynchronous timing, caches, queues, distributed communication, memory lifetimes, quality and goodput, with a personal learning review, 17 interactive diagrams and 63 answered self-checks."
+    },
+    "ouro-rollout-publication": {
+      "title": "Ouro RL: Recurrent Replay, Weight Publication and Recovery",
+      "coverTitle": [
+        "Ouro RL",
+        "Replay & Restore"
+      ],
+      "summary": "A version-pinned engineering account of recurrent trace replay, full-weight publication, two-GPU training recovery and one-GPU Ray service validation, including the negative N+2 result and remaining trainer integration boundaries."
     }
   },
   "collections": {

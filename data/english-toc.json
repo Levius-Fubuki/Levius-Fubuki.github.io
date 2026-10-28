@@ -821,5 +821,16 @@
   "16.3 多卡扩容不线性": "16.3 Diagnosing Sublinear Multi-GPU Scaling",
   "16.4 证明优化真实有效": "16.4 Demonstrating a Reproducible Improvement",
   "16.5 一次优化报告的可填写骨架": "16.5 A Fillable Optimization Report",
-  "19. 参考资料与进一步核对": "19. References and Verification Boundaries"
+  "19. 参考资料与进一步核对": "19. References and Verification Boundaries",
+  "一、先固定模型语义，再接训练框架": "1. Preserve Recurrent Semantics Before Framework Integration",
+  "输出深度必须移到正确的输入位置": "Align Output Depths with the Correct Input Positions",
+  "二、退出以后，历史 K/V 仍然参与后面的计算": "2. Exited Tokens Still Contribute Historical KV",
+  "三、raw score、训练步和发布版本分别保存": "3. Keep Raw Scores, Training Steps and Versions Separate",
+  "四、完整权重发布是一段有失败状态的协议": "4. Full-Weight Publication Is a Failure-Aware Protocol",
+  "五、用新进程的下一步证明恢复，而不是只看文件存在": "5. Prove Recovery with the Next Step in Fresh Processes",
+  "开关开启还不够，需要实际执行证据": "Observe Actual Execution Beyond Enabled Flags",
+  "六、Ray 接入最难的是执行所有权和准入顺序": "6. Ray Execution Ownership and Admission Ordering",
+  "七、N+2 真的执行到目标深度，也可能不值得部署": "7. Executing N+2 Does Not Establish a Deployment Benefit",
+  "八、交付物和下一步仍沿着同一条证据链": "8. Deliverables and Remaining Validation",
+  "相关笔记": "Related Notes"
 }
