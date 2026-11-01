@@ -269,7 +269,7 @@
       "id": "gr308-image",
       "collection": "engineering",
       "volume": "III",
-      "title": "Qwen Image 2.1 移植 GR308：从单卡出图到 TP2 与分块 VAE",
+      "title": "Qwen Image 2.1 移植 GR308：从 latent 与扩散到 TP2、分块 VAE",
       "coverTitle": [
         "GR308",
         "图像生成"
@@ -277,14 +277,16 @@
       "english": "THE MOSAIC ENGINE",
       "path": "/2026/10/02/gr308-image/",
       "date": "2026-10-02",
-      "summary": "从 Qwen Image 单卡出图、分块 VAE 到 TP2 DiT，追踪实现细节、数值差异与尚未完成的验收。",
+      "summary": "用一张1024×1024图片串联条件编码、latent维度、Flow Matching、时间门控、DiT TP2与VAE瓦片；复盘历史实测、追问和质量边界。",
       "art": "/img/books/gr308-image.png",
       "source": "content/posts/gr308-image.md",
       "tags": [
         "GR308",
         "多模态",
         "分布式推理"
-      ]
+      ],
+      "updated": "2026-11-01",
+      "math": true
     },
     {
       "id": "gr308-video",

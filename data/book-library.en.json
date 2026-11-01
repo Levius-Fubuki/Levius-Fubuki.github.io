@@ -269,7 +269,7 @@
       "id": "gr308-image",
       "collection": "engineering",
       "volume": "III",
-      "title": "Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE",
+      "title": "Qwen Image 2.1 on GR308: Latents, Flow Matching, TP2 and Tiled VAE",
       "coverTitle": [
         "GR308",
         "Image Generation"
@@ -277,14 +277,16 @@
       "english": "THE MOSAIC ENGINE",
       "path": "/2026/10/02/gr308-image/",
       "date": "2026-10-02",
-      "summary": "From single-GPU Qwen Image generation and tiled VAE to TP2 DiT: implementation details, numerical differences, and outstanding acceptance tests.",
+      "summary": "A 1024×1024 walkthrough of conditioning, tensor shapes, Flow Matching, time gates, DiT TP2 and tiled VAE, with interactive diagrams, revision questions and measured limits.",
       "art": "/img/books/gr308-image.png",
       "source": "content/posts/gr308-image.md",
       "tags": [
         "GR308",
         "Multimodal",
         "Distributed Inference"
-      ]
+      ],
+      "updated": "2026-11-01",
+      "math": true
     },
     {
       "id": "gr308-video",

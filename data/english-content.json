@@ -73,12 +73,12 @@
       "summary": "Parallel topologies, MTP, graphs, and quantization for Qwen and DeepSeek, distinguishing full tests, short runs, and failure boundaries."
     },
     "gr308-image": {
-      "title": "Porting Qwen Image 2.1 to GR308: From Single-GPU Generation to TP2 and Tiled VAE",
+      "title": "Qwen Image 2.1 on GR308: Latents, Flow Matching, TP2 and Tiled VAE",
       "coverTitle": [
         "GR308",
         "Image Generation"
       ],
-      "summary": "From single-GPU Qwen Image generation and tiled VAE to TP2 DiT: implementation details, numerical differences, and outstanding acceptance tests."
+      "summary": "A 1024×1024 walkthrough of conditioning, tensor shapes, Flow Matching, time gates, DiT TP2 and tiled VAE, with interactive diagrams, revision questions and measured limits."
     },
     "gr308-video": {
       "title": "Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks",

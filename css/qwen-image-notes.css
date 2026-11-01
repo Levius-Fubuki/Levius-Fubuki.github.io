@@ -1,0 +1,36 @@
+/* Article-local diagrams and tensor-shape exploration. */
+.qwen-diagram,.qwen-image-lab{--qi-text:#e0ddd4;--qi-muted:#aaa89e;--qi-line:#68685f;--qi-surface:#191b19;--qi-accent:#a5cbb9;max-width:100%;min-width:0;color:var(--qi-text);margin:28px 0}
+.qwen-diagram figcaption{font-size:15px;margin-bottom:10px;color:var(--qi-text)}
+.qwen-diagram .qwen-diagram-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.qwen-diagram button,.qwen-image-lab select{font:inherit;font-size:14px;color:var(--qi-text);background:var(--qi-surface);border:1px solid var(--qi-line);border-radius:3px;padding:7px 11px;min-height:40px}
+.qwen-diagram button:hover,.qwen-diagram button:focus-visible,.qwen-image-lab select:focus-visible{border-color:var(--qi-accent);outline:2px solid var(--qi-accent);outline-offset:2px}
+.qwen-diagram button:disabled{opacity:.4}
+.qwen-diagram [data-qwen-zoom-label]{font-size:13px;font-variant-numeric:tabular-nums;color:var(--qi-muted);min-width:42px}
+.qwen-diagram-viewport,.qwen-image-lab [data-qwen-shape-diagram]{max-width:100%;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--qi-line) transparent}
+.qwen-diagram-viewport{max-height:570px;border-block:1px solid #45483f;padding:12px 0}
+.qwen-diagram.is-expanded .qwen-diagram-viewport{max-height:none}
+.qwen-diagram-viewport:focus-visible{outline:2px solid var(--qi-accent);outline-offset:2px}
+.qwen-diagram svg,.qwen-image-lab svg{display:block;max-width:none!important;height:auto;color:var(--qi-text)}
+.qwen-diagram svg{width:740px}
+.qwen-image-lab svg{width:740px}
+.qwen-image-lab{container-type:inline-size}
+.qwen-shape-mobile{display:none;flex-direction:column;gap:8px}
+.qwen-shape-mobile .qwen-shape-stage{padding:12px;border:1px solid var(--qi-line);border-radius:6px;background:var(--qi-surface);text-align:center;font-size:14px;line-height:1.8;overflow-wrap:anywhere}
+.qwen-shape-mobile .qwen-shape-stage strong{display:block;font-weight:400;color:var(--qi-accent)}
+.qwen-shape-mobile .qwen-shape-arrow{text-align:center;color:var(--qi-muted)}
+@container(max-width:700px){.qwen-shape-desktop{display:none!important}.qwen-shape-mobile{display:flex}}
+.qwen-diagram .qi-node,.qwen-image-lab .qi-node{fill:var(--qi-surface);stroke:var(--qi-line);stroke-width:1}
+.qwen-diagram .qi-node-accent,.qwen-image-lab .qi-node-accent{stroke:var(--qi-accent)}
+.qwen-diagram .qi-edge,.qwen-image-lab .qi-edge{fill:none;stroke:var(--qi-muted);stroke-width:1.2}
+.qwen-diagram .qi-arrow,.qwen-image-lab .qi-arrow{fill:var(--qi-muted)}
+.qwen-diagram svg text,.qwen-image-lab svg text{fill:var(--qi-text);font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;font-weight:400}
+.qwen-diagram svg .qi-edge-label{fill:var(--qi-muted);font-size:13px}
+.qwen-diagram details{margin-top:12px;font-size:14px}
+.qwen-diagram summary{cursor:pointer;color:var(--qi-muted)}
+.qwen-lab-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.qwen-lab-controls label{display:flex;flex-direction:column;gap:5px;font-size:14px;min-width:0}
+.qwen-image-lab select{width:100%;max-width:100%}
+.qwen-image-lab [data-qwen-shape-detail]{font-size:14px;line-height:1.8;font-variant-numeric:tabular-nums;border-left:2px solid var(--qi-accent);padding-left:12px}
+.qwen-legacy-anchor{display:block;scroll-margin-top:26px}
+@media(min-width:1200px){.qwen-diagram svg,.qwen-image-lab svg{width:max(740px,100%)}}
+@media(max-width:360px){.qwen-lab-controls{grid-template-columns:1fr}.qwen-diagram .qwen-diagram-tools{gap:6px}.qwen-diagram button{padding:6px 9px}}
