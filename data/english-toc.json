@@ -893,5 +893,9 @@
   "问题七：MTP4为何不等于模型有四层草稿模块": "Question 7: MTP4 versus the Number of Draft Layers",
   "问题八：怎样证明自己找到了通信瓶颈": "Question 8: Evidence for a Communication Bottleneck",
   "10. 来源与证据范围": "10. Sources and Evidence Boundaries",
-  "9B：部署拓扑贡献最大，扫描顺序仍要按记录阅读": "9B: Topology Delivers the Largest Gain; Preserve the Actual Search Order"
+  "9B：部署拓扑贡献最大，扫描顺序仍要按记录阅读": "9B: Topology Delivers the Largest Gain; Preserve the Actual Search Order",
+  "复验通过之前，先验收观察工具": "Validate the Observer Before Accepting a Retest",
+  "选中了用例，还没有证明它执行过": "Selection Does Not Prove Execution",
+  "相同 KV 块数，可能来自不同的原始预算": "Equal KV Block Counts Can Hide Different Budgets",
+  "诊断器本身也有失败路径": "Diagnostic Tools Have Failure Paths Too"
 }
