@@ -263,7 +263,8 @@
         "GR308",
         "大模型",
         "性能测量"
-      ]
+      ],
+      "updated": "2026-11-01T22:35:52+08:00"
     },
     {
       "id": "gr308-image",
@@ -726,6 +727,31 @@
         "分布式推理",
         "强化学习",
         "显存优化"
+      ]
+    },
+    {
+      "id": "qwen9b-gr308",
+      "collection": "engineering",
+      "volume": "VII",
+      "title": "Qwen3.5-9B 推理调优笔记：从 Gated DeltaNet 到 GR308 的调度与双副本",
+      "coverTitle": [
+        "Qwen 9B",
+        "状态与调优"
+      ],
+      "english": "THE RECURRENT LEDGER",
+      "path": "/2026/11/01/qwen9b-gr308/",
+      "date": "2026-11-01",
+      "updated": "2026-11-01T22:35:52+08:00",
+      "summary": "用3072→1024请求串联混合注意力、因果卷积与GDN状态、KV容量、token预算、Graph桶和TP1×DP2；复盘GR308实测、主动追问与五个互动演示。",
+      "art": "/img/books/qwen9b-gr308.png",
+      "source": "content/posts/qwen9b-gr308.md",
+      "math": true,
+      "tags": [
+        "GR308",
+        "模型架构",
+        "KV Cache",
+        "投机解码",
+        "性能测量"
       ]
     }
   ]

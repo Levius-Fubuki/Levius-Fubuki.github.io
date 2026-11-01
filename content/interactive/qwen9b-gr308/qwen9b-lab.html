@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Qwen9B 结构与调优互动笔记</title>
+  <link rel="stylesheet" href="lab.css?v=e5788bdda5ce">
+  <script src="models.js?v=e5788bdda5ce" defer></script>
+  <script src="lab.js?v=e5788bdda5ce" defer></script>
+</head>
+<body>
+  <main id="lab">
+    <header class="masthead"><p class="eyebrow">QWEN 9B · ENGINEERING NOTEBOOK</p><h1 id="panel-title">结构、状态与调度</h1><p id="panel-description"></p></header>
+    <label class="panel-picker">选择演示<select id="panel"><option value="chain">01 请求生命周期</option><option value="gdn">02 GDN 与局部卷积</option><option value="scheduler">03 Token 调度预算</option><option value="graph">04 Graph 桶与 padding</option><option value="memory">05 缓存与副本容量</option></select></label>
+    <section id="controls" class="controls" aria-label="演示参数"></section>
+    <section id="result" aria-live="polite" aria-atomic="true"></section>
+    <p class="footnote">教学演示 · 公式可核算，时间不作预测。真实配置以厂商运行时、缓存分配与性能记录为准。</p>
+    <noscript>请启用 JavaScript 查看交互；正文已保留公式、示例和实验结果。</noscript>
+  </main>
+</body>
+</html>

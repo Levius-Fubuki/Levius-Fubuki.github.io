@@ -239,6 +239,14 @@
         "Replay & Restore"
       ],
       "summary": "A version-pinned engineering account of recurrent trace replay, full-weight publication, two-GPU training recovery and one-GPU Ray service validation, including the negative N+2 result and remaining trainer integration boundaries."
+    },
+    "qwen9b-gr308": {
+      "title": "Qwen3.5-9B Inference Tuning: Gated DeltaNet, Scheduling, and Dual Replicas on GR308",
+      "coverTitle": [
+        "Qwen 9B",
+        "State & Tuning"
+      ],
+      "summary": "A worked 3072-to-1024 request connects hybrid attention, causal convolution, GDN state, cache sizing, token budgets, graph buckets and TP1×DP2, with measured boundaries, review questions and five interactive lessons."
     }
   },
   "collections": {

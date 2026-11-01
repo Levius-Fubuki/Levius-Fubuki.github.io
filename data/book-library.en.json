@@ -263,7 +263,8 @@
         "GR308",
         "Large Language Models",
         "Performance Measurement"
-      ]
+      ],
+      "updated": "2026-11-01T22:35:52+08:00"
     },
     {
       "id": "gr308-image",
@@ -726,6 +727,31 @@
         "Distributed Inference",
         "Reinforcement Learning",
         "Memory Optimization"
+      ]
+    },
+    {
+      "id": "qwen9b-gr308",
+      "collection": "engineering",
+      "volume": "VII",
+      "title": "Qwen3.5-9B Inference Tuning: Gated DeltaNet, Scheduling, and Dual Replicas on GR308",
+      "coverTitle": [
+        "Qwen 9B",
+        "State & Tuning"
+      ],
+      "english": "THE RECURRENT LEDGER",
+      "path": "/2026/11/01/qwen9b-gr308/",
+      "date": "2026-11-01",
+      "updated": "2026-11-01T22:35:52+08:00",
+      "summary": "A worked 3072-to-1024 request connects hybrid attention, causal convolution, GDN state, cache sizing, token budgets, graph buckets and TP1×DP2, with measured boundaries, review questions and five interactive lessons.",
+      "art": "/img/books/qwen9b-gr308.png",
+      "source": "content/posts/qwen9b-gr308.md",
+      "math": true,
+      "tags": [
+        "GR308",
+        "Model Architecture",
+        "KV Cache",
+        "Speculative Decoding",
+        "Performance Measurement"
       ]
     }
   ]
