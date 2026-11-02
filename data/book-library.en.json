@@ -264,7 +264,7 @@
         "Large Language Models",
         "Performance Measurement"
       ],
-      "updated": "2026-11-01T22:35:52+08:00"
+      "updated": "2026-11-02T22:29:43+08:00"
     },
     {
       "id": "gr308-image",
@@ -752,6 +752,31 @@
         "Model Architecture",
         "KV Cache",
         "Speculative Decoding",
+        "Performance Measurement"
+      ]
+    },
+    {
+      "id": "qwen30b-gr308",
+      "collection": "engineering",
+      "volume": "VIII",
+      "title": "Qwen3-30B-A3B Inference Tuning: GQA, MoE, and the GR308 Bottleneck Loop",
+      "coverTitle": [
+        "Qwen 30B",
+        "Routing & Tuning"
+      ],
+      "english": "THE ROUTING LEDGER",
+      "path": "/2026/11/02/qwen30b-gr308/",
+      "date": "2026-11-02",
+      "updated": "2026-11-02T22:29:43+08:00",
+      "summary": "A worked 3072-to-1024 request connects full GQA, Top-8 MoE, GR308 memory and communication, TP/EP, graph buckets and asynchronous scheduling, with experiment-by-experiment evidence, review questions and four interactive lessons.",
+      "art": "/img/books/qwen30b-gr308.png",
+      "source": "content/posts/qwen30b-gr308.md",
+      "math": true,
+      "tags": [
+        "GR308",
+        "Model Architecture",
+        "Distributed Inference",
+        "KV Cache",
         "Performance Measurement"
       ]
     }

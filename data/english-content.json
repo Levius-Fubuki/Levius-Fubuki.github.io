@@ -247,6 +247,14 @@
         "State & Tuning"
       ],
       "summary": "A worked 3072-to-1024 request connects hybrid attention, causal convolution, GDN state, cache sizing, token budgets, graph buckets and TP1×DP2, with measured boundaries, review questions and five interactive lessons."
+    },
+    "qwen30b-gr308": {
+      "title": "Qwen3-30B-A3B Inference Tuning: GQA, MoE, and the GR308 Bottleneck Loop",
+      "coverTitle": [
+        "Qwen 30B",
+        "Routing & Tuning"
+      ],
+      "summary": "A worked 3072-to-1024 request connects full GQA, Top-8 MoE, GR308 memory and communication, TP/EP, graph buckets and asynchronous scheduling, with experiment-by-experiment evidence, review questions and four interactive lessons."
     }
   },
   "collections": {

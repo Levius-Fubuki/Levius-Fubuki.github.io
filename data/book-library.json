@@ -264,7 +264,7 @@
         "大模型",
         "性能测量"
       ],
-      "updated": "2026-11-01T22:35:52+08:00"
+      "updated": "2026-11-02T22:29:43+08:00"
     },
     {
       "id": "gr308-image",
@@ -752,6 +752,31 @@
         "模型架构",
         "KV Cache",
         "投机解码",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "qwen30b-gr308",
+      "collection": "engineering",
+      "volume": "VIII",
+      "title": "Qwen3-30B-A3B 推理调优笔记：从 GQA 与 MoE 到 GR308 瓶颈闭环",
+      "coverTitle": [
+        "Qwen 30B",
+        "路由与调优"
+      ],
+      "english": "THE ROUTING LEDGER",
+      "path": "/2026/11/02/qwen30b-gr308/",
+      "date": "2026-11-02",
+      "updated": "2026-11-02T22:29:43+08:00",
+      "summary": "用3072→1024请求串起GQA全注意力、Top-8 MoE、GR308容量与通信、TP/EP、Graph桶和异步调度；逐轮复盘瓶颈假设与实测边界，保留真实追问和四组互动演示。",
+      "art": "/img/books/qwen30b-gr308.png",
+      "source": "content/posts/qwen30b-gr308.md",
+      "math": true,
+      "tags": [
+        "GR308",
+        "模型架构",
+        "分布式推理",
+        "KV Cache",
         "性能测量"
       ]
     }

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Qwen30B 结构与 GR308 调优互动笔记</title>
+  <link rel="stylesheet" href="lab.css?v=970d8157da13">
+  <script src="models.js?v=970d8157da13" defer></script>
+  <script src="lab.js?v=970d8157da13" defer></script>
+</head>
+<body>
+  <main id="lab">
+    <header><p class="eyebrow">QWEN 30B · ROUTING AND EVIDENCE</p><h1 id="panel-title">模型结构与调优</h1><p id="panel-description"></p></header>
+    <label class="panel-picker" for="panel">选择演示<select id="panel"><option value="chain">01 请求链路与容量</option><option value="moe">02 Top-8 路由与 TP / EP</option><option value="scheduling">03 Graph 桶与 async</option><option value="bottleneck">04 瓶颈假设与实验复盘</option></select></label>
+    <section id="controls" class="controls" aria-label="演示参数"></section>
+    <section id="result" aria-live="polite" aria-atomic="true"></section>
+    <p class="footnote">根据讨论重建的教学演示。合成路由、理想时间与容量公式不是 GPU 实测；历史结果独立标注。</p>
+    <noscript>请启用 JavaScript 使用互动图。文章正文已保留结构、公式和历史实验数据。</noscript>
+  </main>
+</body>
+</html>
