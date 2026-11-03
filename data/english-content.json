@@ -81,12 +81,12 @@
       "summary": "A 1024×1024 walkthrough of conditioning, tensor shapes, Flow Matching, time gates, DiT TP2 and tiled VAE, with interactive diagrams, revision questions and measured limits."
     },
     "gr308-video": {
-      "title": "Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks",
+      "title": "Wan2.2 on GR308: Video Latents, DiT and Mixed Precision",
       "coverTitle": [
         "GR308",
         "Video Tuning"
       ],
-      "summary": "Wan2.2 mixed-precision paths and H3 decoder weight caching, including measured gains, quality checks, and long-video blockers."
+      "summary": "A five-frame walkthrough of video latents, two time axes, DiT and VAE, compared with Qwen-Image, plus mixed-precision evidence, quality checks and long-video blockers."
     },
     "heartbeat-agent": {
       "title": "Inside Heartbeat: Proactive Triggers, Layered Memory, and Tool Boundaries",

@@ -293,7 +293,7 @@
       "id": "gr308-video",
       "collection": "engineering",
       "volume": "IV",
-      "title": "Video Models on GR308: Wan2.2 Mixed Precision and MiniMax-H3 Numerical Checks",
+      "title": "Wan2.2 on GR308: Video Latents, DiT and Mixed Precision",
       "coverTitle": [
         "GR308",
         "Video Tuning"
@@ -301,14 +301,15 @@
       "english": "THE MOVING LANTERN",
       "path": "/2026/10/02/gr308-video/",
       "date": "2026-10-02",
-      "summary": "Wan2.2 mixed-precision paths and H3 decoder weight caching, including measured gains, quality checks, and long-video blockers.",
+      "summary": "A five-frame walkthrough of video latents, two time axes, DiT and VAE, compared with Qwen-Image, plus mixed-precision evidence, quality checks and long-video blockers.",
       "art": "/img/books/gr308-video.png",
       "source": "content/posts/gr308-video.md",
       "tags": [
         "GR308",
         "Multimodal",
         "Performance Measurement"
-      ]
+      ],
+      "updated": "2026-11-03"
     },
     {
       "id": "heartbeat-agent",

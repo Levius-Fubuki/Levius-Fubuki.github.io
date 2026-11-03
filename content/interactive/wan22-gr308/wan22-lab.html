@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>Wan2.2 与 Qwen-Image 结构及调优观察器</title>
+<link rel="stylesheet" href="lab.css?v=e82443847124"><script src="lab.js?v=f635db0de05a" defer></script>
+</head><body><main id="lab">
+<header><p class="eyebrow">VIDEO LATENTS · DIFFUSION · PRECISION</p><h1 id="panel-title">Wan2.2 观察器</h1><p id="panel-description"></p></header>
+<label class="panel-picker" for="panel">选择观察器<select id="panel"><option value="chain">01 请求与两条时间轴</option><option value="shape">02 图像与视频的 token 形状</option><option value="cache">03 条件交互与缓存</option><option value="precision">04 混合精度与瓶颈预算</option></select></label>
+<section id="controls" class="controls" aria-label="演示参数"></section>
+<section id="result" aria-live="polite" aria-atomic="true"></section>
+<p class="footnote">教学示意，不运行神经网络。历史秒数仅来自 GR308 固定 5 帧、3 步实验；形状推导不表示对应负载已完成测试。121 帧完整目标尚未通过。各面板参数独立。</p>
+<noscript>启用 JavaScript 可调整参数；文章正文保留全部基础形状、流程和验证范围。</noscript>
+</main></body></html>

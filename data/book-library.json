@@ -293,7 +293,7 @@
       "id": "gr308-video",
       "collection": "engineering",
       "volume": "IV",
-      "title": "GR308 视频模型复盘：Wan2.2 混合精度与 MiniMax-H3 数值门",
+      "title": "GR308 视频推理笔记：Wan2.2 生成链路、混合精度与 DiT 对照",
       "coverTitle": [
         "GR308",
         "视频调优"
@@ -301,14 +301,15 @@
       "english": "THE MOVING LANTERN",
       "path": "/2026/10/02/gr308-video/",
       "date": "2026-10-02",
-      "summary": "记录 Wan2.2 混合精度路径与 H3 解码权重缓存，分别解释有效收益、质量门和长视频阻塞。",
+      "summary": "用一段5帧视频串联latent、两种时间、DiT与VAE，对照Qwen-Image，复盘TP2基线下的混合精度、质量门与长视频阻塞。",
       "art": "/img/books/gr308-video.png",
       "source": "content/posts/gr308-video.md",
       "tags": [
         "GR308",
         "多模态",
         "性能测量"
-      ]
+      ],
+      "updated": "2026-11-03"
     },
     {
       "id": "heartbeat-agent",
