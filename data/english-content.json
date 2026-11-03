@@ -255,6 +255,14 @@
         "Routing & Tuning"
       ],
       "summary": "A worked 3072-to-1024 request connects full GQA, Top-8 MoE, GR308 memory and communication, TP/EP, graph buckets and asynchronous scheduling, with experiment-by-experiment evidence, review questions and four interactive lessons."
+    },
+    "qwen35b80b-gr308": {
+      "title": "Qwen35B / 80B: Hybrid State and GR308 Tuning",
+      "coverTitle": [
+        "Qwen 35B / 80B",
+        "Hybrid State"
+      ],
+      "summary": "A worked request links hybrid attention, sparse experts, memory, TP/EP, MTP, graphs and token budgets on GR308, with historical experiments, question review and four interactive lessons."
     }
   },
   "collections": {

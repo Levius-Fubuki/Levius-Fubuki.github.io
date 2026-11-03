@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Qwen35B 与 Qwen80B 结构和调优实验台</title>
+  <link rel="stylesheet" href="lab.css?v=5f1a7bdc7d16">
+  <script src="models.js?v=60f7f4f3a2dc" defer></script>
+  <script src="lab.js?v=efd121a1f101" defer></script>
+</head>
+<body>
+  <main id="lab">
+    <header><p class="eyebrow">HYBRID ATTENTION · MEMORY · EVIDENCE</p><h1 id="panel-title">结构与调优</h1><p id="panel-description"></p></header>
+    <div class="pickers">
+      <label for="panel">选择演示<select id="panel"><option value="chain">01 请求与混合层</option><option value="budget">02 Token 与显存预算</option><option value="state">03 MTP 接受与状态</option><option value="evidence">04 历史调优证据</option></select></label>
+      <label for="model">选择模型<select id="model"><option value="35b">Qwen3.6-35B-A3B</option><option value="80b">Qwen3-Next-80B-A3B</option></select></label>
+    </div>
+    <section id="controls" class="controls" aria-label="当前演示参数"></section>
+    <section id="result" aria-live="polite" aria-atomic="true"></section>
+    <p class="footnote">教学计算不预测真实 TPS。历史数值来自固定负载的短测；点与点之间不一定构成严格 A/B。没有真实模型在此页面运行。</p>
+    <noscript>请启用 JavaScript 使用互动图。文章正文包含全部基础概念、公式和实验结论。</noscript>
+  </main>
+</body>
+</html>

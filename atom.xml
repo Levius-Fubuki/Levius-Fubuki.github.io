@@ -6,7 +6,7 @@
   <link href="https://leviusspace.top/atom.xml" rel="self"/>
   
   <link href="https://leviusspace.top/"/>
-  <updated>2026-11-02T22:29:43+08:00</updated>
+  <updated>2026-11-03T11:27:31+08:00</updated>
   <id>https://leviusspace.top/</id>
   
   <author>
@@ -103,9 +103,10 @@
 <p>验证顺序则从小到大：单机 tiny model 数值对照、两 rank 短 forward、连续 cache 更新、短生成、长 prompt、长 decode，再到真实服务入口。每一层都补充新的故障面。模型列表接口只能证明进程响应了请求，长生成才会暴露另一部分问题。</p>
 <p>这项实验留下的价值，是一条从错误日志到架构与执行粒度的可解释路径：用独立节点预算确定权重分配，用阶段边界控制通信频率，用实际求值边界限制提交规模，最后用有范围的请求记录定义成功。后续若要服务化，仍需补足重启后的复验、质量测试、长生成与运维恢复；这些可以沿着现有证据继续做，而不用重新猜测之前的选择。</p>
 ]]></content><summary type="text">A public two-Mac experiment explained through pipeline partitioning, weight packing, lazy execution, and the limits of context-length validation.</summary></entry>
-<entry><title>Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</title><link href="https://leviusspace.top/2026/10/02/gr308-language/"/><id>https://leviusspace.top/2026/10/02/gr308-language/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-11-02T22:29:43+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-language">Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</h1>
+<entry><title>Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</title><link href="https://leviusspace.top/2026/10/02/gr308-language/"/><id>https://leviusspace.top/2026/10/02/gr308-language/</id><published>2026-10-02T00:00:00+08:00</published><updated>2026-11-03T11:27:31+08:00</updated><content type="html"><![CDATA[<h1 id="gr308-language">Tuning Language Models on GR308: Parallel Topologies, MTP, Graphs, and Acceptance Tests</h1>
 <p>同样是把模型放到 GR308 上，9B 模型适合把两个逻辑芯片拆成独立副本，30B MoE 在测试中关闭专家并行反而更快，80B 模型则需要四路张量并行。27B 的一次大幅加速，后来又被冷启动对照修正了归因。调优最有价值的部分，正是这些选择怎样被实验逐步筛出来。</p>
 <p>30B 的结构与逐轮实验进一步整理为 <a href="/2026/11/02/qwen30b-gr308/">Qwen3-30B-A3B 专题：从 GQA 与 MoE 到 GR308 瓶颈闭环</a>，包含基础概念、真实追问与四组互动演示。</p>
+<p>35B 与 80B 的混合注意力、递归状态、MTP 和跨卡通信进一步整理为 <a href="/2026/11/03/qwen35b80b-gr308/">Qwen35B / Qwen80B 专题</a>，通过一条请求串联容量估算与逐步调优，附四组互动图。</p>
 <p>本文整理 2026 年 9 月的本地报告、指标 CSV 与对应 Codex 工作区记录。10 月 2 日进行的是证据整理，没有重新运行设备实验。型号沿用各报告的模型标识；不同 checkpoint、驱动、容器与请求长度各自成组，不把它们拼成硬件排行榜。多模态分支另见 <a href="/2026/10/02/gr308-image/">Qwen Image 实现复盘</a> 和 <a href="/2026/10/02/gr308-video/">Wan / H3 报告</a>。</p>
 <h2 id="先定义一张卡-一个副本与一个成绩">先定义一张卡、一个副本与一个成绩</h2>
 <p>这些实验中的 GR308 物理卡包含两个逻辑设备。TP2 表示一个模型被切到两个逻辑设备，并不自动表示用了两张物理卡；具体放置还要看实验记录。DP2 则是两份独立模型副本，各自接受请求。9B 的 TP1+DP2 和 30B 的 TP2 都可以占用一张双芯物理卡，但通信行为完全不同。</p>
@@ -9596,6 +9597,521 @@ T_{kernel}\gtrsim\max\left(\frac F{P},\frac D{B_{mem}}\right).</annotation></sem
 <p>本篇的互动演示是根据讨论重建的教学资产。模型结构与历史表格固定展示；合成路由、Graph填充、理想调度重叠和Roofline计算均明确标记为示意，不生成新的GPU实验结论。</p>
 <script defer="" src="/js/transformer-interactives.js"></script>
 ]]></content><summary type="text">A worked 3072-to-1024 request connects full GQA, Top-8 MoE, GR308 memory and communication, TP/EP, graph buckets and asynchronous scheduling, with experiment-by-experiment evidence, review questions and four interactive lessons.</summary></entry>
+<entry><title>Qwen35B / 80B: Hybrid State and GR308 Tuning</title><link href="https://leviusspace.top/2026/11/03/qwen35b80b-gr308/"/><id>https://leviusspace.top/2026/11/03/qwen35b80b-gr308/</id><published>2026-11-03T00:00:00+08:00</published><updated>2026-11-03T11:27:31+08:00</updated><content type="html"><![CDATA[<h1 id="qwen35b80b-gr308">Qwen35B / 80B: Hybrid State and GR308 Tuning</h1>
+<p>Qwen3.6-35B-A3B 与 Qwen3-Next-80B-A3B 的调优，需要把四件事连起来：一个 token 经过什么结构，完整权重和历史状态占多少显存，模型如何切到 GR308 的逻辑设备上，以及一次调度究竟推进多少有效 token。理解了这些关系，TP2、TP4、MTP4、MTP3、Graph64 和 batch token 预算才有明确含义。</p>
+<p>本文以 35B 的一条「3072 token 输入、最多 1024 token 输出」请求为主线，再把相同方法迁移到 80B。结构参数取自官方模型说明与配置；性能来自 2026 年 9 月 GR308 历史实验。本次于 2026 年 11 月 3 日整理基础知识、提问与工程记录，没有重新运行 GPU 实验。教学估算、历史测量和待验证解释分别标明。</p>
+<p>本篇承接 <a href="/2026/10/02/gr308-language/">GR308 语言模型调优总览</a>。9B 的双副本路线见 <a href="/2026/11/01/qwen9b-gr308/">Qwen9B 深入笔记</a>，纯全注意力 MoE 的对照见 <a href="/2026/11/02/qwen30b-gr308/">Qwen30B 专题</a>。本文不把不同模型、输入长度和实验阶段的数据拼成一次共同的加速实验。</p>
+<h2 id="1-用一条请求串起整个知识链">1. 用一条请求串起整个知识链</h2>
+<p>设想一个 3072 token 的 prompt 到达 35B 服务。CPU 调度器先检查请求槽位、全注意力 KV、GDN 状态池和执行预算。随后 Prefill 处理输入：Embedding 把 token ID 变成隐藏向量；40 个 Block 交替执行 GDN 或全注意力，每个 Block 还有 MoE；最后经过归一化、LM Head 和采样，得到第一个输出 token。</p>
+<p>后续 Decode 每轮把新 token 输入模型，读取和更新历史状态，逐步预测下一个 token。启用 MTP 后，辅助路径先提出候选，目标模型验证后，只提交可接受的前缀，并把缓存与递归状态推进到相同位置。TP2 的两个 rank 需要共同执行相应的分片计算和集合通信。请求完成后，释放它占用的缓存和状态槽位。</p>
+<pre><code class="language-text">3072 token prompt
+→ 排队与容量检查
+→ 本轮 token 预算决定处理多少输入
+→ Embedding
+→ 10 组「GDN+MoE，GDN+MoE，GDN+MoE，全注意力+MoE」
+→ Norm、LM Head、采样
+→ 首个输出
+→ 普通 Decode 或 MTP 候选与验证
+→ 提交有效 token，同步推进 KV、GDN 和卷积状态
+→ 达到停止条件，释放资源
+</code></pre>
+<p>这里有四个不同的「数量」：单个请求的输入长度、服务中的在途请求数、一次执行实际处理的 token 数、调度器允许的 token 上限。C16 只表示客户端最多保持 16 条请求在途，不保证每轮都执行 16 条。MTP4 也不表示一次请求必定多产出四个 token。</p>
+<h3 id="互动图-一个请求经过哪些对象">互动图：一个请求经过哪些对象</h3>
+<p>演示可以切换 35B 与 80B，并逐步查看排队、Prefill、Decode、MTP 验证和资源回收。它是本次知识整理的教学图，不是真实 GPU 时间线。当前可用的会话资料没有保存可直接导出的原互动图，因此这里重新组织讨论中的关键关系。</p>
+<p><a href="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=chain&amp;v=56818fa1cd19">单独打开请求链演示</a>。</p>
+<iframe class="transformer-interactive" data-widget="qwen35b80b-chain" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=chain&amp;v=56818fa1cd19" style="display:block;width:100%;height:820px;border:0" title="Qwen35B 与 Qwen80B 请求执行链"></iframe>
+<h2 id="2-先读懂模型-混合注意力和稀疏专家">2. 先读懂模型：混合注意力和稀疏专家</h2>
+<table>
+<thead>
+<tr>
+<th>结构</th>
+<th align="right">Qwen3.6-35B-A3B</th>
+<th align="right">Qwen3-Next-80B-A3B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>总参数 / 激活参数</td>
+<td align="right">约 35B / 3B</td>
+<td align="right">约 80B / 3B</td>
+</tr>
+<tr>
+<td>主干层数</td>
+<td align="right">40</td>
+<td align="right">48</td>
+</tr>
+<tr>
+<td>隐藏维度</td>
+<td align="right">2048</td>
+<td align="right">2048</td>
+</tr>
+<tr>
+<td>GDN / 全注意力层数</td>
+<td align="right">30 / 10</td>
+<td align="right">36 / 12</td>
+</tr>
+<tr>
+<td>每层路由专家总数</td>
+<td align="right">256</td>
+<td align="right">512</td>
+</tr>
+<tr>
+<td>每 token、每层选中路由专家</td>
+<td align="right">8</td>
+<td align="right">10</td>
+</tr>
+<tr>
+<td>共享专家</td>
+<td align="right">1</td>
+<td align="right">1</td>
+</tr>
+<tr>
+<td>专家中间维度</td>
+<td align="right">512</td>
+<td align="right">512</td>
+</tr>
+<tr>
+<td>全注意力 Q / KV 头数</td>
+<td align="right">16 / 2</td>
+<td align="right">16 / 2</td>
+</tr>
+<tr>
+<td>全注意力每头维度</td>
+<td align="right">256</td>
+<td align="right">256</td>
+</tr>
+<tr>
+<td>GDN QK / V 头数</td>
+<td align="right">16 / 32</td>
+<td align="right">16 / 32</td>
+</tr>
+<tr>
+<td>GDN K / V 每头维度</td>
+<td align="right">128 / 128</td>
+<td align="right">128 / 128</td>
+</tr>
+</tbody></table>
+<p>参数来自 <a href="https://huggingface.co/Qwen/Qwen3.6-35B-A3B">35B 官方模型说明</a>、<a href="https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/main/config.json">35B 配置</a>、<a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct">80B 官方模型说明</a>和 <a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/blob/main/config.json">80B 配置</a>。服务器历史 checkpoint 配置没有完整随归档交付，不能把当前官方文件当成历史权重的逐字段证明。</p>
+<p>35B 配置的架构标识仍使用 <code>qwen3_5_moe</code>，这是实现复用。它带视觉编码器，但本次 GR308 文本实验设置 <code>--language-model-only</code>，不能把文字吞吐解释成多模态端到端性能。</p>
+<h3 id="2-1-四层一组-每层都经过自己的-moe">2.1 四层一组，每层都经过自己的 MoE</h3>
+<p>两个模型每四层安排三层 Gated DeltaNet 和一层 Gated Attention。GDN 或 Attention 是 token 间的信息混合模块；MoE 是前馈变换模块。每个 Block 还包含归一化和残差连接，各层拥有各自的专家权重。</p>
+<p>这里有两种门控，需要区分。注意力门控调节信息混合模块的输出；MoE router 决定一个 token 被送到哪些专家。它们既不共享同一个含义，也不能用一个「gate」概括性能瓶颈。</p>
+<p>80B 比 35B 增大容量，主要依靠更多层和更多专家，隐藏维度与单专家宽度相同。两者都叫 A3B，只能说明官方激活参数量约为 3B；不能由此推断延迟相同、访存量相同或只需要存储 3B 权重。</p>
+<h3 id="2-2-全注意力-gqa-与-kv-cache">2.2 全注意力、GQA 与 KV cache</h3>
+<p>全注意力层中，当前 Q 访问历史 K/V。16 个 Q 头共享 2 个 KV 头，即每八个 Q 头共享一组 K/V。Q/K/V 投影空间由显式头数和 head dimension 决定，不能机械地用隐藏维度除头数代替配置中的 256。</p>
+<p>Prefill 建立历史 K/V；普通 Decode 为新位置追加 K/V，并访问已有缓存。其占用随上下文长度增长。按 BF16、2 个 KV 头、每头 256 维，单层每个历史 token 的 K/V 数据粗估为：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><mo>×</mo><mn>2</mn><mo>×</mo><mn>256</mn><mo>×</mo><mn>2</mn><mo>=</mo><mn>2048</mn><mtext> bytes</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">2\times2\times256\times2=2048\ \text{bytes}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">256</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord">2048</span><span class="mspace"> </span><span class="mord text"><span class="mord">bytes</span></span><span class="mord">.</span></span></span></span></span>
+<p>前一个 2 是 K 与 V，后一个 2 是 BF16 字节数。35B 只有 10 层全注意力，80B 为 12 层。若按 4096 个位置计算，完整模型未分片、无分页开销时，每请求全注意力 KV 分别约为 80 MiB 和 96 MiB。这是教学容量估算，不是每个 rank 的实际分配量。</p>
+<p>TP4 超过两个 KV 头时，实际实现可能复制 KV 头或采用其他支持方式，因此不能简单把 KV 估算除以四。应检查运行时布局和日志。</p>
+<h3 id="2-3-gdn-递归状态-遗忘门与纠错更新">2.3 GDN：递归状态、遗忘门与纠错更新</h3>
+<p>GDN 将历史信息写入持续更新的矩阵状态。输入先经过投影、短因果卷积，再用门控递归计算输出。省略归一化、多头与输出门控，用 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>V</mi><mo>×</mo><mi>K</mi></mrow><annotation encoding="application/x-tex">V\times K</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal" style="margin-right:0.22222em;">V</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">×</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.07153em;">K</span></span></span></span> 状态方向写成概念形式：</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mover accent="true"><mi>S</mi><mo stretchy="true">~</mo></mover><mi>t</mi></msub><mo>=</mo><msub><mi>α</mi><mi>t</mi></msub><msub><mi>S</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">\widetilde S_t=\alpha_t S_{t-1},</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:1.0933em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9433em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span></span><span class="svg-align" style="width:calc(100% - 0.1667em);margin-left:0.1667em;top:-3.6833em;"><span class="pstrut" style="height:3em;"></span><span style="height:0.26em;"><svg height="0.26em" preserveaspectratio="none" viewbox="0 0 600 260" width="100%" xmlns="http://www.w3.org/2000/svg"><path d="M200 55.538c-77 0-168 73.953-177 73.953-3 0-7
+-2.175-9-5.437L2 97c-1-2-2-4-2-6 0-4 2-7 5-9l20-12C116 12 171 0 207 0c86 0
+ 114 68 191 68 78 0 168-68 177-68 4 0 7 2 9 5l12 19c1 2.175 2 4.35 2 6.525 0
+ 4.35-2 7.613-5 9.788l-19 13.05c-92 63.077-116.937 75.308-183 76.128
+-68.267.847-113-73.952-191-73.952z"></path></svg></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0576em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8917em;vertical-align:-0.2083em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0576em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2083em;"><span></span></span></span></span></span></span><span class="mpunct">,</span></span></span></span></span>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>S</mi><mi>t</mi></msub><mo>=</mo><msub><mover accent="true"><mi>S</mi><mo stretchy="true">~</mo></mover><mi>t</mi></msub><mo>+</mo><msub><mi>β</mi><mi>t</mi></msub><mo stretchy="false">(</mo><msub><mi>v</mi><mi>t</mi></msub><mo>−</mo><msub><mover accent="true"><mi>S</mi><mo stretchy="true">~</mo></mover><mi>t</mi></msub><msub><mi>k</mi><mi>t</mi></msub><mo stretchy="false">)</mo><msubsup><mi>k</mi><mi>t</mi><mi mathvariant="normal">⊤</mi></msubsup><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">S_t=\widetilde S_t+\beta_t(v_t-\widetilde S_t k_t)k_t^\top,</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0576em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1.0933em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9433em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span></span><span class="svg-align" style="width:calc(100% - 0.1667em);margin-left:0.1667em;top:-3.6833em;"><span class="pstrut" style="height:3em;"></span><span style="height:0.26em;"><svg height="0.26em" preserveaspectratio="none" viewbox="0 0 600 260" width="100%" xmlns="http://www.w3.org/2000/svg"><path d="M200 55.538c-77 0-168 73.953-177 73.953-3 0-7
+-2.175-9-5.437L2 97c-1-2-2-4-2-6 0-4 2-7 5-9l20-12C116 12 171 0 207 0c86 0
+ 114 68 191 68 78 0 168-68 177-68 4 0 7 2 9 5l12 19c1 2.175 2 4.35 2 6.525 0
+ 4.35-2 7.613-5 9.788l-19 13.05c-92 63.077-116.937 75.308-183 76.128
+-68.267.847-113-73.952-191-73.952z"></path></svg></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0576em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05278em;">β</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0528em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">v</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.1933em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9433em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.05764em;">S</span></span><span class="svg-align" style="width:calc(100% - 0.1667em);margin-left:0.1667em;top:-3.6833em;"><span class="pstrut" style="height:3em;"></span><span style="height:0.26em;"><svg height="0.26em" preserveaspectratio="none" viewbox="0 0 600 260" width="100%" xmlns="http://www.w3.org/2000/svg"><path d="M200 55.538c-77 0-168 73.953-177 73.953-3 0-7
+-2.175-9-5.437L2 97c-1-2-2-4-2-6 0-4 2-7 5-9l20-12C116 12 171 0 207 0c86 0
+ 114 68 191 68 78 0 168-68 177-68 4 0 7 2 9 5l12 19c1 2.175 2 4.35 2 6.525 0
+ 4.35-2 7.613-5 9.788l-19 13.05c-92 63.077-116.937 75.308-183 76.128
+-68.267.847-113-73.952-191-73.952z"></path></svg></span></span></span></span></span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0576em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0315em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8991em;"><span style="top:-2.453em;margin-left:-0.0315em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">⊤</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.247em;"><span></span></span></span></span></span></span><span class="mpunct">,</span></span></span></span></span>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>o</mi><mi>t</mi></msub><mo>=</mo><msub><mi>S</mi><mi>t</mi></msub><msub><mi>q</mi><mi>t</mi></msub><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">o_t=S_tq_t.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">o</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05764em;">S</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0576em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">q</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span></p>
+<p><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>α</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\alpha_t</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0037em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> 控制旧记忆保留多少，<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>β</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\beta_t</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.05278em;">β</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0528em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> 控制新信息写入多少，括号内是当前状态对 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>v</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">v_t</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">v</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> 的预测误差。它通过递归状态承载历史，不需要在 GDN 层保存所有历史位置的完整 K/V。普通 Decode 中，单请求递归状态和短卷积历史的形状通常固定。</p>
+<p>固定形状仍有实际开销。若仅按每层 32 个 V 头、128×128 状态和 FP32 存储粗算，一层约 2 MiB；35B 的 30 个 GDN 层约 60 MiB／请求，80B 的 36 层约 72 MiB／请求。这里没有计入 TP 分配、卷积状态、padding、池管理和 MTP 临时状态，不能作为实际显存准入值。</p>
+<p>这也解释了为什么容量评估不能只看 KV：短上下文下，递归状态本身就可能是不可忽略的一项。</p>
+<h3 id="2-4-moe-稀疏激活与小-gemm">2.4 MoE：稀疏激活与小 GEMM</h3>
+<p>一个 token 在每层经过 router，选择 Top-K 路由专家，并执行共享专家分支。输出概念上是所选专家的加权和，加上共享专家分支。每个专家使用 SwiGLU：2048 维输入分别经过 gate 和 up 投影到 512 维，再做 <code>SiLU(gate) × up</code>，最后由 down 投影回 2048 维。</p>
+<p>只看普通 C16 Decode，若这轮恰有 16 个 token，35B 每层产生 128 个路由 assignment，80B 为 160 个。assignment 是「某个 token 送到某个专家执行一次」，不等于独立请求数。实际 assignment 可能集中在少数专家，也可能分散，必须从路由分布确认。</p>
+<p>专家收到的 token 很少时，GEMM 的行数很小。此时排序、分组、dispatch、kernel launch、combine 和同步可能占据明显比例。grouped GEMM 可以组织多个专家计算，但是否更快仍取决于后端、实际形状和数据重排成本。</p>
+<h2 id="3-三种预算-并发-每轮-token-与历史状态">3. 三种预算：并发、每轮 token 与历史状态</h2>
+<p>本次对话中特别澄清了 <code>max-num-batched-tokens</code>。它表示一次调度迭代中，执行 batch 最多处理多少个 token。称它为「调度 token 预算」是为了说明它限制本轮工作量；直接称为「每个执行 batch 的 token 数上限」也正确。</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>约束对象</th>
+<th>不代表什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>客户端 C16</td>
+<td>最多 16 条在途请求</td>
+<td>GPU 每轮必定执行 16 条</td>
+</tr>
+<tr>
+<td><code>max-num-seqs</code></td>
+<td>调度器的序列数量上限</td>
+<td>每请求上下文长度</td>
+</tr>
+<tr>
+<td><code>max-num-batched-tokens</code></td>
+<td>一次调度迭代处理的 token 总量</td>
+<td>整个请求输入加输出的总量</td>
+</tr>
+<tr>
+<td><code>max-model-len</code></td>
+<td>单请求允许的上下文长度</td>
+<td>本轮必须一次处理的输入量</td>
+</tr>
+<tr>
+<td>KV / state pool</td>
+<td>可驻留的历史状态</td>
+<td>空闲显存可以全部拿来做缓存</td>
+</tr>
+</tbody></table>
+<p>普通 Decode 中，每个活跃请求本轮通常输入一个 token；Prefill 则可能处理一整段输入。设预算 2048，本轮有 8 条普通 Decode，理想算术余量为 2040 个 Prefill token；真正分配仍受到序列上限、分页对齐、优先级和后端限制约束。</p>
+<p>对于 3072-token 的新 prompt，启用 chunked prefill 且本轮预算只有 2048 时，需要分多轮推进。把上限改为 4096，可能让输入不再因这个 token 上限而被迫拆成同样的块，但是否一次完成仍由实际调度决定。MTP 的 draft/verify 计数要查后端，不能把普通 Decode 算法直接套过去。</p>
+<p>更大的预算可能减少部分工作切分，也可能增加单轮耗时、临时显存和请求等待。它不会自动提高所有专家的 GEMM batch，更不会保证 TTFT 单调改善。</p>
+<h3 id="互动图-调整-token-预算和显存粗估">互动图：调整 token 预算和显存粗估</h3>
+<p>演示把普通调度预算与静态权重容量分开：一侧观察 Decode token 如何占据本轮预算，另一侧比较 35B/80B 在 TP1/2/4 下的权重粗估。容量图不包含全部运行开销，也不会给出未经实测的 TPS 预测。</p>
+<p><a href="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=budget&amp;v=56818fa1cd19">单独打开预算演示</a>。</p>
+<iframe class="transformer-interactive" data-widget="qwen35b80b-budget" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=budget&amp;v=56818fa1cd19" style="display:block;width:100%;height:840px;border:0" title="调度 token 预算与权重容量粗估"></iframe>
+<h2 id="4-从模型结构走到-gr308-拓扑">4. 从模型结构走到 GR308 拓扑</h2>
+<p>本轮环境有四张双芯物理卡，八个逻辑设备；测试脚本解析的每逻辑设备容量约 56 GiB。TP2 使用同一物理卡的两个逻辑设备仍然需要通信。程序不能把双芯卡当作一个无需同步的统一显存池。</p>
+<p>BF16 完整权重粗估：35B 为 70 GB，约 65.2 GiB；80B 为 160 GB，约 149.0 GiB。理想均分时，35B TP2 约 32.6 GiB／rank，80B TP2 约 74.5 GiB／rank，80B TP4 约 37.3 GiB／rank。</p>
+<p>这给出了初始可行拓扑：35B 从单物理卡 TP2 开始；80B 的 TP2 权重粗估已超过单逻辑设备容量，因此使用跨两物理卡的 TP4。实际准入还要加入复制参数、KV、GDN、激活、Graph、通信缓冲与工作区。</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>M</mi><mrow><mi>r</mi><mi>a</mi><mi>n</mi><mi>k</mi></mrow></msub><mo>≈</mo><msub><mi>M</mi><mrow><mi>w</mi><mi>e</mi><mi>i</mi><mi>g</mi><mi>h</mi><mi>t</mi><mi>s</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>K</mi><mi>V</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>G</mi><mi>D</mi><mi>N</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>c</mi><mi>o</mi><mi>n</mi><mi>v</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>w</mi><mi>o</mi><mi>r</mi><mi>k</mi><mi>s</mi><mi>p</mi><mi>a</mi><mi>c</mi><mi>e</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>g</mi><mi>r</mi><mi>a</mi><mi>p</mi><mi>h</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>c</mi><mi>o</mi><mi>m</mi><mi>m</mi></mrow></msub><mo>+</mo><msub><mi>M</mi><mrow><mi>r</mi><mi>u</mi><mi>n</mi><mi>t</mi><mi>i</mi><mi>m</mi><mi>e</mi></mrow></msub><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">M_{rank}\approx M_{weights}+M_{KV}+M_{GDN}+M_{conv}+M_{workspace}+M_{graph}+M_{comm}+M_{runtime}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.02778em;">r</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">ank</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.02691em;">w</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight">i</span><span class="mord mathnormal mtight" style="margin-right:0.03588em;">g</span><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">s</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.07153em;">K</span><span class="mord mathnormal mtight" style="margin-right:0.22222em;">V</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3283em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">G</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">D</span><span class="mord mathnormal mtight" style="margin-right:0.10903em;">N</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">co</span><span class="mord mathnormal mtight">n</span><span class="mord mathnormal mtight" style="margin-right:0.03588em;">v</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.02691em;">w</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">or</span><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span><span class="mord mathnormal mtight">s</span><span class="mord mathnormal mtight">p</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">ce</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">g</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">r</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">p</span><span class="mord mathnormal mtight">h</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">co</span><span class="mord mathnormal mtight">mm</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">M</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.109em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.02778em;">r</span><span class="mord mathnormal mtight">u</span><span class="mord mathnormal mtight">n</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">im</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord">.</span></span></span></span></span>
+<p>上述各项可能存在复用或时间重叠，不能把多个独立峰值简单相加。完整权重也未必严格均分。最终应以启动、峰值与完整请求测试确认。</p>
+<p>TP、DP、EP、PP 切分的对象不同。TP 切层内张量；DP 放多个副本接不同请求；EP 分配专家并搬运 token；PP 分层并在阶段间传激活。35B/80B 的最终路线使用 TP，后期尝试过 EP，但没有保留。不能把 9B 单芯可容纳时有效的 DP2 原样搬到 80B。</p>
+<p>80B 的 TP4 还使层内本地矩阵更窄。在常见列切分示意下，512 个专家中间通道经 TP2 对应 256 个，经 TP4 对应 128 个。本地算量减少，但 collective 和同步不一定同比减少。实际厂商 kernel 的布局仍需核对，不能只凭示意尺寸宣布通信已经成为主瓶颈。</p>
+<h2 id="5-第一步-冻结环境-建立可以比较的基线">5. 第一步：冻结环境，建立可以比较的基线</h2>
+<p>先固定模型身份、权重精度、MTP 权重证据、镜像 digest、驱动、运行时配置、设备编号和 CPU 核集合。启动脚本保存 <code>fantHipSettings.cfg</code> 和完整参数，不把启动环境当作无关细节。</p>
+<p>35B 用 3072→1024，80B 用 1024→1024；短测 C1 使用 16 请求、C16 使用 32 请求。关闭 prefix cache，避免命中率改变成绩。保持选定 custom all-reduce 路径，测试过程中不把它与其他参数一起切换。</p>
+<p>CPU 绑定诸如 <code>0-7</code>、<code>8-15</code>、<code>16-31</code> 的核集合，是减少线程迁移和竞争的控制措施，不等于已经证明最优 NUMA。NUMA 放置还需核对 CPU、内存和设备关系。communicator 初始化也要控制顺序，避免同时启动多个模型产生额外初始化波动。</p>
+<p>一次准入至少确认：权重身份正确，API 返回目标模型；基础输出检查通过；KV 与状态足以驻留目标并发；没有致命运行时错误；Graph 真正捕获或回放；请求完成后资源能释放。</p>
+<p>有运行脚本只证明实现了测试流程，不证明所有分支都成功执行。35B 的脚本包含跨卡复测和正式阶段，但 MTP4 最优点目前仍以短测候选记录，不能据脚本名字补出正式验收。</p>
+<h2 id="6-第二步-用观测结果决定先改哪里">6. 第二步：用观测结果决定先改哪里</h2>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>首先检查</th>
+<th>可以安排的实验</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>启动 OOM</td>
+<td>权重、状态池、工作区、Graph 和通信缓冲</td>
+<td>固定其余条件，降低或固定缓存预算</td>
+</tr>
+<tr>
+<td>有抢占、请求反复重算</td>
+<td>KV/state 驻留容量</td>
+<td>记录实际 block/slot 与抢占，验证容量修正</td>
+</tr>
+<tr>
+<td>C1 慢、C16 扩展明显</td>
+<td>固定启动成本、小矩阵、通信延迟</td>
+<td>eager/Graph、MTP 深度配对比较</td>
+</tr>
+<tr>
+<td>MTP 接受率高但吞吐低</td>
+<td>draft、verify、状态维护和同步</td>
+<td>分开计时，比较每轮有效提交量</td>
+</tr>
+<tr>
+<td>TTFT 高、Decode 接近</td>
+<td>prefill 分块、排队与调度预算</td>
+<td>比较 token 上限，观察请求时间线</td>
+</tr>
+<tr>
+<td>TP 扩大后无收益</td>
+<td>本地矩阵缩小、collective 和等待</td>
+<td>固定模型与负载，比较可行拓扑</td>
+</tr>
+<tr>
+<td>GPU 利用率降到零却请求未完成</td>
+<td>host 等待、进程、死锁与固件错误</td>
+<td>检查调用栈与日志，先恢复正确执行</td>
+</tr>
+<tr>
+<td>C64 在算子处报错</td>
+<td>索引、布局与状态容量</td>
+<td>构造最小兼容性复现，不记录无效 TPS</td>
+</tr>
+</tbody></table>
+<p>这是诊断入口表，不是根因判定器。GPU 核心利用率高不能证明达到 DRAM 带宽上限；collective API 时间可能包含等待其他 rank；微基准带宽也不能直接替代模型中的通信成本。没有对应计数器和分项计时，就应保留假设。</p>
+<h2 id="7-第三步-mtp-和-graph-联合筛选">7. 第三步：MTP 和 Graph 联合筛选</h2>
+<p>MTP 辅助路径提出多个候选，目标模型验证并提交可接受前缀。35B 配置中一个 MTP 隐藏层，与推理参数 MTP4 的四个候选 token 不是同一个数量。80B 的最优候选为 MTP3，也不能据此认为它新增了三个主干层。</p>
+<p>评估目标可以写为概念式：</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo stretchy="false">(</mo><mi>k</mi><mo stretchy="false">)</mo><mo>≈</mo><mfrac><mrow><mi mathvariant="double-struck">E</mi><mo stretchy="false">[</mo><mtext>每轮有效提交 token</mtext><mo stretchy="false">]</mo></mrow><mrow><msub><mi>T</mi><mrow><mi>d</mi><mi>r</mi><mi>a</mi><mi>f</mi><mi>t</mi></mrow></msub><mo>+</mo><msub><mi>T</mi><mrow><mi>v</mi><mi>e</mi><mi>r</mi><mi>i</mi><mi>f</mi><mi>y</mi></mrow></msub><mo>+</mo><msub><mi>T</mi><mrow><mi>s</mi><mi>t</mi><mi>a</mi><mi>t</mi><mi>e</mi></mrow></msub><mo>+</mo><msub><mi>T</mi><mrow><mi>s</mi><mi>c</mi><mi>h</mi><mi>e</mi><mi>d</mi><mi>u</mi><mi>l</mi><mi>e</mi></mrow></msub><mo>+</mo><msub><mi>T</mi><mrow><mi>c</mi><mi>o</mi><mi>m</mi><mi>m</mi><mi>u</mi><mi>n</mi><mi>i</mi><mi>c</mi><mi>a</mi><mi>t</mi><mi>i</mi><mi>o</mi><mi>n</mi></mrow></msub></mrow></mfrac><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">R(k)\approx\frac{\mathbb{E}[\text{每轮有效提交 token}]}{T_{draft}+T_{verify}+T_{state}+T_{schedule}+T_{communication}}.</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.00773em;">R</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.3991em;vertical-align:-0.9721em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.427em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">d</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">r</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight" style="margin-right:0.10764em;">f</span><span class="mord mathnormal mtight">t</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">v</span><span class="mord mathnormal mtight" style="margin-right:0.02778em;">er</span><span class="mord mathnormal mtight">i</span><span class="mord mathnormal mtight" style="margin-right:0.10764em;">f</span><span class="mord mathnormal mtight" style="margin-right:0.03588em;">y</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">s</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">sc</span><span class="mord mathnormal mtight">h</span><span class="mord mathnormal mtight">e</span><span class="mord mathnormal mtight">d</span><span class="mord mathnormal mtight">u</span><span class="mord mathnormal mtight" style="margin-right:0.01968em;">l</span><span class="mord mathnormal mtight">e</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.13889em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">co</span><span class="mord mathnormal mtight">mm</span><span class="mord mathnormal mtight">u</span><span class="mord mathnormal mtight">ni</span><span class="mord mathnormal mtight">c</span><span class="mord mathnormal mtight">a</span><span class="mord mathnormal mtight">t</span><span class="mord mathnormal mtight">i</span><span class="mord mathnormal mtight">o</span><span class="mord mathnormal mtight">n</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathbb">E</span><span class="mopen">[</span><span class="mord text"><span class="mord cjk_fallback">每轮有效提交</span><span class="mord"> token</span></span><span class="mclose">]</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.9721em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mord">.</span></span></span></span></span>
+<p>这里是辅助理解的成本账本，实际路径可能重叠，计时时要避免重复相加。增大 <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi></mrow><annotation encoding="application/x-tex">k</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.03148em;">k</span></span></span></span> 会增加候选，也可能增加拒绝、验证、状态和工作区开销。接受率与平均接受长度还受计数口径影响，框架可能把额外 token 计入某些长度指标。</p>
+<h3 id="7-1-混合状态模型的-mtp-正确性">7.1 混合状态模型的 MTP 正确性</h3>
+<p>全注意力需要管理候选位置的 KV 有效长度；GDN 和短卷积也必须保证正式状态只推进到接受前缀。若四个候选只接受前两个，不能让第 3、4 个候选对应的递归更新继续污染下一轮。</p>
+<p>实现可以采用检查点、候选状态、中间状态选择或其他策略；具体方式由后端决定，不能宣称仓库已经统一实现某一种机制。需要检验的结果是：token 提交位置、KV 有效位置与 recurrent state 对应位置一致。</p>
+<p>本地 FLA 适配还存在框架与厂商状态布局差异：SGLang 使用 <code>[N,H,V,K]</code>，厂商算子使用 <code>[N,H,K,V]</code>。适配器按请求索引抽取状态，转置并保证连续，执行后写回状态池。它说明状态语义和布局本身就是兼容工作的一部分。</p>
+<h3 id="互动图-候选被拒绝后-状态停在哪里">互动图：候选被拒绝后，状态停在哪里</h3>
+<p>演示采用一条线性的候选序列，选择接受前缀长度，观察「已提交」和「未提交」的位置。它不模拟真实 GDN 数值，也不代表厂商采用树形草稿或某一种具体回滚实现。</p>
+<p><a href="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=state&amp;v=56818fa1cd19">单独打开 MTP 状态演示</a>。</p>
+<iframe class="transformer-interactive" data-widget="qwen35b80b-state" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=state&amp;v=56818fa1cd19" style="display:block;width:100%;height:790px;border:0" title="MTP 接受前缀与 KV GDN 状态位置"></iframe>
+<h3 id="7-2-graph-需要匹配执行形状">7.2 Graph 需要匹配执行形状</h3>
+<p>最终路径使用 <code>FULL_DECODE_ONLY</code>；编译配置中的 <code>mode=NONE</code> 不代表 Graph 关闭，也不能把 Graph 收益叫作全模型编译收益。Graph 通过复用已捕获的执行路径减少重复发射等成本，但不会自动消除所有计算与通信。</p>
+<p>应检查 capture sizes、实际 replay 和 eager fallback，而不是只看启动命令。C16 是请求并发，不能直接推出 Graph16；同样不能用 C16×MTP4 就认定 64 桶必然覆盖验证形状。是否包含额外位置、如何 padding 以及 runner 怎样定义 batch 都需要看后端。</p>
+<h2 id="8-35b-的实际调优-mtp4-和-4096-token-预算">8. 35B 的实际调优：MTP4 和 4096 token 预算</h2>
+<p>35B 从 TP2、MTP1 和 Graph32 路线开始，逐步比较 MTP3、Graph 桶、调度预算与 KV。后续 MTP4 矩阵同时放置不同候选到不同物理卡筛选，并保留 MTP3 控制组。</p>
+<table>
+<thead>
+<tr>
+<th>对比</th>
+<th>记录</th>
+<th>决策</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MTP3→MTP4，batch2048</td>
+<td>C16 164.38→175.57 tok/s</td>
+<td>保留 MTP4 候选</td>
+</tr>
+<tr>
+<td>MTP4，预算2048→4096</td>
+<td>C16 175.57→180.64；TTFT 5593.57→3321.47 ms</td>
+<td>选择 4096</td>
+</tr>
+<tr>
+<td>Graph64→128</td>
+<td>C16 总吞吐约 +0.5%，Decode TPS 略降</td>
+<td>保留到 64</td>
+</tr>
+<tr>
+<td>预算4096→6144</td>
+<td>C16 −0.50%，C32 +0.48%，TTFT 更高</td>
+<td>不扩大</td>
+</tr>
+<tr>
+<td>Triton grouped GEMM＋融合</td>
+<td>C16 167.69，C32 188.63</td>
+<td>相对候选回归</td>
+</tr>
+<tr>
+<td>EP2 linear</td>
+<td>C16 167.81，C32 185.50</td>
+<td>关闭 EP</td>
+</tr>
+<tr>
+<td>round-robin 放置</td>
+<td>实际回退 linear</td>
+<td>没有有效 A/B</td>
+</tr>
+<tr>
+<td>C64</td>
+<td>SSM kernel 因状态索引非连续失败</td>
+<td>无有效吞吐</td>
+</tr>
+</tbody></table>
+<p>不同阶段的行不是连续累乘的加速链；MTP4 预算2048和4096的筛选还存在物理卡不同这一变量。它支持下一步复测谁，不足以精确断言全部差异由预算造成。</p>
+<p>最终 D 组为 TP2、MTP4、Graph <code>[4,8,16,32,64]</code>、预算4096、block1088、自动 KV、同步调度、auto MoE backend。C16 为 180.6351 tok/s，32 请求、0 失败；C32 为 208.0804，64 请求、0 失败，均保留短测分类。</p>
+<p>复现要找 <code>gr308_35b_mtp4_short_matrix.py</code> 的 <code>D-mtp4-g64-b4096</code>。通用正式脚本里的35B仍是较早的MTP3/预算2048，不应拿错配置。</p>
+<p>35B 没有因调大 token 预算持续变快，Graph128 也没有稳定优势。此时更合理的研究方向是核对真实专家形状、排序/分组/汇总开销和 MTP verify，而不是继续无边界扩参数。</p>
+<h2 id="9-80b-的实际调优-先用-mtp-再处理跨卡成本">9. 80B 的实际调优：先用 MTP，再处理跨卡成本</h2>
+<p>80B 的第一轮脚本清楚地排列了 eager无MTP、eager+MTP1、Graph32和Graph64，再尝试自动KV、预算4096与异步调度。最初阶段只建立MTP1能力；后期记录才继续出现MTP2和MTP3，应按时间区分。</p>
+<table>
+<thead>
+<tr>
+<th>对比</th>
+<th>C16 记录</th>
+<th>决策</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>无MTP→MTP1</td>
+<td>177.71→231.30 tok/s</td>
+<td>主要正收益</td>
+</tr>
+<tr>
+<td>MTP1＋Graph64</td>
+<td>231.98 tok/s</td>
+<td>用作后续候选</td>
+</tr>
+<tr>
+<td>MTP1→MTP2</td>
+<td>231.98→251.49</td>
+<td>保留</td>
+</tr>
+<tr>
+<td>MTP2→MTP3</td>
+<td>251.49→255.93</td>
+<td>MTP3 为最佳短测</td>
+</tr>
+<tr>
+<td>MTP1下预算2048→4096</td>
+<td>吞吐接近，TTFT下降</td>
+<td>可考虑延迟档</td>
+</tr>
+<tr>
+<td>同步→异步</td>
+<td>C16略降，TTFT恶化</td>
+<td>保留同步</td>
+</tr>
+<tr>
+<td>TP4＋EP4</td>
+<td>233.93，较255.93低约8.6%</td>
+<td>不采用EP</td>
+</tr>
+<tr>
+<td>TP2×DP2×EP</td>
+<td>设备类型问题后又出现固件同步超时</td>
+<td>无可用候选</td>
+</tr>
+</tbody></table>
+<p>MTP2→MTP3 的C16增加约1.8%，但对应C1总输出由36.75升到47.13 tok/s。是否值得仍要以重复实验确认，不能把一次小增幅说成统计显著。</p>
+<p>最终候选为TP4、MTP3、Graph <code>[4,8,16,32,64]</code>、预算2048、block1088、固定8 GiB KV、同步。自动KV在初始化阶段失败，不能因35B成功就直接照搬。</p>
+<p>C16最佳为255.9308 tok/s、32请求、0失败。后续C32原始JSON记录339.2602 tok/s、64/64完成、65536个输出token，接受率约86.09%、接受长度指标约3.58。这些接受率只对应C32窗口。</p>
+<p>归档还保留一个复现缺口：80B MTP3的C16独立原始入口尚未确认，报告和CSV保留了结果；已有MTP3入口覆盖C32补测。不能把报告完整等同于所有原始运行材料完整。</p>
+<h2 id="10-第四步-为什么-ep-与通信融合没有自动获胜">10. 第四步：为什么 EP 与通信融合没有自动获胜</h2>
+<p>纯TP将层内权重或中间通道切分，相关行并行输出需要归约。EP把专家分配给不同rank，可能让每个专家在本地保持更完整的矩阵，但要付出token派发、接收、输出汇总和负载不均的成本。</p>
+<p>因此应该比较的是两条完整路径：</p>
+<pre><code class="language-text">纯TP：本地专家分片计算＋相应归约
+EP：路由＋跨rank派发＋专家计算＋跨rank汇总
+</code></pre>
+<p>collective的具体组合由后端决定，不必然等于直接调用某个<code>alltoall_base</code>。图像模型一次FHCCL能力探测的结果，不能无条件搬到文本EP运行路径。需要保存实际backend、进程组、专家放置和分派日志。</p>
+<p>本轮35B与80B的EP对照都没有赢，支持保留纯TP。要进一步判断损失来自通信传输、rank等待、专家小GEMM还是重排，需要分项profile。仅凭端到端回归无法唯一归因。</p>
+<p>同样，<code>fuse_gemm_comms</code>、<code>fuse_allreduce_rms</code> 在部分候选中启动失败，说明先要处理兼容性，不能把配置名称当成已经获得的融合收益。后期实验保持custom all-reduce开启；早期27B关闭该路径的记录属于不同环境，不应混用。</p>
+<h2 id="11-互动实验台-沿历史候选查看证据">11. 互动实验台：沿历史候选查看证据</h2>
+<p>实验台只切换已记录的候选数据，不用滑块编造性能曲线。每个点展示并发、吞吐、条件和局限；没有有效结果的路径显示失败状态。图中相邻点不保证构成严格同环境A/B，各步收益也不能相乘。</p>
+<p><a href="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=evidence&amp;v=56818fa1cd19">单独打开调优证据实验台</a>。</p>
+<iframe class="transformer-interactive" data-widget="qwen35b80b-evidence" loading="lazy" referrerpolicy="no-referrer" src="/content/interactive/qwen35b80b-gr308/qwen35b80b-lab.html?panel=evidence&amp;v=56818fa1cd19" style="display:block;width:100%;height:850px;border:0" title="35B 与 80B 历史调优候选与证据范围"></iframe>
+<h2 id="12-怎样判断优化结果可以交付">12. 怎样判断优化结果可以交付</h2>
+<p>aggregate output tok/s是完整测试窗口内实际输出token除以wall time。报告的Decode Avg TPS按<code>1000 / mean TPOT(ms)</code>换算。TTFT还可能包含排队和调度等待，不是单个Prefill kernel时间；TPOT是每个输出token的摊销时间，MTP下也不能直接等同于一次verify耗时。</p>
+<p>验收应同时检查输出数量、请求完整率、基础正确性、性能和资源生命周期。固定答案检查不等于普遍逐token等价，零HTTP错误也不等于业务质量通过。35B/80B最高点仍是短测候选，后续至少应在相同配置做配对重复，固定物理卡和启动顺序，并报告波动。</p>
+<p>优先补齐三类证据：</p>
+<ol>
+<li>每轮候选数、接受数、提交数，以及draft/verify/state计时。</li>
+<li>实际Graph回放、专家token分布、collective传输与rank等待。</li>
+<li>多轮完整请求、冷启动与先C1后C16两种生命周期、结束后的资源释放。</li>
+</ol>
+<p>小于3%的单轮差异在本轮按工程持平处理，这是筛选规则，不是统计显著性检验。只有一次失败的路径也不能直接外推成所有驱动和负载的永久限制。</p>
+<h2 id="13-从整个-gr308-项目保留下来的方法">13. 从整个 GR308 项目保留下来的方法</h2>
+<p>主聊天还涉及9B、30B、图像、视频和H3。它们提供的是分析方法的补充，不应混入35B/80B的加速分母。</p>
+<table>
+<thead>
+<tr>
+<th>分支</th>
+<th>已记录结果</th>
+<th>可迁移的方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>9B</td>
+<td>TP2→双TP1短测157.67→247.87；正式C16为247.16</td>
+<td>先判断单芯能否容纳，再决定是否需要层内通信</td>
+</tr>
+<tr>
+<td>30B</td>
+<td>TP2无EP、预算4096、async，正式C16为225.67</td>
+<td>异步和EP必须逐模型验证</td>
+</tr>
+<tr>
+<td>27B历史</td>
+<td>早期约19 tok/s后被厂商环境复现的53.574修正</td>
+<td>启动环境和生命周期属于实验变量</td>
+</tr>
+<tr>
+<td>Qwen-Image</td>
+<td>DiT短测163.33→89.60秒</td>
+<td>阶段加速与端到端加速分开；单算子收益不能直接叠加</td>
+</tr>
+<tr>
+<td>Wan2.2</td>
+<td>有效5帧/3步1190.20→672.33秒，首帧PSNR39.36</td>
+<td>混合精度必须同时验证性能和质量；不外推到长视频</td>
+</tr>
+<tr>
+<td>H3</td>
+<td>原生W4A8门禁未通过</td>
+<td>输出在设备上、数值正确和原生加速是不同结论</td>
+</tr>
+</tbody></table>
+<p>27B的KV144→152曾消除抢占并大幅提高吞吐，但在后续无抢占环境强制KV152几乎不改变性能。两段记录并不冲突：容量不足时解决抢占，与容量已充足时继续调整KV，是不同问题。</p>
+<p>图像和视频的详细复盘已独立成文，见 <a href="/2026/10/02/gr308-image/">Qwen Image</a> 与 <a href="/2026/10/02/gr308-video/">Wan/H3</a>。这些边界提醒我们，先确定瓶颈在哪个阶段，再选择合适的优化对象。</p>
+<h2 id="14-本次提问与表达复盘">14. 本次提问与表达复盘</h2>
+<p>当前可见会话主要是主动提问、概念澄清和项目梳理，没有完整的模拟面试问答。因此这里不虚构「我曾回答错了什么」。可以确证的是提出了哪些问题，以及哪些表述需要补全条件。</p>
+<table>
+<thead>
+<tr>
+<th>实际提出的问题或澄清</th>
+<th>它指向的知识缺口</th>
+<th>更完整的表达方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>结合简历与项目，梳理各模型完整调优</td>
+<td>简历成绩与实现、证据如何对应</td>
+<td>先报负载和验证范围，再说明修改与对照，不混算各阶段收益</td>
+</tr>
+<tr>
+<td>先从35B、80B的模型结构入手</td>
+<td>为什么相同A3B采用不同拓扑</td>
+<td>结合总权重、层数、专家、混合状态与设备容量说明</td>
+</tr>
+<tr>
+<td>针对模型结构和GPU、通信配置，如何逐步分析调优</td>
+<td>从原理走到实验决策</td>
+<td>按容量→基线→观测→单变量候选→复测讲，不只列开关</td>
+</tr>
+<tr>
+<td>max-num-batched-tokens是每个batch的token最大数</td>
+<td>上限限定的是哪个batch、哪些token</td>
+<td>一次调度迭代的执行batch token总数上限；普通Prefill/Decode合计，MTP查后端口径</td>
+</tr>
+</tbody></table>
+<p>最后一项澄清方向是正确的。「每个batch」还可以补上「一次调度迭代」和「实际处理token」两个限定，避免被误解成所有在途请求的输入加输出总量。此前把它称为预算是同一概念的另一种表述，不应把这个澄清记成错误。</p>
+<h3 id="14-1-容易说得过满的句子">14.1 容易说得过满的句子</h3>
+<table>
+<thead>
+<tr>
+<th>容易出现的简写</th>
+<th>应补上的条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A3B，所以显存只要3B权重</td>
+<td>激活参数与完整存储不同；普通部署仍要容纳全部专家权重</td>
+</tr>
+<tr>
+<td>两个芯片在一张卡，所以不用通信</td>
+<td>它们是独立逻辑设备，层内分片仍需同步</td>
+</tr>
+<tr>
+<td>batch变大，所以所有专家GEMM变大</td>
+<td>该参数是调度上限，实际batch和路由分布要观测</td>
+</tr>
+<tr>
+<td>MTP接受率高，所以一定快</td>
+<td>同时看每轮有效提交量与draft/verify/state成本</td>
+</tr>
+<tr>
+<td>EP慢，是all-to-all带宽低</td>
+<td>端到端只确认本轮回归；具体损失需profile</td>
+</tr>
+<tr>
+<td>Graph64覆盖C16×MTP4</td>
+<td>并发、候选数、执行形状和桶定义不能直接相乘替代日志</td>
+</tr>
+<tr>
+<td>64请求成功，所以是正式稳定验收</td>
+<td>实验类别、重复、负载和生命周期覆盖都要确认</td>
+</tr>
+</tbody></table>
+<h3 id="14-2-一段可以复述的项目回答">14.2 一段可以复述的项目回答</h3>
+<blockquote>
+<p>我先根据BF16完整权重与运行状态估算设备容量：35B从单物理卡TP2开始，80B使用跨两物理卡TP4。然后冻结镜像、运行时、CPU核集合与输入输出条件，分别观察C1和C16。由于模型包含大量GDN层和稀疏专家，我优先比较MTP与Graph，再调整每轮token上限和状态容量，最后比较专家backend、同步调度与EP。35B收敛到MTP4和4096预算，80B收敛到MTP3和2048预算；两者都没有保留EP。最高C16分别为180.64和255.93 output tok/s，目前仍是固定负载下的短测候选。性能方向有记录，细分瓶颈归因与多轮稳定性仍需补齐。</p>
+</blockquote>
+<p>这段回答的后续追问，应能展开到一个具体实验：提出了什么假设、固定哪些条件、观测什么、结果是否超过波动、下一步为何保留或淘汰。这样结构知识和工程经历才真正连在一起。</p>
+<h2 id="15-资料与可复查入口">15. 资料与可复查入口</h2>
+<ul>
+<li><a href="https://huggingface.co/Qwen/Qwen3.6-35B-A3B">Qwen3.6-35B-A3B 官方模型说明</a>与<a href="https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/main/config.json">结构配置</a>。</li>
+<li><a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct">Qwen3-Next-80B-A3B-Instruct 官方模型说明</a>与<a href="https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/blob/main/config.json">结构配置</a>。</li>
+<li><a href="https://github.com/KunyuanComputing/gr308-lab">GR308 Lab 公开代码与报告</a>：README中的四模型结果表、报告索引、35B MTP4矩阵和80B短测入口可以交叉核对。</li>
+<li><a href="https://github.com/KunyuanComputing/gr308-lab/blob/main/projects/gr308-three-card-mtp1-graph32/scripts/gr308_35b_mtp4_short_matrix.py">35B MTP4短测矩阵</a>。</li>
+<li><a href="https://github.com/KunyuanComputing/gr308-lab/blob/main/projects/gr308-three-card-mtp1-graph32/scripts/gr308_80b_short_tuning.py">80B早期短测矩阵</a>。</li>
+<li><a href="https://github.com/KunyuanComputing/gr308-lab/blob/main/projects/gr308-three-card-mtp1-graph32/scripts/gr308_parallel_goal.py">公共测试启动器</a>：用于核对设备放置、精度、Graph和启动环境；代码存在不代表每个实验都完成。</li>
+</ul>
+<p>所有互动图都是教学演示；历史性能点保留其负载和证据等级。文章不提供未经测量的组合TPS，不把失败候选或理论容量当成部署验收。</p>
+<script defer="" src="/js/transformer-interactives.js"></script>
+]]></content><summary type="text">A worked request links hybrid attention, sparse experts, memory, TP/EP, MTP, graphs and token budgets on GR308, with historical experiments, question review and four interactive lessons.</summary></entry>
 <entry>
     <title>Becoming an LLM Engineer: A Learning Roadmap from Scratch</title>
     <link href="https://leviusspace.top/2026/04/07/0-%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF%E5%9B%BE/"/>

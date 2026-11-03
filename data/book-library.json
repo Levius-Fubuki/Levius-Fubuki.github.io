@@ -264,7 +264,7 @@
         "大模型",
         "性能测量"
       ],
-      "updated": "2026-11-02T22:29:43+08:00"
+      "updated": "2026-11-03T11:27:31+08:00"
     },
     {
       "id": "gr308-image",
@@ -777,6 +777,32 @@
         "模型架构",
         "分布式推理",
         "KV Cache",
+        "性能测量"
+      ]
+    },
+    {
+      "id": "qwen35b80b-gr308",
+      "collection": "engineering",
+      "volume": "IX",
+      "title": "Qwen35B 与 Qwen80B 推理调优笔记：从混合注意力到 GR308 瓶颈分析",
+      "coverTitle": [
+        "Qwen 35B / 80B",
+        "混合状态与调优"
+      ],
+      "english": "THE HYBRID LEDGER",
+      "path": "/2026/11/03/qwen35b80b-gr308/",
+      "date": "2026-11-03",
+      "updated": "2026-11-03T11:27:31+08:00",
+      "summary": "用一条请求串联GDN与GQA、稀疏专家、GR308双芯容量、TP/EP通信、MTP状态、Graph与每轮token上限；按实验复盘35B/80B短测候选、真实追问和四组互动图。",
+      "art": "/img/books/qwen35b80b-gr308.png",
+      "source": "content/posts/qwen35b80b-gr308.md",
+      "math": true,
+      "tags": [
+        "GR308",
+        "模型架构",
+        "分布式推理",
+        "KV Cache",
+        "投机解码",
         "性能测量"
       ]
     }
