@@ -644,7 +644,7 @@
       "english": "THREE NODES, SHARED WORK",
       "path": "/2026/10/14/p800-numa-pipeline-topology/",
       "date": "2026-10-14",
-      "updated": "2026-11-04T10:24:54+08:00",
+      "updated": "2026-11-04T10:33:44+08:00",
       "summary": "以三台八卡 P800 的实际拓扑解释 Kimi-K3 的 TP8×PP3、W4A16 和流水线等待。用两轮 D3 案例串起辅助特征、Q4 验证、反馈与 KDA 状态提交，并记录排查步骤、实验边界和复盘问答。",
       "art": "/img/books/p800-numa-pipeline-topology.png",
       "source": "content/posts/p800-numa-pipeline-topology.md",

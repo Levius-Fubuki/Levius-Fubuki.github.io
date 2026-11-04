@@ -987,5 +987,7 @@
   "把容易混在一起的三类信息分开": "Feedback, Metadata, and Thread Context",
   "从现象开始定位，而不是从补丁开始": "Debugging from Observed Symptoms",
   "如何把瓶颈分析变成一组能回答问题的实验": "Experiments for Isolating Bottlenecks",
-  "提问、作答与复盘": "Questions and Answer Review"
+  "提问、作答与复盘": "Questions and Answer Review",
+  "Q4 到底改了哪个字段？": "Which Metadata Field Changes for Q4?",
+  "反馈经过哪个线程才出错？": "Where Did the Feedback Thread Fail?"
 }

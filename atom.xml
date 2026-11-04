@@ -6,7 +6,7 @@
   <link href="https://leviusspace.top/atom.xml" rel="self"/>
   
   <link href="https://leviusspace.top/"/>
-  <updated>2026-11-04T10:24:54+08:00</updated>
+  <updated>2026-11-04T10:33:44+08:00</updated>
   <id>https://leviusspace.top/</id>
   
   <author>
@@ -5960,7 +5960,7 @@ GPU 1：[[ 8, 4], [20,10]]
 @media(max-width:400px){#post-meta .post-meta-date{display:grid;grid-template-columns:max-content max-content;gap:4px 6px;white-space:normal}#post-meta .post-meta-date>.post-meta-label:first-child{grid-column:1;grid-row:1}#post-meta .post-meta-date>.post-meta-date-created{grid-column:2;grid-row:1}#post-meta .post-meta-date>.post-meta-label:last-of-type{grid-column:1;grid-row:2}#post-meta .post-meta-date>.post-meta-date-updated{grid-column:2;grid-row:2}#post-meta .post-meta-date>.post-meta-separator{display:none}}
 </style>
 ]]></content><summary type="text">A worked 7B training task connecting gradient accumulation, DDP, ZeRO/FSDP, tensor and pipeline parallelism, SP/CP, checkpointing, precision and scaling diagnosis, with 27 interactive diagrams and 42 answered self-check questions.</summary></entry>
-<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/"/><id>https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/</id><published>2026-10-14T00:00:00+08:00</published><updated>2026-11-04T10:24:54+08:00</updated><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</h1>
+<entry><title>P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</title><link href="https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/"/><id>https://leviusspace.top/2026/10/14/p800-numa-pipeline-topology/</id><published>2026-10-14T00:00:00+08:00</published><updated>2026-11-04T10:33:44+08:00</updated><content type="html"><![CDATA[<h1 id="p800-numa-pipeline-topology">P800 and Kimi-K3: From NUMA Topology to Pipeline Bottlenecks</h1>
 <p>这次排查从两个看似简单的问题开始：一台 P800 服务器里的卡是不是都通过 PCIe 通信？如果三台机器的加速器活动率差别很大，是不是模型层分配错了？</p>
 <p>把设备拓扑、CPU/NUMA 归属和推理时间线放到一起后，我发现，这两个问题都不能只靠一张利用率截图回答。机内有专用的 XPULink，也有 PCIe 和跨 NUMA 路径；模型层数可以平均，等待方式却可能完全不同。</p>
 <p>这篇笔记记录三台八卡 P800 运行 Kimi-K3 的结构，以及从已有实验中能得出什么、还不能得出什么。硬件核查时间是 2026 年 10 月 14 日；前半篇保留 10 月 13 日的诊断、短测与当时的优化计划。后续补记分别记录 10 月 16 日 Eagle3 的负结果、10 月 18 日执行栈优化后的正式复测，以及截至 10 月 22 日仍未闭合的一致性问题；这些属于不同版本，不能互相覆盖。为了保留工程关系而不暴露访问地址，文中使用节点 53、55、57 作为服务器编号。</p>
@@ -6349,7 +6349,7 @@ GPU 1：[[ 8, 4], [20,10]]
 <h3 id="从-pp-所有权修到真实状态语义">从 PP 所有权修到真实状态语义</h3>
 <p>接入草稿模型时，不能假设所有 PP rank 都拥有同一个对象。目标模型在三个阶段都有工作，草稿侧的 Graph key 和 attention backend 却由实际拥有 drafter 的阶段初始化。修复必须同时保留每段目标模型的初始化，避免为了让非尾段“不报属性不存在”而跳过它自己的状态；真正应该拥有 drafter 的尾段缺失该对象时，仍应报错。这个区别让检查针对资源归属，而不是用宽泛的异常捕获把错误吞掉。</p>
 <p>随后暴露的是多 token 路径的状态问题。一次验证多个候选 token 时，attention 的真实上下文长度、有效 token 行与 KDA 的递归状态和卷积历史必须互相对应。CPU 上的容量上界只能用于分配和调度，不能直接冒充每行在 GPU 上的精确有效长度。固定输入的 Q4 或 Graph replay 恰好通过，也不能代替纯 prefill、混合批次和长前缀的检查。</p>
-<p>原生卷积对照进一步区分了两种问题：非连续的状态索引向量会错误寻址；带已有状态的长 prefill，则只在最前面三个输出位置出现差异，后面的输出和最终历史可以正常。候选先把索引规范为连续格式，再在受限定的候选路径中，用独立保存的输入与历史、沿 Q1 更新原语重算受影响的前缀输出。最终缓存仍由原路径完成更新。把历史打包成三个紧凑位置的替代尝试没有解决长前缀问题，因此未进入保留方案。</p>
+<p>原生卷积对照进一步区分了两种问题：非连续的状态索引向量会被要求连续布局的 native 接口拒绝；带已有状态的长 prefill，则只在最前面三个输出位置出现差异，后面的输出和最终历史可以正常。候选先把索引规范为连续格式，再在受限定的候选路径中，用独立保存的输入与历史、沿 Q1 更新原语重算受影响的前缀输出。最终缓存仍由原路径完成更新。把历史打包成三个紧凑位置的替代尝试没有解决长前缀问题，因此未进入保留方案。</p>
 <p>这不是“给整个模型改成高精度”的处理，也不是绕过差异比较。r16 在加载真实目标权重之前，先覆盖全部 24 rank 的完整 KDA 顺序 Q1 对照、输出与最终状态/历史检查、Graph 波次和原生卷积参照。报告分别保留 216 次完整 KDA 检查、72 次 KDA Graph 波次、960 个 greedy verifier 案例和 168 次直接卷积对照；它们验证不同边界，不能相加成同一种独立样本数。早期失败与未执行的诊断分支也保留在记录中，没有被后来的绿灯覆盖。</p>
 <h3 id="三层检查不能互相替代">三层检查不能互相替代</h3>
 <p>原生门通过后，还有一次完整架构的 dummy 启动。它使用随机目标权重和真实草稿权重，只能证明初始化、协议与执行路径能够衔接，不能产生目标模型语义质量或性能结论。</p>
@@ -6491,14 +6491,14 @@ GPU 1：[[ 8, 4], [20,10]]
 <p>三台各八卡，合计 24 张 96 GiB P800。每台的八卡分摊同一阶段的层内张量，三个阶段分别执行第 1–31、32–62、63–93 层。每台内部是两个四卡 XPULink 全连接组，再加对应卡的跨组连接。层内频繁的集合通信留在本节点，跨阶段传递 hidden、残差和逐步收集的 EAGLE3 辅助特征。拓扑图给出连接条件和网口亲和性，运行时的集合通信选路与链路完成时间需要另测。</p>
 <p>KDA 的 96 个头在 TP8 下每卡 12 个头。单请求、单层、单分片的一个 FP32 递推矩阵为 <code>12 × 128 × 128 × 4 = 786432 bytes</code>，即 0.75 MiB。MLA 则保存按 token 组织的压缩表示，项目中每个历史位置的表示宽度为 512 + 64。目标 MLA 使用 NoPE，配置字段里的 <code>qk_rope_head_dim</code> 表示维度，目标实现的 rotary 开关决定是否旋转。两类 attention 的差别直接影响投机回退，MLA 通过有效长度限制可见历史，KDA 要选择对应前缀的矩阵和卷积历史。</p>
 <h3 id="跟着一个请求走两轮">跟着一个请求走两轮</h3>
-<p>用下图切换接受 0 至 3 个候选，对照有效输出、各阶段提交的状态和下一轮 Q4 输入。</p>
-<iframe class="transformer-interactive" data-widget="p800-eagle3-cycle" height="560" loading="lazy" src="/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=5564a8baeb81" style="display:block;width:100%;height:560px;border:0" title="EAGLE3 validation, feedback, and state commit" width="100%"></iframe>
-<p><a href="/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=5564a8baeb81">单独打开 D3 验证演示</a></p>
+<p>用下图跟踪同一个请求。先在 Prefill 切换正常与模拟前缀故障，再查看 Q4 的打包边界，选择接受 0 至 3 个候选，最后单步检查反馈里的 buffer、header 与 event。图中的输入和故障注入是教学示例。</p>
+<iframe class="transformer-interactive" data-widget="p800-eagle3-cycle" height="560" loading="lazy" src="/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=6b8b0c5eff22" style="display:block;width:100%;height:560px;border:0" title="KDA prefill, Q4 metadata, and EAGLE3 feedback explorer" width="100%"></iframe>
+<p><a href="/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=6b8b0c5eff22">单独打开 D3 验证演示</a></p>
 <ol>
 <li><strong>Prefill 与辅助特征。</strong> 目标模型的三个 PP 阶段依次消费 prompt，捕获配置指定的辅助点 2、46、90。前两级将已得到的特征与正常中间结果一起向下游发送。末级汇集三份特征，拼接后由草稿模型的 FC 融合，并根据目标采样得到的首个输出 <code>t0</code> 生成三个候选 <code>a,b,c</code>。</li>
 <li><strong>本轮验证。</strong> 下一次目标前向的输入是 <code>[t0,a,b,c]</code>。D3 指三个草稿候选，Q4 指目标需要处理的四个 query 位置。目标前向仍穿过全部三个阶段。每个阶段持有自己负责层的权重、MLA cache 和 KDA 状态。</li>
 <li><strong>拒绝与提交。</strong> 假设验证接受 <code>a,b</code>、拒绝 <code>c</code>，并由目标模型输出替代 token <code>z</code>。本轮对外输出 <code>[a,b,z]</code>。保留的 KDA 状态对应已消费 <code>[t0,a,b]</code>，<code>z</code> 在下一轮进入目标前向。MLA 的逻辑有效长度也要排除拒绝后缀。</li>
-<li><strong>末级生成下一轮草稿。</strong> 完整 draft 放在末级节点的 TP8 组，draft 构造按 PP1 处理。末级根据本轮有效结果和对应目标特征生成新候选 <code>[e1,e2,e3]</code>。反馈包含本轮输出、下一轮候选、最后有效输出、有效数量与源位置。D3 的反馈行为 10 个 INT64 元素，结构为 4 个输出槽、3 个候选槽、最后有效输出、数量和源位置。示例中的有效输出数为 3，已接受草稿数为 2。</li>
+<li><strong>末级生成下一轮草稿。</strong> 完整 draft 放在末级节点的 TP8 组，draft 构造按 PP1 处理。末级根据本轮有效结果和对应目标特征生成新候选 <code>[e1,e2,e3]</code>。反馈包含本轮输出、下一轮候选、最后有效输出、有效数量与源位置。D3 的反馈行包含 10 个 INT64 元素，结构为 4 个输出槽、3 个候选槽、最后有效输出、数量和源位置。示例中的有效输出数为 3，已接受草稿数为 2。</li>
 <li><strong>反馈与状态交接。</strong> 各 PP 组通过后台 CPU/Gloo 路径接收反馈。在本地按请求身份、generation 和生产轮次找回对应行，再按接受边界发布各层状态。前向中间张量走阶段间发送，控制反馈通过 D2H、CPU 广播和 H2D 返回。每个阶段先提交向下游的前向发送，末级才有数据产生反馈。Future 返回设备 event 后，对应消费者还要等待该 event。</li>
 <li><strong>调度和本轮输入准备。</strong> CPU Scheduler 选择本轮请求、token 预算和缓存资源。它可以先预留三个投机位置，GPU worker 在消费该请求前用真实反馈替换占位语义，构造 <code>[z,e1,e2,e3]</code>。反馈提供真实 token、计数和源位置，页表则来自本地缓存分配。随后 runner 组装本轮 query 边界、位置、长度和槽位。</li>
 <li><strong>Graph 重放。</strong> 候选接受数可以变化。请求继续完整 D3 时，下一轮验证仍有四个位置，改变的是 token、位置、有效长度和状态索引。Graph 可以读写预先分配的固定地址，每轮更新 buffer 内容。实际批次大小变化时，按 token 几何选择可用形状桶，适用时补齐容量并保护无效行。Draft 的 padded 准备保留拒绝后缀占用的行，用有效计数和采样索引选择正确位置，再修正历史长度。Graph 覆盖范围取决于模式、shape 与后端资格。<a href="https://docs.pytorch.org/docs/main/notes/cuda.html#cuda-graphs">CUDA Graph 的重放约束</a></li>
@@ -6508,6 +6508,26 @@ GPU 1：[[ 8, 4], [20,10]]
 <p><strong>反馈是上一轮的记录。</strong> 它说明验证产生了什么、下一轮草稿是什么、该从哪里继续。<strong>Metadata 是本轮算子的输入说明。</strong> 例如请求 A、B、C 分别有 4、3、1 行 query 时，打包边界为 <code>query_start_loc = [0,4,7,8]</code>。<code>seq_lens</code> 确定上下文可见范围，<code>block_table</code> 将逻辑页映射到物理页，<code>slot_mapping</code> 描述当前写槽。<strong>Builder 是组织这些数据的代码。</strong> MLA builder 把通用 batch 信息转换成当前 MLA 后端能读的 metadata，KDA 的 builder 还要准备状态索引等字段。</p>
 <p>异步投机时，CPU 可能先假设上一轮草稿全接受。比如 CPU 估计已计算 104 个位置，设备根据接受结果确认实际为 103；再安排 4 个 query 后，CPU 上界为 108，设备长度为 107。CPU 上界供 host 准备，实际因果读取仍需要校正后的长度。早期 unpadded 转换裁掉 padding 时漏传了 <code>seq_lens_cpu_upper_bound</code>，修复是随其余请求字段一起切片。</p>
 <p>第三类信息是<strong>线程执行上下文</strong>。这里的 <code>inference_mode</code> 是 PyTorch 对当前线程生效的运行设置。RPC 是进程间发起 worker 调用的机制，transport 负责反馈传输，<code>ThreadPoolExecutor</code> 把部分任务交给后台线程。主线程的模式不会随函数和参数一起传给后台线程。项目中启动与 Graph 预检通过，第一条真实 API 进入后台拷贝和回调才报错。后来在统一提交入口显式进入推理模式。设备、stream、event 和 buffer 生命周期各有自己的约束。<a href="https://docs.pytorch.org/docs/stable/generated/torch.autograd.grad_mode.inference_mode.html">PyTorch inference_mode</a></p>
+<h3 id="q4-metadata-builder">Q4 到底改了哪个字段？</h3>
+<p>假设请求 A 本轮处理四个 query，B 处理一个。打包偏移是 <code>query_start_loc=[0,4,5]</code>。A 取第 0 到 3 行，B 取第 4 行。若 A 此前已计算 100 个位置，它的四行分别能看到 101、102、103、104 个位置。历史的 100 个位置通过长度和 KV 页表描述，本轮的 4 个位置才进入打包偏移。Prefill 时，尚未计算但本轮已调度的 prompt token 也计入偏移。CPU 长度上界用于 host 规划，设备上的精确长度用于决定每行实际访问的历史范围。</p>
+<p>Runner 按验证几何生成 <code>max_query_len=4</code>。原先子类的 <code>build_for_cudagraph_capture()</code> 调父类，父类先检查 <code>max_query_len &lt;= reorder_batch_threshold</code>，再调用已有的通用 <code>build()</code>。当阈值为 1、传入 4 时，权重已经加载，服务却在 capture 阶段因断言停住，尚未执行正式请求。</p>
+<p>补丁给子类 capture 入口加了一条分支。指定候选启用 Breakable Graph 且 query 超过阈值时，直接调用原有的 <code>self.build(0, metadata)</code>，让这段 attention 使用 prefill metadata 并在 eager 段运行。参数 0 表示公共前缀长度。这个分支读取真实的 Q4 长度作判断。后续短 query 候选把四行分别展开为因果 Q1，沿用原请求页表并更新每行的可见长度，那时后端 metadata 中的 1 才表示展开后的布局。去 padding 时补传 <code>seq_lens_cpu_upper_bound</code> 是另一处字段修复。</p>
+<h3 id="pp-feedback-thread-boundary">反馈经过哪个线程才出错？</h3>
+<p>以接受 <code>a,b</code>、拒绝 <code>c</code> 的同一轮为例。末级在设备上把反馈写到 <code>packed</code>。它有四个输出槽、三个新草稿槽，另有最后有效输出、有效计数和源位置。末级把数据异步拷到 pinned CPU buffer 并记录 <code>ready</code>，前级也分配同形状的 CPU 接收区和设备目标。</p>
+<ol>
+<li>两侧 RPC 线程把交换任务提交给各自的后台线程。发送方等 <code>ready</code>，让 CPU 中转区可以读取。</li>
+<li>Gloo 先广播五个整数 <code>[2, sequence, num_rows, k, identity]</code>。Header 核对的是格式、轮次、行数、深度和身份。比如前级等第 17 轮，收到第 16 轮就报错。正文随后才广播到 CPU buffer。</li>
+<li>前级在指定设备和反馈 stream 上提交 <code>packed.copy_(cpu, non_blocking=True)</code> 并记录完成 event。Future 可以先返回 event。消费 stream 等 event 后才能读取反馈，buffer 的引用也要保留到相关操作完成。</li>
+</ol>
+<p>最早的 <code>_submit()</code> 直接把原函数交给线程池。RPC 线程创建的 inference tensor 可以跨线程传递，PyTorch 的 <code>inference_mode</code> 开关留在原执行线程。后台任务在模式关闭时原地修改 inference tensor，会触发异常并中断请求。<code>no_grad()</code> 关的是梯度记录。实验记录只把首条 API 的失败定位到后台反馈路径，具体第一个抛错算子仍未知。接收侧的 <code>copy_</code> 是源码可见的一个原地写入点。 <a href="https://github.com/pytorch/pytorch/blob/main/c10/core/TensorImpl.h#L2962">PyTorch 原地更新检查</a></p>
+<pre><code class="language-python"># _submit：在线程池实际执行的函数内部进入推理模式
+def run():
+    with self.torch.inference_mode():
+        return fn(*args)
+
+future = self.pool.submit(run)
+</code></pre>
+<p>交换和经同一入口提交的回调都获得了正确的 PyTorch 模式。操作系统的运行、就绪和阻塞描述线程是否能获得 CPU。推理模式描述这个线程执行 PyTorch 运算时使用的开关。设备和 stream 的选择，以及 Future 返回后还要等哪个 event，分别由反馈代码管理。</p>
 <h3 id="从现象开始定位-而不是从补丁开始">从现象开始定位，而不是从补丁开始</h3>
 <table>
 <thead>
@@ -6554,6 +6574,43 @@ GPU 1：[[ 8, 4], [20,10]]
 </tr>
 </tbody></table>
 <p>卷积的前缀现象可以用宽度 4 的小例子理解。已有历史 <code>[a,b,c]</code>，新输入 <code>[d,e,f,g]</code>。前四个窗口依次为 <code>[a,b,c,d]</code>、<code>[b,c,d,e]</code>、<code>[c,d,e,f]</code>、<code>[d,e,f,g]</code>。前三个窗口依赖旧缓存，第四个开始全是新输入。最终卷积缓存正确也无法补回已经进入递推的错误输出。后来的精确路径分开线性卷积和 SiLU，使用 FP32 scratch，按实际请求长度发布普通历史并保留投机列。分块 prefill 要将同一请求前一块的最终状态交给下一块。</p>
+<p>旧历史指上一段最后的三个输入值，旧缓存是这个请求的 <code>conv_state</code> 槽里存这些值的位置。把它们写成 <code>[1,2,3]</code>，新输入写成 <code>[4,5,6,7,8]</code>，将卷积简化成窗口求和：</p>
+<table>
+<thead>
+<tr>
+<th>当前输入</th>
+<th align="right">正常输出</th>
+<th align="right">模拟旧历史被当作 0 时的输出</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4</td>
+<td align="right">10</td>
+<td align="right">4</td>
+</tr>
+<tr>
+<td>5</td>
+<td align="right">14</td>
+<td align="right">9</td>
+</tr>
+<tr>
+<td>6</td>
+<td align="right">18</td>
+<td align="right">15</td>
+</tr>
+<tr>
+<td>7</td>
+<td align="right">22</td>
+<td align="right">22</td>
+</tr>
+<tr>
+<td>8</td>
+<td align="right">26</td>
+<td align="right">26</td>
+</tr>
+</tbody></table>
+<p>两边最后的卷积缓存都是 <code>[6,7,8]</code>。最终缓存存的是最近三个输入，因此会覆盖旧历史。置零是图中的演示假设。项目定位到的是 native 批量卷积接续旧缓存时前三个输出错误，现有证据没有区分内核读错了历史地址、用了错误的值，还是计算时漏掉了历史贡献。修补是在批量卷积覆盖缓存前保存输入和历史，再用私有 Q1 状态重算前三步，替换对应输出。</p>
+<p>索引布局故障也有独立的对照。假设块表三行第一列是 <code>[7,21,35]</code>，每行四列。打印值正常，但它们实际位于底层位置 0、4、8，native 接口拒绝这样的跨步向量。<code>.contiguous()</code> 只把槽号复制成紧挨着的布局。索引连续化后，带缓存长 prefill 的前三步仍可复现错误，因此两项分别修、分别验。</p>
 <p>验证时先固定输入和初始状态，比较普通 Q1、Q4、串行、并发和重复执行。找到首个分歧位置，再对投影、卷积、激活、递推输出、最终状态、全状态池和 NULL 页逐层检查。参考实现也可能有问题，早期出现过参考 g 维度不对和索引 stride 不满足 native ABI，修复参考后才重新比较。固定题通过、组件逐字节通过和整模逐 token 通过各有自己的覆盖范围。</p>
 <h3 id="如何把瓶颈分析变成一组能回答问题的实验">如何把瓶颈分析变成一组能回答问题的实验</h3>
 <ol>
@@ -6611,6 +6668,22 @@ GPU 1：[[ 8, 4], [20,10]]
 <tr>
 <td>KDA prefill/decode 有什么现象，能否先举例？</td>
 <td>cached prefill 前三次卷积仍依赖旧历史，缺陷在这些位置出现。投机 decode 则按接受前缀恢复状态。用卷积窗口与拒绝 c 的两轮例子分别说明。</td>
+</tr>
+<tr>
+<td>Q4 需要改哪个字段？capture 入口和 build 是什么关系？</td>
+<td>Runner 算出 max_query_len=4，补丁读它分流到已有 build。后续把 Q4 展开为 Q1 时，才按新的后端布局填 1。</td>
+</tr>
+<tr>
+<td>query_start_loc 包含历史吗？</td>
+<td>写出 [0,4,5]，解释它只给本轮行编号。再单独说 A 的 seq_len=104 与历史长度 100。</td>
+</tr>
+<tr>
+<td>原地更新检查只是额外开销吗？buffer 和 header 又是什么？</td>
+<td>检查失败会中断请求。CPU buffer 存反馈正文，header 核对批次，event 管设备依赖。模式在后台任务内部开启。</td>
+</tr>
+<tr>
+<td>为什么最终缓存正常，前三个输出仍然会错？内核究竟哪里错了？</td>
+<td>画出依赖 3、2、1 个历史值的三个窗口，再说明最终缓存保存新输入。能定位到批量卷积接续路径，具体内核缺陷仍未知。</td>
 </tr>
 </tbody></table>
 <p>还有三道复述练习适合检验有没有把证据讲过头。<strong>44/44 固定题说明了什么？</strong> 只说明该小集通过。<strong>为什么没有将 native MLA 的核心倍率写进最终成绩？</strong> 最终版本归属不同，且严格对照与完整入口成本仍有门槛。<strong>为什么不用三台平均卡利用率直接决定迁层？</strong> 活动率混合了计算、传输和等待，先按 rank 时间线确定最慢阶段与等待来源，才有条件评估层划分。</p>

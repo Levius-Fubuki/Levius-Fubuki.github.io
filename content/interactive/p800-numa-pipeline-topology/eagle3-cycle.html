@@ -8,6 +8,7 @@
 :root{color-scheme:light dark;--ink:#25322f;--bg:#f7faf7;--line:#b8c9c0;--muted:#4e6058;--accent:#176651;--fill:#e6f3e9}
 @media(prefers-color-scheme:dark){:root{--ink:#e7f0ea;--bg:#17231f;--line:#52685d;--muted:#bbcbc3;--accent:#9adbbf;--fill:#233d32}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}
+[hidden]{display:none!important}
 main{padding:clamp(12px,3vw,24px);max-width:980px;margin:auto}h1{font-size:1.18rem;margin:0}p{margin:.55em 0}small,.muted{color:var(--muted)}
 fieldset{border:1px solid var(--line);border-radius:8px;margin:.8em 0;padding:8px 10px;min-inline-size:0}
 label{display:inline-flex;align-items:center;gap:4px;margin-right:12px}button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
@@ -16,14 +17,19 @@ nav{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.pipeline{display:grid;gri
 .stage{border:1px solid var(--line);border-radius:7px;padding:8px;min-width:0}.stage strong,.stage small{display:block}.stage.active{background:var(--fill);border-color:var(--accent)}.arrow{align-self:center;color:var(--accent)}
 .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:12px 0}.metric{border-left:2px solid var(--line);padding:3px 8px;min-width:0}
 .metric strong,.metric output{display:block;overflow-wrap:anywhere}.metric output{font-family:ui-monospace,monospace}.detail{min-height:5em}
+.inspect{border-top:1px solid var(--line);padding-top:10px;margin-top:12px}.inspect h2{font-size:1rem;margin:0}
+.inspect ol{padding-inline-start:1.35em;margin:.6em 0}.inspect li+li{margin-top:.45em}
+.table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left}
+th,td{padding:5px 6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+tr[data-mismatch="true"] td:last-child{font-weight:700;color:var(--accent);background:var(--fill)}
 @media(max-width:420px){main{padding:10px}.pipeline{gap:4px}.stage{padding:4px}.stage small{font-size:11px}.metrics{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <main>
-  <h1>EAGLE3 的两轮验证</h1>
-  <p class="muted">教学算例。目标输入为 [t0, a, b, c]，draft 深度固定为 3。</p>
-  <fieldset><legend>本轮接受的草稿数</legend>
+  <h1>一个请求的 Prefill、Q4 与 PP 反馈</h1>
+  <p class="muted">教学算例。切换步骤查看这个请求的卷积历史、query 布局和反馈。目标输入为 [t0, a, b, c]，draft 深度固定为 3。</p>
+  <fieldset id="acceptance"><legend>本轮接受的草稿数</legend>
     <label><input type="radio" name="accepted" value="0">0</label>
     <label><input type="radio" name="accepted" value="1">1</label>
     <label><input type="radio" name="accepted" value="2" checked>2</label>
@@ -43,12 +49,45 @@ nav{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.pipeline{display:grid;gri
     <div class="stage" id="stage2"><strong>PP2 · TP8</strong><small>目标 63–93 层与 draft</small></div>
   </div>
   <p class="detail" id="detail" aria-live="polite"></p>
-  <div class="metrics" aria-live="polite">
+  <div class="metrics" id="validation-results" aria-live="polite">
     <div class="metric"><strong>本轮有效输出</strong><output id="committed"></output></div>
     <div class="metric"><strong>本地 KDA 提交状态</strong><output id="state"></output></div>
     <div class="metric"><strong>反馈的输出槽与有效数</strong><output id="packed"></output></div>
     <div class="metric"><strong>下一轮 target 输入</strong><output id="next"></output></div>
   </div>
+  <section class="inspect" data-panel="prefill" hidden aria-labelledby="prefill-title">
+    <h2 id="prefill-title">接上旧卷积历史</h2>
+    <p>旧缓存 [1, 2, 3]，新输入 [4, 5, 6, 7, 8]。卷积简化为最近四个值相加。</p>
+    <fieldset><legend>卷积边界</legend>
+      <label><input type="radio" name="history" value="normal" checked>正常接续</label>
+      <label><input type="radio" name="history" value="fault">模拟历史被当成 0</label>
+    </fieldset>
+    <div class="table-scroll"><table>
+      <thead><tr><th scope="col">新输入</th><th scope="col">本步窗口</th><th scope="col">输出</th></tr></thead>
+      <tbody id="conv-rows"></tbody>
+    </table></div>
+    <p aria-live="polite" id="conv-result"></p>
+    <small>置零仅用于演示。项目记录定位到批量卷积接续路径的前三步异常。</small>
+  </section>
+  <section class="inspect" data-panel="verify" aria-labelledby="metadata-title">
+    <h2 id="metadata-title">本轮的 Q4 Metadata</h2>
+    <p>A 有四行 query，B 有一行。<code>query_start_loc = [0, 4, 5]</code> 切出 A 的第 0–3 行和 B 的第 4 行。</p>
+    <p>A 已处理 100 个历史位置。四行各自可见 101、102、103、104 个位置，共用 A 的页表。批内 <code>max_query_len = 4</code>。</p>
+  </section>
+  <section class="inspect" data-panel="feedback" hidden aria-labelledby="feedback-title">
+    <h2 id="feedback-title">单步查看 PP 反馈</h2>
+    <nav id="feedback-steps" aria-label="反馈子步骤">
+      <button type="button" data-feedback="0" aria-pressed="true">设备到 CPU</button>
+      <button type="button" data-feedback="1" aria-pressed="false">后台广播</button>
+      <button type="button" data-feedback="2" aria-pressed="false">写回设备</button>
+      <button type="button" data-feedback="3" aria-pressed="false">消费反馈</button>
+    </nav>
+    <p id="feedback-detail" aria-live="polite"></p>
+  </section>
+  <section class="inspect" data-panel="next" hidden aria-labelledby="next-title">
+    <h2 id="next-title">按接受边界续接</h2>
+    <p id="next-detail" aria-live="polite"></p>
+  </section>
   <noscript><p>示例接受 a、b，输出 [a,b,z]。各阶段提交消费 [t0,a,b] 后的状态，下一轮验证 [z,e1,e2,e3]。</p></noscript>
 </main>
 <script>
@@ -60,6 +99,33 @@ const descriptions = {
   next: 'worker 用最后有效输出与新候选构造 Q4，按反馈校正位置和长度，再用本地页表构建 metadata。固定形状可用新数值重放 Graph。'
 };
 let step = 'verify';
+let feedbackStep = 0;
+const feedbackDescriptions = [
+  '末级把 packed 异步拷到 pinned CPU buffer，并记录 ready。后台线程等 ready 后才读取 CPU buffer。',
+  '线程池任务内部进入 inference_mode。Gloo 先广播 header [2, 17, 1, 3, identity] 核对格式、轮次、行数、草稿深度和身份，再广播 buffer 正文。',
+  '接收侧在反馈 stream 原地写回设备 packed，记录完成 event。CPU 和设备 buffer 保留到拷贝完成。',
+  'Future 返回 event，消费 stream 等待 event 后读设备 packed，再按接受边界选择状态并准备下一轮。'
+];
+function renderConvolution() {
+  const injectFault = document.querySelector('input[name="history"]:checked').value === 'fault';
+  const inputs = [4, 5, 6, 7, 8];
+  const series = [...(injectFault ? [0, 0, 0] : [1, 2, 3]), ...inputs];
+  const rows = inputs.map((value, index) => {
+    const windowValues = series.slice(index, index + 4);
+    const sum = windowValues.reduce((total, entry) => total + entry, 0);
+    const row = document.createElement('tr');
+    row.dataset.mismatch = String(injectFault && index < 3);
+    for (const entry of [value, tokenList(windowValues), sum]) {
+      const cell = row.insertCell();
+      cell.textContent = entry;
+    }
+    return row;
+  });
+  document.querySelector('#conv-rows').replaceChildren(...rows);
+  document.querySelector('#conv-result').textContent = injectFault
+    ? '前三个输出改变，后两步和最终卷积缓存 [6, 7, 8] 与正常路径相同。'
+    : '输出为 [10, 14, 18, 22, 26]，最终卷积缓存保存最近三个输入 [6, 7, 8]。';
+}
 function render() {
   const accepted = Number(document.querySelector('input[name="accepted"]:checked').value);
   const prefix = ['a', 'b', 'c'].slice(0, accepted);
@@ -70,11 +136,20 @@ function render() {
   document.querySelector('#packed').textContent = tokenList([...committed, ...Array(4 - committed.length).fill(-1)]) + ' / ' + committed.length;
   document.querySelector('#next').textContent = tokenList([last, 'e1', 'e2', 'e3']);
   document.querySelector('#detail').textContent = descriptions[step];
+  document.querySelector('#acceptance').hidden = step === 'prefill';
+  document.querySelector('#validation-results').hidden = step === 'prefill';
+  document.querySelector('#feedback-detail').textContent = feedbackDescriptions[feedbackStep];
+  document.querySelector('#next-detail').textContent = '从 S' + (accepted + 1) + ' 继续消费 ' + last + '。此时 ' + last + ' 已作为输出返回，下一轮才会进入递推状态。';
   document.querySelectorAll('[data-step]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.step === step)));
+  document.querySelectorAll('[data-panel]').forEach(panel => { panel.hidden = panel.dataset.panel !== step; });
+  document.querySelectorAll('[data-feedback]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.feedback) === feedbackStep)));
   document.querySelectorAll('.stage').forEach(stage => stage.classList.toggle('active', step !== 'feedback' || stage.id === 'stage2'));
 }
 document.querySelectorAll('[data-step]').forEach(button => button.addEventListener('click', () => { step = button.dataset.step; render(); }));
+document.querySelectorAll('[data-feedback]').forEach(button => button.addEventListener('click', () => { feedbackStep = Number(button.dataset.feedback); render(); }));
 document.querySelectorAll('input[name="accepted"]').forEach(input => input.addEventListener('change', render));
+document.querySelectorAll('input[name="history"]').forEach(input => input.addEventListener('change', renderConvolution));
+renderConvolution();
 render();
 if (parent !== window) {
   const main = document.querySelector('main');

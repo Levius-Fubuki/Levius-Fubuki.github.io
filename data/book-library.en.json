@@ -644,7 +644,7 @@
       "english": "THREE NODES, SHARED WORK",
       "path": "/2026/10/14/p800-numa-pipeline-topology/",
       "date": "2026-10-14",
-      "updated": "2026-11-04T10:24:54+08:00",
+      "updated": "2026-11-04T10:33:44+08:00",
       "summary": "A three-node P800 topology and Kimi-K3 inference notebook, with a worked EAGLE3 D3 cycle connecting W4A16, TP8/PP3, Q4 verification, feedback, KDA state commit, and the evidence behind tuning decisions.",
       "art": "/img/books/p800-numa-pipeline-topology.png",
       "source": "content/posts/p800-numa-pipeline-topology.md",

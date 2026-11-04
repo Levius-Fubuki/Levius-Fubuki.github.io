@@ -267,7 +267,7 @@ DSpark 要另设同版本 baseline/spec 对照。接受率统计需要排除 bon
 
 随后暴露的是多 token 路径的状态问题。一次验证多个候选 token 时，attention 的真实上下文长度、有效 token 行与 KDA 的递归状态和卷积历史必须互相对应。CPU 上的容量上界只能用于分配和调度，不能直接冒充每行在 GPU 上的精确有效长度。固定输入的 Q4 或 Graph replay 恰好通过，也不能代替纯 prefill、混合批次和长前缀的检查。
 
-原生卷积对照进一步区分了两种问题：非连续的状态索引向量会错误寻址；带已有状态的长 prefill，则只在最前面三个输出位置出现差异，后面的输出和最终历史可以正常。候选先把索引规范为连续格式，再在受限定的候选路径中，用独立保存的输入与历史、沿 Q1 更新原语重算受影响的前缀输出。最终缓存仍由原路径完成更新。把历史打包成三个紧凑位置的替代尝试没有解决长前缀问题，因此未进入保留方案。
+原生卷积对照进一步区分了两种问题：非连续的状态索引向量会被要求连续布局的 native 接口拒绝；带已有状态的长 prefill，则只在最前面三个输出位置出现差异，后面的输出和最终历史可以正常。候选先把索引规范为连续格式，再在受限定的候选路径中，用独立保存的输入与历史、沿 Q1 更新原语重算受影响的前缀输出。最终缓存仍由原路径完成更新。把历史打包成三个紧凑位置的替代尝试没有解决长前缀问题，因此未进入保留方案。
 
 这不是“给整个模型改成高精度”的处理，也不是绕过差异比较。r16 在加载真实目标权重之前，先覆盖全部 24 rank 的完整 KDA 顺序 Q1 对照、输出与最终状态/历史检查、Graph 波次和原生卷积参照。报告分别保留 216 次完整 KDA 检查、72 次 KDA Graph 波次、960 个 greedy verifier 案例和 168 次直接卷积对照；它们验证不同边界，不能相加成同一种独立样本数。早期失败与未执行的诊断分支也保留在记录中，没有被后来的绿灯覆盖。
 
@@ -380,16 +380,16 @@ KDA 的 96 个头在 TP8 下每卡 12 个头。单请求、单层、单分片的
 
 ### 跟着一个请求走两轮
 
-用下图切换接受 0 至 3 个候选，对照有效输出、各阶段提交的状态和下一轮 Q4 输入。
+用下图跟踪同一个请求。先在 Prefill 切换正常与模拟前缀故障，再查看 Q4 的打包边界，选择接受 0 至 3 个候选，最后单步检查反馈里的 buffer、header 与 event。图中的输入和故障注入是教学示例。
 
-<iframe src="/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=5564a8baeb81" class="transformer-interactive" data-widget="p800-eagle3-cycle" title="EAGLE3 validation, feedback, and state commit" width="100%" height="560" style="display:block;width:100%;height:560px;border:0" loading="lazy"></iframe>
+<iframe src="/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=6b8b0c5eff22" class="transformer-interactive" data-widget="p800-eagle3-cycle" title="KDA prefill, Q4 metadata, and EAGLE3 feedback explorer" width="100%" height="560" style="display:block;width:100%;height:560px;border:0" loading="lazy"></iframe>
 
-[单独打开 D3 验证演示](/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=5564a8baeb81)
+[单独打开 D3 验证演示](/content/interactive/p800-numa-pipeline-topology/eagle3-cycle.html?v=6b8b0c5eff22)
 
 1. **Prefill 与辅助特征。** 目标模型的三个 PP 阶段依次消费 prompt，捕获配置指定的辅助点 2、46、90。前两级将已得到的特征与正常中间结果一起向下游发送。末级汇集三份特征，拼接后由草稿模型的 FC 融合，并根据目标采样得到的首个输出 `t0` 生成三个候选 `a,b,c`。
 2. **本轮验证。** 下一次目标前向的输入是 `[t0,a,b,c]`。D3 指三个草稿候选，Q4 指目标需要处理的四个 query 位置。目标前向仍穿过全部三个阶段。每个阶段持有自己负责层的权重、MLA cache 和 KDA 状态。
 3. **拒绝与提交。** 假设验证接受 `a,b`、拒绝 `c`，并由目标模型输出替代 token `z`。本轮对外输出 `[a,b,z]`。保留的 KDA 状态对应已消费 `[t0,a,b]`，`z` 在下一轮进入目标前向。MLA 的逻辑有效长度也要排除拒绝后缀。
-4. **末级生成下一轮草稿。** 完整 draft 放在末级节点的 TP8 组，draft 构造按 PP1 处理。末级根据本轮有效结果和对应目标特征生成新候选 `[e1,e2,e3]`。反馈包含本轮输出、下一轮候选、最后有效输出、有效数量与源位置。D3 的反馈行为 10 个 INT64 元素，结构为 4 个输出槽、3 个候选槽、最后有效输出、数量和源位置。示例中的有效输出数为 3，已接受草稿数为 2。
+4. **末级生成下一轮草稿。** 完整 draft 放在末级节点的 TP8 组，draft 构造按 PP1 处理。末级根据本轮有效结果和对应目标特征生成新候选 `[e1,e2,e3]`。反馈包含本轮输出、下一轮候选、最后有效输出、有效数量与源位置。D3 的反馈行包含 10 个 INT64 元素，结构为 4 个输出槽、3 个候选槽、最后有效输出、数量和源位置。示例中的有效输出数为 3，已接受草稿数为 2。
 5. **反馈与状态交接。** 各 PP 组通过后台 CPU/Gloo 路径接收反馈。在本地按请求身份、generation 和生产轮次找回对应行，再按接受边界发布各层状态。前向中间张量走阶段间发送，控制反馈通过 D2H、CPU 广播和 H2D 返回。每个阶段先提交向下游的前向发送，末级才有数据产生反馈。Future 返回设备 event 后，对应消费者还要等待该 event。
 6. **调度和本轮输入准备。** CPU Scheduler 选择本轮请求、token 预算和缓存资源。它可以先预留三个投机位置，GPU worker 在消费该请求前用真实反馈替换占位语义，构造 `[z,e1,e2,e3]`。反馈提供真实 token、计数和源位置，页表则来自本地缓存分配。随后 runner 组装本轮 query 边界、位置、长度和槽位。
 7. **Graph 重放。** 候选接受数可以变化。请求继续完整 D3 时，下一轮验证仍有四个位置，改变的是 token、位置、有效长度和状态索引。Graph 可以读写预先分配的固定地址，每轮更新 buffer 内容。实际批次大小变化时，按 token 几何选择可用形状桶，适用时补齐容量并保护无效行。Draft 的 padded 准备保留拒绝后缀占用的行，用有效计数和采样索引选择正确位置，再修正历史长度。Graph 覆盖范围取决于模式、shape 与后端资格。[CUDA Graph 的重放约束](https://docs.pytorch.org/docs/main/notes/cuda.html#cuda-graphs)
@@ -404,6 +404,35 @@ KDA 的 96 个头在 TP8 下每卡 12 个头。单请求、单层、单分片的
 
 第三类信息是**线程执行上下文**。这里的 `inference_mode` 是 PyTorch 对当前线程生效的运行设置。RPC 是进程间发起 worker 调用的机制，transport 负责反馈传输，`ThreadPoolExecutor` 把部分任务交给后台线程。主线程的模式不会随函数和参数一起传给后台线程。项目中启动与 Graph 预检通过，第一条真实 API 进入后台拷贝和回调才报错。后来在统一提交入口显式进入推理模式。设备、stream、event 和 buffer 生命周期各有自己的约束。[PyTorch inference_mode](https://docs.pytorch.org/docs/stable/generated/torch.autograd.grad_mode.inference_mode.html)
 
+<h3 id="q4-metadata-builder">Q4 到底改了哪个字段？</h3>
+
+假设请求 A 本轮处理四个 query，B 处理一个。打包偏移是 `query_start_loc=[0,4,5]`。A 取第 0 到 3 行，B 取第 4 行。若 A 此前已计算 100 个位置，它的四行分别能看到 101、102、103、104 个位置。历史的 100 个位置通过长度和 KV 页表描述，本轮的 4 个位置才进入打包偏移。Prefill 时，尚未计算但本轮已调度的 prompt token 也计入偏移。CPU 长度上界用于 host 规划，设备上的精确长度用于决定每行实际访问的历史范围。
+
+Runner 按验证几何生成 `max_query_len=4`。原先子类的 `build_for_cudagraph_capture()` 调父类，父类先检查 `max_query_len <= reorder_batch_threshold`，再调用已有的通用 `build()`。当阈值为 1、传入 4 时，权重已经加载，服务却在 capture 阶段因断言停住，尚未执行正式请求。
+
+补丁给子类 capture 入口加了一条分支。指定候选启用 Breakable Graph 且 query 超过阈值时，直接调用原有的 `self.build(0, metadata)`，让这段 attention 使用 prefill metadata 并在 eager 段运行。参数 0 表示公共前缀长度。这个分支读取真实的 Q4 长度作判断。后续短 query 候选把四行分别展开为因果 Q1，沿用原请求页表并更新每行的可见长度，那时后端 metadata 中的 1 才表示展开后的布局。去 padding 时补传 `seq_lens_cpu_upper_bound` 是另一处字段修复。
+
+<h3 id="pp-feedback-thread-boundary">反馈经过哪个线程才出错？</h3>
+
+以接受 `a,b`、拒绝 `c` 的同一轮为例。末级在设备上把反馈写到 `packed`。它有四个输出槽、三个新草稿槽，另有最后有效输出、有效计数和源位置。末级把数据异步拷到 pinned CPU buffer 并记录 `ready`，前级也分配同形状的 CPU 接收区和设备目标。
+
+1. 两侧 RPC 线程把交换任务提交给各自的后台线程。发送方等 `ready`，让 CPU 中转区可以读取。
+2. Gloo 先广播五个整数 `[2, sequence, num_rows, k, identity]`。Header 核对的是格式、轮次、行数、深度和身份。比如前级等第 17 轮，收到第 16 轮就报错。正文随后才广播到 CPU buffer。
+3. 前级在指定设备和反馈 stream 上提交 `packed.copy_(cpu, non_blocking=True)` 并记录完成 event。Future 可以先返回 event。消费 stream 等 event 后才能读取反馈，buffer 的引用也要保留到相关操作完成。
+
+最早的 `_submit()` 直接把原函数交给线程池。RPC 线程创建的 inference tensor 可以跨线程传递，PyTorch 的 `inference_mode` 开关留在原执行线程。后台任务在模式关闭时原地修改 inference tensor，会触发异常并中断请求。`no_grad()` 关的是梯度记录。实验记录只把首条 API 的失败定位到后台反馈路径，具体第一个抛错算子仍未知。接收侧的 `copy_` 是源码可见的一个原地写入点。 [PyTorch 原地更新检查](https://github.com/pytorch/pytorch/blob/main/c10/core/TensorImpl.h#L2962)
+
+```python
+# _submit：在线程池实际执行的函数内部进入推理模式
+def run():
+    with self.torch.inference_mode():
+        return fn(*args)
+
+future = self.pool.submit(run)
+```
+
+交换和经同一入口提交的回调都获得了正确的 PyTorch 模式。操作系统的运行、就绪和阻塞描述线程是否能获得 CPU。推理模式描述这个线程执行 PyTorch 运算时使用的开关。设备和 stream 的选择，以及 Future 返回后还要等哪个 event，分别由反馈代码管理。
+
 ### 从现象开始定位，而不是从补丁开始
 
 | 出现阶段 | 现象与区分实验 | 修改 |
@@ -417,6 +446,20 @@ KDA 的 96 个头在 TP8 下每卡 12 个头。单请求、单层、单分片的
 | 投机 decode | 拒绝后缀有可能被带入下一轮递推 | 验证每个接受边界，按反馈发布本地状态，在消费或复用前等对应 event |
 
 卷积的前缀现象可以用宽度 4 的小例子理解。已有历史 `[a,b,c]`，新输入 `[d,e,f,g]`。前四个窗口依次为 `[a,b,c,d]`、`[b,c,d,e]`、`[c,d,e,f]`、`[d,e,f,g]`。前三个窗口依赖旧缓存，第四个开始全是新输入。最终卷积缓存正确也无法补回已经进入递推的错误输出。后来的精确路径分开线性卷积和 SiLU，使用 FP32 scratch，按实际请求长度发布普通历史并保留投机列。分块 prefill 要将同一请求前一块的最终状态交给下一块。
+
+旧历史指上一段最后的三个输入值，旧缓存是这个请求的 `conv_state` 槽里存这些值的位置。把它们写成 `[1,2,3]`，新输入写成 `[4,5,6,7,8]`，将卷积简化成窗口求和：
+
+| 当前输入 | 正常输出 | 模拟旧历史被当作 0 时的输出 |
+| --- | ---: | ---: |
+| 4 | 10 | 4 |
+| 5 | 14 | 9 |
+| 6 | 18 | 15 |
+| 7 | 22 | 22 |
+| 8 | 26 | 26 |
+
+两边最后的卷积缓存都是 `[6,7,8]`。最终缓存存的是最近三个输入，因此会覆盖旧历史。置零是图中的演示假设。项目定位到的是 native 批量卷积接续旧缓存时前三个输出错误，现有证据没有区分内核读错了历史地址、用了错误的值，还是计算时漏掉了历史贡献。修补是在批量卷积覆盖缓存前保存输入和历史，再用私有 Q1 状态重算前三步，替换对应输出。
+
+索引布局故障也有独立的对照。假设块表三行第一列是 `[7,21,35]`，每行四列。打印值正常，但它们实际位于底层位置 0、4、8，native 接口拒绝这样的跨步向量。`.contiguous()` 只把槽号复制成紧挨着的布局。索引连续化后，带缓存长 prefill 的前三步仍可复现错误，因此两项分别修、分别验。
 
 验证时先固定输入和初始状态，比较普通 Q1、Q4、串行、并发和重复执行。找到首个分歧位置，再对投影、卷积、激活、递推输出、最终状态、全状态池和 NULL 页逐层检查。参考实现也可能有问题，早期出现过参考 g 维度不对和索引 stride 不满足 native ABI，修复参考后才重新比较。固定题通过、组件逐字节通过和整模逐 token 通过各有自己的覆盖范围。
 
@@ -448,6 +491,10 @@ KDA 的 96 个头在 TP8 下每卡 12 个头。单请求、单层、单分片的
 | 反馈和 metadata 有什么关系？ | 反馈提供上一轮结果、有效数量和位置，worker 再结合本轮调度与缓存管理构造算子所需的数据。 |
 | inference_mode 的上下文、RPC、transport、线程池是什么意思？ | RPC 发起 worker 调用，transport 交接反馈，线程池运行后台任务。推理模式属于执行任务的那个线程。 |
 | KDA prefill/decode 有什么现象，能否先举例？ | cached prefill 前三次卷积仍依赖旧历史，缺陷在这些位置出现。投机 decode 则按接受前缀恢复状态。用卷积窗口与拒绝 c 的两轮例子分别说明。 |
+| Q4 需要改哪个字段？capture 入口和 build 是什么关系？ | Runner 算出 max_query_len=4，补丁读它分流到已有 build。后续把 Q4 展开为 Q1 时，才按新的后端布局填 1。 |
+| query_start_loc 包含历史吗？ | 写出 [0,4,5]，解释它只给本轮行编号。再单独说 A 的 seq_len=104 与历史长度 100。 |
+| 原地更新检查只是额外开销吗？buffer 和 header 又是什么？ | 检查失败会中断请求。CPU buffer 存反馈正文，header 核对批次，event 管设备依赖。模式在后台任务内部开启。 |
+| 为什么最终缓存正常，前三个输出仍然会错？内核究竟哪里错了？ | 画出依赖 3、2、1 个历史值的三个窗口，再说明最终缓存保存新输入。能定位到批量卷积接续路径，具体内核缺陷仍未知。 |
 
 还有三道复述练习适合检验有没有把证据讲过头。**44/44 固定题说明了什么？** 只说明该小集通过。**为什么没有将 native MLA 的核心倍率写进最终成绩？** 最终版本归属不同，且严格对照与完整入口成本仍有门槛。**为什么不用三台平均卡利用率直接决定迁层？** 活动率混合了计算、传输和等待，先按 rank 时间线确定最慢阶段与等待来源，才有条件评估层划分。
 
