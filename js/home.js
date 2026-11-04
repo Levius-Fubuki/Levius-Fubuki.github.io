@@ -37,7 +37,7 @@
   async function loadIndex() {
     if (index) return index;
     if (!pendingIndex) {
-      pendingIndex = fetch("/js/search-index.json?v=572f1fea83ea")
+      pendingIndex = fetch("/js/search-index.json?v=338a3d8a2c3a")
         .then((response) => {
           if (!response.ok) throw new Error("Search index unavailable");
           return response.json();

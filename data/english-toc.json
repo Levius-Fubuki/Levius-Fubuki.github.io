@@ -979,5 +979,13 @@
   "我问过的问题与需要练习的表达": "My Questions and Explanations to Practice",
   "与主会话其他模型的联系": "Connections to Other Models",
   "H3 两条诊断分支需要分别阅读": "Two Separate H3 Diagnostic Paths",
-  "配置与复现资料": "Configuration and Reproduction References"
+  "配置与复现资料": "Configuration and Reproduction References",
+  "从一次 D3 验证串起整条推理链": "Tracing the Inference Pipeline Through One D3 Verification",
+  "权重、激活与持久状态": "Weights, Activations, and Persistent State",
+  "目标模型怎样利用三台机器": "How the Target Model Uses Three Nodes",
+  "跟着一个请求走两轮": "One Request Across Two Iterations",
+  "把容易混在一起的三类信息分开": "Feedback, Metadata, and Thread Context",
+  "从现象开始定位，而不是从补丁开始": "Debugging from Observed Symptoms",
+  "如何把瓶颈分析变成一组能回答问题的实验": "Experiments for Isolating Bottlenecks",
+  "提问、作答与复盘": "Questions and Answer Review"
 }

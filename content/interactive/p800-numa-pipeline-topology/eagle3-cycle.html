@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EAGLE3 三阶段验证与状态提交</title>
+<style>
+:root{color-scheme:light dark;--ink:#25322f;--bg:#f7faf7;--line:#b8c9c0;--muted:#4e6058;--accent:#176651;--fill:#e6f3e9}
+@media(prefers-color-scheme:dark){:root{--ink:#e7f0ea;--bg:#17231f;--line:#52685d;--muted:#bbcbc3;--accent:#9adbbf;--fill:#233d32}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif}
+main{padding:clamp(12px,3vw,24px);max-width:980px;margin:auto}h1{font-size:1.18rem;margin:0}p{margin:.55em 0}small,.muted{color:var(--muted)}
+fieldset{border:1px solid var(--line);border-radius:8px;margin:.8em 0;padding:8px 10px;min-inline-size:0}
+label{display:inline-flex;align-items:center;gap:4px;margin-right:12px}button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--fill);border-color:var(--accent);color:var(--accent)}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+nav{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.pipeline{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:6px}
+.stage{border:1px solid var(--line);border-radius:7px;padding:8px;min-width:0}.stage strong,.stage small{display:block}.stage.active{background:var(--fill);border-color:var(--accent)}.arrow{align-self:center;color:var(--accent)}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:12px 0}.metric{border-left:2px solid var(--line);padding:3px 8px;min-width:0}
+.metric strong,.metric output{display:block;overflow-wrap:anywhere}.metric output{font-family:ui-monospace,monospace}.detail{min-height:5em}
+@media(max-width:420px){main{padding:10px}.pipeline{gap:4px}.stage{padding:4px}.stage small{font-size:11px}.metrics{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>EAGLE3 的两轮验证</h1>
+  <p class="muted">教学算例。目标输入为 [t0, a, b, c]，draft 深度固定为 3。</p>
+  <fieldset><legend>本轮接受的草稿数</legend>
+    <label><input type="radio" name="accepted" value="0">0</label>
+    <label><input type="radio" name="accepted" value="1">1</label>
+    <label><input type="radio" name="accepted" value="2" checked>2</label>
+    <label><input type="radio" name="accepted" value="3">3</label>
+  </fieldset>
+  <nav aria-label="执行步骤">
+    <button type="button" data-step="prefill" aria-pressed="false">Prefill</button>
+    <button type="button" data-step="verify" aria-pressed="true">验证 Q4</button>
+    <button type="button" data-step="feedback" aria-pressed="false">提交与反馈</button>
+    <button type="button" data-step="next" aria-pressed="false">下一轮</button>
+  </nav>
+  <div class="pipeline" aria-label="三阶段目标模型">
+    <div class="stage" id="stage0"><strong>PP0 · TP8</strong><small>目标 1–31 层</small></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="stage" id="stage1"><strong>PP1 · TP8</strong><small>目标 32–62 层</small></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="stage" id="stage2"><strong>PP2 · TP8</strong><small>目标 63–93 层与 draft</small></div>
+  </div>
+  <p class="detail" id="detail" aria-live="polite"></p>
+  <div class="metrics" aria-live="polite">
+    <div class="metric"><strong>本轮有效输出</strong><output id="committed"></output></div>
+    <div class="metric"><strong>本地 KDA 提交状态</strong><output id="state"></output></div>
+    <div class="metric"><strong>反馈的输出槽与有效数</strong><output id="packed"></output></div>
+    <div class="metric"><strong>下一轮 target 输入</strong><output id="next"></output></div>
+  </div>
+  <noscript><p>示例接受 a、b，输出 [a,b,z]。各阶段提交消费 [t0,a,b] 后的状态，下一轮验证 [z,e1,e2,e3]。</p></noscript>
+</main>
+<script>
+const tokenList = tokens => '[' + tokens.join(', ') + ']';
+const descriptions = {
+  prefill: '三个阶段依次消费 prompt。辅助点 2、46、90 的特征沿前向到末级，产生第一个输出 t0 和候选 a、b、c。',
+  verify: '三个阶段共同验证 [t0, a, b, c]。末级采样决定接受边界，各阶段保留本地可选状态。',
+  feedback: '末级提交输出并生成新候选 e1、e2、e3。反馈从末级返回；各阶段按请求、轮次和有效数量选择自己的状态。',
+  next: 'worker 用最后有效输出与新候选构造 Q4，按反馈校正位置和长度，再用本地页表构建 metadata。固定形状可用新数值重放 Graph。'
+};
+let step = 'verify';
+function render() {
+  const accepted = Number(document.querySelector('input[name="accepted"]:checked').value);
+  const prefix = ['a', 'b', 'c'].slice(0, accepted);
+  const last = accepted === 3 ? 'bonus' : 'z';
+  const committed = [...prefix, last];
+  document.querySelector('#committed').textContent = tokenList(committed);
+  document.querySelector('#state').textContent = 'S' + (accepted + 1) + ' ← ' + tokenList(['t0', ...prefix]);
+  document.querySelector('#packed').textContent = tokenList([...committed, ...Array(4 - committed.length).fill(-1)]) + ' / ' + committed.length;
+  document.querySelector('#next').textContent = tokenList([last, 'e1', 'e2', 'e3']);
+  document.querySelector('#detail').textContent = descriptions[step];
+  document.querySelectorAll('[data-step]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.step === step)));
+  document.querySelectorAll('.stage').forEach(stage => stage.classList.toggle('active', step !== 'feedback' || stage.id === 'stage2'));
+}
+document.querySelectorAll('[data-step]').forEach(button => button.addEventListener('click', () => { step = button.dataset.step; render(); }));
+document.querySelectorAll('input[name="accepted"]').forEach(input => input.addEventListener('change', render));
+render();
+if (parent !== window) {
+  const main = document.querySelector('main');
+  let lastHeight = 0;
+  const measure = () => {
+    const height = Math.ceil(main.getBoundingClientRect().height);
+    if (height === lastHeight) return;
+    lastHeight = height;
+    parent.postMessage({type:'transformer-viz-height',widget:'p800-eagle3-cycle',height},location.origin);
+  };
+  new ResizeObserver(measure).observe(main);
+  window.addEventListener('load', measure, {once:true});
+}
+</script>
+</body>
+</html>

@@ -214,7 +214,7 @@
         "P800 Topology",
         "Pipeline Waits"
       ],
-      "summary": "A three-node, eight-card-per-node P800 topology walkthrough covering sockets, NUMA, host RAM and device memory, Kimi-K3 TP8 × PP3 placement, pipeline waits and communication measurement, with an interactive explorer and a diagnostic roadmap."
+      "summary": "A three-node P800 topology and Kimi-K3 inference notebook, with a worked EAGLE3 D3 cycle connecting W4A16, TP8/PP3, Q4 verification, feedback, KDA state commit, and the evidence behind tuning decisions."
     },
     "gpu-cuda": {
       "title": "GPU, CUDA and Operator Optimization",
